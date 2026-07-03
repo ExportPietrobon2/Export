@@ -243,6 +243,8 @@ app.patch('/api/recebimentos/:id/excluir-foto', autenticar(['admin']), async (re
   )
   res.json({ ok: true })
 })
+
+app.get('/api/usuarios', autenticar(['admin']), async (req, res) => {
   const [rows] = await pool.query('SELECT id, nome, email, papel FROM usuarios ORDER BY nome')
   res.json(rows)
 })
