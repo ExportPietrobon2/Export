@@ -140,6 +140,7 @@ function renderizarRecebimentos(recebimentos) {
   document.querySelectorAll('.btn-concluir').forEach((btn) => {
     btn.addEventListener('click', () => concluirPi(btn.dataset.id, btn.dataset.concluida === 'true'))
   })
+}
 
 toggleConcluidas.addEventListener('change', carregar)
 
