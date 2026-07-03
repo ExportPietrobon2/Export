@@ -25,8 +25,10 @@ async function concluirPi(piId, concluida) {
   carregar()
 }
 
-function renderizarAlmoxarifado(produtos, totalQuantidade) {
-  if (!produtos || produtos.length === 0) return '<p class="vazio-inline">Nenhum produto cadastrado.</p>'
+function renderizarAlmoxarifado(produtos) {
+  if (!produtos || produtos.length === 0) {
+    return '<p class="vazio-inline">Nenhum produto cadastrado.</p>'
+  }
   return produtos.map((produto) => {
     const insumos = produto.insumos_produto || []
     const status = calcularStatusProduto(insumos)
@@ -36,57 +38,31 @@ function renderizarAlmoxarifado(produtos, totalQuantidade) {
         const sobra = Number(insumo.sobra) || 0
         const necessario = Number(produto.quantidade) || 0
         const suf = sobra >= necessario
-        detalhes = `Sobra: ${sobra} cx · ${suf ? `<span class="texto-ok">Suficiente (+${sobra - necessario} cx)</span>` : `<span class="texto-erro">Faltam ${necessario - sobra} cx</span>`}`
+        detalhes = `Sobra: ${sobra} cx · ${suf ? '<span class="texto-ok">Suficiente (+' + (sobra - necessario) + ' cx)</span>' : '<span class="texto-erro">Faltam ' + (necessario - sobra) + ' cx</span>'}`
       } else if (insumo.tipo === 'etiqueta') {
         const sobra = Number(insumo.sobra) || 0
-        detalhes = sobra === 0 ? '<span class="texto-erro">Sem estoque</span>' : sobra < 100 ? `<span class="texto-alerta">⚠ Baixo (${sobra} un)</span>` : `${sobra} unidades`
+        detalhes = sobra === 0 ? '<span class="texto-erro">Sem estoque</span>' : sobra < 100 ? '<span class="texto-alerta">⚠ Baixo (' + sobra + ' un)</span>' : sobra + ' unidades'
       } else {
         const sobra = Number(insumo.sobra) || 0
         const pacotes = Number(insumo.quantidade_por_pacote) || 0
-        detalhes = `Sobra: ${sobra} kg${pacotes > 0 ? ` · ${pacotes} pacotes` : ''}`
+        detalhes = 'Sobra: ' + sobra + ' kg' + (pacotes > 0 ? ' · ' + pacotes + ' pacotes' : '')
       }
-      return `<tr><td>${rotuloInsumo[insumo.tipo]}</td><td>${insumo.confirmado ? '✅' : '❌'}</td><td>${detalhes}</td></tr>`
+      return '<tr><td>' + (rotuloInsumo[insumo.tipo] || insumo.tipo) + '</td><td>' + (insumo.confirmado ? '✅' : '❌') + '</td><td>' + detalhes + '</td></tr>'
     }).join('')
-    return `
-      <div class="bloco-produto">
-        <div class="produto-cabecalho">
-          <strong>${produto.produto}</strong>
-          <span class="qtd-produto">${formatarQuantidade(produto.quantidade)}</span>
-          <span class="badge ${status === 'LIBERADO' ? 'badge-ok' : 'badge-pendente'}">${status}</span>
-        </div>
-        ${insumos.length > 0 ? `<table class="tabela-insumos-admin"><thead><tr><th>Insumo</th><th>OK</th><th>Estoque</th></tr></thead><tbody>${linhas}</tbody></table>` : '<p class="vazio-inline">Sem dados do almoxarifado.</p>'}
-      </div>`
+    return '<div class="bloco-produto"><div class="produto-cabecalho"><strong>' + produto.produto + '</strong><span class="qtd-produto">' + formatarQuantidade(produto.quantidade) + '</span><span class="badge ' + (status === 'LIBERADO' ? 'badge-ok' : 'badge-pendente') + '">' + status + '</span></div>' + (insumos.length > 0 ? '<table class="tabela-insumos-admin"><thead><tr><th>Insumo</th><th>OK</th><th>Estoque</th></tr></thead><tbody>' + linhas + '</tbody></table>' : '<p class="vazio-inline">Sem dados do almoxarifado.</p>') + '</div>'
   }).join('')
 }
 
 function renderizarRecebimentos(recebimentos) {
   const recebidos = (recebimentos || []).filter((r) => r.status_recebimento === 'recebido')
   if (recebidos.length === 0) return '<p class="vazio-inline">Nenhum recebimento confirmado ainda.</p>'
-
-  return `
-    <div class="grid-recebimentos-detalhe">
-      ${recebidos.map((r) => `
-        <div class="card-recebimento-detalhe">
-          <div class="recebimento-detalhe-info">
-            <span class="badge badge-ok">${rotuloInsumo[r.tipo] || r.tipo}</span>
-            ${r.quantidade_recebida ? `<span class="recebimento-quantidade">${r.quantidade_recebida}</span>` : ''}
-          </div>
-          <div class="recebimento-fotos">
-            ${r.foto_url ? `
-              <div class="foto-detalhe">
-                <span class="foto-detalhe-label">Produto</span>
-                <img src="${r.foto_url}" alt="Foto produto" loading="lazy" class="foto-detalhe-img">
-              </div>` : ''}
-            ${r.foto_nota_url ? `
-              <div class="foto-detalhe">
-                <span class="foto-detalhe-label">Nota fiscal</span>
-                <img src="${r.foto_nota_url}" alt="Foto nota" loading="lazy" class="foto-detalhe-img">
-              </div>` : ''}
-            ${!r.foto_url && !r.foto_nota_url ? '<span class="vazio-inline">Sem fotos</span>' : ''}
-          </div>
-        </div>`).join('')}
-    </div>`
+  return '<div class="grid-recebimentos-detalhe">' + recebidos.map((r) => {
+    const fotos = (r.foto_url ? '<div class="foto-detalhe"><span class="foto-detalhe-label">Produto</span><img src="' + r.foto_url + '" class="foto-detalhe-img" loading="lazy"></div>' : '') + (r.foto_nota_url ? '<div class="foto-detalhe"><span class="foto-detalhe-label">Nota fiscal</span><img src="' + r.foto_nota_url + '" class="foto-detalhe-img" loading="lazy"></div>' : '') + (!r.foto_url && !r.foto_nota_url ? '<span class="vazio-inline">Sem fotos</span>' : '')
+    return '<div class="card-recebimento-detalhe"><div class="recebimento-detalhe-info"><span class="badge badge-ok">' + (rotuloInsumo[r.tipo] || r.tipo) + '</span>' + (r.quantidade_recebida ? '<span class="recebimento-quantidade">' + r.quantidade_recebida + '</span>' : '') + '</div><div class="recebimento-fotos">' + fotos + '</div></div>'
+  }).join('') + '</div>'
 }
+
+async function carregar() {
   const incluirConcluidas = toggleConcluidas.checked
   const pedidos = await api.pedidos.completo(incluirConcluidas)
   if (!pedidos) return
@@ -100,37 +76,30 @@ function renderizarRecebimentos(recebimentos) {
   document.getElementById('numero-concluidas').textContent = concluidas
 
   containerPis.innerHTML = ''
+
   pedidos.forEach((pedido) => {
     const status = statusDoPi(pedido)
     const card = document.createElement('div')
-    card.className = `card-pi-admin ${pedido.concluida ? 'pi-concluida' : ''}`
-    card.innerHTML = `
-      <div class="card-pi-cabecalho">
-        <div class="pi-cabecalho-info">
-          <span class="pi-numero">PI ${pedido.numero_pi}</span>
-          <span class="pi-cliente">${pedido.cliente ?? ''} ${pedido.destino ? '· ' + pedido.destino : ''}</span>
-        </div>
-        <div class="pi-cabecalho-acoes">
-          <span class="badge ${status === 'LIBERADO' ? 'badge-ok' : status === 'NÃO PRODUZ' ? 'badge-pendente' : 'badge-em_andamento'}">${status}</span>
-          <span class="recebimento-resumo">📦 ${resumoRecebimento(pedido)}</span>
-          <button class="btn-expandir" data-id="${pedido.id}">Ver detalhes ▾</button>
-          <button class="btn-concluir ${pedido.concluida ? 'btn-reabrir' : ''}" data-id="${pedido.id}" data-concluida="${pedido.concluida ? 'true' : 'false'}">
-            ${pedido.concluida ? '↩ Reabrir' : '✔ Concluir'}
-          </button>
-        </div>
-      </div>
-      <div class="card-pi-detalhe" id="detalhe-${pedido.id}" style="display:none">
-        <h4 class="detalhe-titulo">Insumos por Produto</h4>
-        ${renderizarAlmoxarifado(pedido.produtos_pi)}
-        <h4 class="detalhe-titulo">Recebimentos B2</h4>
-        ${renderizarRecebimentos(pedido.recebimentos_b2)}
-      </div>`
+    card.className = 'card-pi-admin' + (pedido.concluida ? ' pi-concluida' : '')
+
+    const cabecalho = document.createElement('div')
+    cabecalho.className = 'card-pi-cabecalho'
+    cabecalho.innerHTML = '<div class="pi-cabecalho-info"><span class="pi-numero">PI ' + pedido.numero_pi + '</span><span class="pi-cliente">' + (pedido.cliente || '') + (pedido.destino ? ' · ' + pedido.destino : '') + '</span></div><div class="pi-cabecalho-acoes"><span class="badge ' + (status === 'LIBERADO' ? 'badge-ok' : status === 'NÃO PRODUZ' ? 'badge-pendente' : 'badge-em_andamento') + '">' + status + '</span><span class="recebimento-resumo">📦 ' + resumoRecebimento(pedido) + '</span><button class="btn-expandir" data-id="' + pedido.id + '">Ver detalhes ▾</button><button class="btn-concluir' + (pedido.concluida ? ' btn-reabrir' : '') + '" data-id="' + pedido.id + '" data-concluida="' + (pedido.concluida ? 'true' : 'false') + '">' + (pedido.concluida ? '↩ Reabrir' : '✔ Concluir') + '</button></div>'
+
+    const detalhe = document.createElement('div')
+    detalhe.className = 'card-pi-detalhe'
+    detalhe.id = 'detalhe-' + pedido.id
+    detalhe.style.display = 'none'
+    detalhe.innerHTML = '<h4 class="detalhe-titulo">Insumos por Produto</h4>' + renderizarAlmoxarifado(pedido.produtos_pi) + '<h4 class="detalhe-titulo">Recebimentos B2</h4>' + renderizarRecebimentos(pedido.recebimentos_b2)
+
+    card.appendChild(cabecalho)
+    card.appendChild(detalhe)
     containerPis.appendChild(card)
   })
 
   document.querySelectorAll('.btn-expandir').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const detalhe = document.getElementById(`detalhe-${btn.dataset.id}`)
+      const detalhe = document.getElementById('detalhe-' + btn.dataset.id)
       const aberto = detalhe.style.display !== 'none'
       detalhe.style.display = aberto ? 'none' : 'block'
       btn.textContent = aberto ? 'Ver detalhes ▾' : 'Fechar ▴'
@@ -138,7 +107,9 @@ function renderizarRecebimentos(recebimentos) {
   })
 
   document.querySelectorAll('.btn-concluir').forEach((btn) => {
-    btn.addEventListener('click', () => concluirPi(btn.dataset.id, btn.dataset.concluida === 'true'))
+    btn.addEventListener('click', () => {
+      concluirPi(btn.dataset.id, btn.dataset.concluida === 'true')
+    })
   })
 }
 
