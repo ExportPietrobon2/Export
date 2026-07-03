@@ -55,10 +55,11 @@ app.post('/api/login', async (req, res) => {
   const usuario = rows[0]
   const senhaCorreta = await bcrypt.compare(senha, usuario.senha)
   if (!senhaCorreta) return res.status(401).json({ erro: 'E-mail ou senha incorretos.' })
+  const expiracao = usuario.papel === 'deposito' ? '30d' : '8h'
   const token = jwt.sign(
     { id: usuario.id, nome: usuario.nome, papel: usuario.papel },
     JWT_SECRET,
-    { expiresIn: '8h' }
+    { expiresIn: expiracao }
   )
   res.json({ token, papel: usuario.papel, nome: usuario.nome })
 })
@@ -87,7 +88,7 @@ app.get('/api/pedidos/completo', autenticar(['admin']), async (req, res) => {
     }
     pedido.produtos_pi = produtos
     const [recebimentos] = await pool.query(
-      'SELECT * FROM recebimentos_b2 WHERE pi_id = ?', [pedido.id]
+      'SELECT tipo, status_recebimento, foto_url, foto_nota_url, quantidade_recebida FROM recebimentos_b2 WHERE pi_id = ?', [pedido.id]
     )
     pedido.recebimentos_b2 = recebimentos
   }
@@ -213,7 +214,35 @@ app.patch('/api/recebimentos/:id', autenticar(['admin', 'deposito']), upload.fie
   res.json({ ok: true })
 })
 
-app.get('/api/usuarios', autenticar(['admin']), async (req, res) => {
+app.patch('/api/recebimentos/:id/excluir-foto', autenticar(['admin']), async (req, res) => {
+  const { campo } = req.body
+  if (!['foto_url', 'foto_nota_url'].includes(campo)) {
+    return res.status(400).json({ erro: 'Campo inválido' })
+  }
+
+  const [rows] = await pool.query(`SELECT ${campo} FROM recebimentos_b2 WHERE id = ?`, [req.params.id])
+  if (rows.length && rows[0][campo]) {
+    const urlFoto = rows[0][campo]
+    const partes = urlFoto.split('/')
+    const publicId = partes.slice(partes.indexOf('recebimentos')).join('/').replace(/\.[^/.]+$/, '')
+    try {
+      await cloudinary.uploader.destroy(publicId)
+    } catch (e) {
+      console.error('Erro ao apagar foto do Cloudinary:', e.message)
+    }
+  }
+
+  const outrosCampos = campo === 'foto_url' ? 'foto_nota_url' : 'foto_url'
+  const [rec] = await pool.query(`SELECT ${outrosCampos}, status_recebimento FROM recebimentos_b2 WHERE id = ?`, [req.params.id])
+  const outraFoto = rec[0]?.[outrosCampos]
+  const novoStatus = outraFoto ? 'recebido' : 'pendente'
+
+  await pool.query(
+    `UPDATE recebimentos_b2 SET ${campo} = NULL, status_recebimento = ? WHERE id = ?`,
+    [novoStatus, req.params.id]
+  )
+  res.json({ ok: true })
+})
   const [rows] = await pool.query('SELECT id, nome, email, papel FROM usuarios ORDER BY nome')
   res.json(rows)
 })

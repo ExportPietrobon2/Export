@@ -4,7 +4,6 @@ import { exigirPapel } from './auth.js'
 import { montarCabecalho } from './cabecalho.js'
 
 const containerPis = document.getElementById('container-pis')
-const containerFotos = document.getElementById('container-fotos')
 const toggleConcluidas = document.getElementById('toggle-concluidas')
 
 const rotuloInsumo = { embalagem: 'Embalagem', rotulo: 'Rótulo', caixa: 'Caixa', etiqueta: 'Etiqueta' }
@@ -60,7 +59,34 @@ function renderizarAlmoxarifado(produtos, totalQuantidade) {
   }).join('')
 }
 
-async function carregar() {
+function renderizarRecebimentos(recebimentos) {
+  const recebidos = (recebimentos || []).filter((r) => r.status_recebimento === 'recebido')
+  if (recebidos.length === 0) return '<p class="vazio-inline">Nenhum recebimento confirmado ainda.</p>'
+
+  return `
+    <div class="grid-recebimentos-detalhe">
+      ${recebidos.map((r) => `
+        <div class="card-recebimento-detalhe">
+          <div class="recebimento-detalhe-info">
+            <span class="badge badge-ok">${rotuloInsumo[r.tipo] || r.tipo}</span>
+            ${r.quantidade_recebida ? `<span class="recebimento-quantidade">${r.quantidade_recebida}</span>` : ''}
+          </div>
+          <div class="recebimento-fotos">
+            ${r.foto_url ? `
+              <div class="foto-detalhe">
+                <span class="foto-detalhe-label">Produto</span>
+                <img src="${r.foto_url}" alt="Foto produto" loading="lazy" class="foto-detalhe-img">
+              </div>` : ''}
+            ${r.foto_nota_url ? `
+              <div class="foto-detalhe">
+                <span class="foto-detalhe-label">Nota fiscal</span>
+                <img src="${r.foto_nota_url}" alt="Foto nota" loading="lazy" class="foto-detalhe-img">
+              </div>` : ''}
+            ${!r.foto_url && !r.foto_nota_url ? '<span class="vazio-inline">Sem fotos</span>' : ''}
+          </div>
+        </div>`).join('')}
+    </div>`
+}
   const incluirConcluidas = toggleConcluidas.checked
   const pedidos = await api.pedidos.completo(incluirConcluidas)
   if (!pedidos) return
@@ -96,6 +122,8 @@ async function carregar() {
       <div class="card-pi-detalhe" id="detalhe-${pedido.id}" style="display:none">
         <h4 class="detalhe-titulo">Insumos por Produto</h4>
         ${renderizarAlmoxarifado(pedido.produtos_pi)}
+        <h4 class="detalhe-titulo">Recebimentos B2</h4>
+        ${renderizarRecebimentos(pedido.recebimentos_b2)}
       </div>`
     containerPis.appendChild(card)
   })
@@ -111,33 +139,6 @@ async function carregar() {
 
   document.querySelectorAll('.btn-concluir').forEach((btn) => {
     btn.addEventListener('click', () => concluirPi(btn.dataset.id, btn.dataset.concluida === 'true'))
-  })
-
-  containerFotos.innerHTML = ''
-  const todasFotos = []
-  pedidos.forEach((pedido) => {
-    (pedido.recebimentos_b2 || []).filter((r) => r.foto_url).forEach((r) => {
-      todasFotos.push({ pi: pedido.numero_pi, cliente: pedido.cliente, tipo: r.tipo, url: r.foto_url, quantidade: r.quantidade_recebida })
-    })
-  })
-
-  if (todasFotos.length === 0) {
-    containerFotos.innerHTML = '<p class="vazio">Nenhuma foto registrada ainda.</p>'
-    return
-  }
-
-  todasFotos.forEach((foto) => {
-    const card = document.createElement('div')
-    card.className = 'card-foto'
-    card.innerHTML = `
-      <img src="${foto.url}" alt="Foto ${foto.tipo}" loading="lazy">
-      <div class="foto-legenda">
-        <strong>PI ${foto.pi}</strong>
-        <span>${foto.cliente ?? ''}</span>
-        <span class="badge badge-ok">${foto.tipo}</span>
-        ${foto.quantidade ? `<span class="foto-quantidade">${foto.quantidade}</span>` : ''}
-      </div>`
-    containerFotos.appendChild(card)
   })
 }
 
