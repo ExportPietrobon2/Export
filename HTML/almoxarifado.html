@@ -6,23 +6,20 @@
     <title>Controle de Insumos - Exportação</title>
     <link rel="stylesheet" href="/CSS/style.css">
 </head>
-<body data-pagina="almoxarifado.html" >
+<body data-pagina="almoxarifado.html">
     <div class="app-shell">
         <div id="cabecalho"></div>
         <main class="content">
             <h1>Almoxarifado</h1>
-            <p class="subtitulo">Selecione o PI e o produto para informar estoque e disponibilidade dos insumos.</p>
+            <p class="subtitulo">Selecione a PI para ver e editar todos os insumos de uma vez.</p>
 
             <div class="seletor-item">
                 <select id="select-pi">
-                    <option value="">Selecione o PI</option>
-                </select>
-                <select id="select-produto" disabled>
-                    <option value="">Selecione o produto</option>
+                    <option value="">Selecione a PI</option>
                 </select>
             </div>
 
-            <div id="formulario-container"></div>
+            <div id="conteudo-pi"></div>
         </main>
     </div>
 

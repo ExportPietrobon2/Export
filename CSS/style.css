@@ -1019,3 +1019,60 @@ th {
 .foto-detalhe-img:hover {
   transform: scale(1.03);
 }
+
+.bloco-produto-almox {
+  background: var(--white);
+  border-radius: 14px;
+  padding: 22px 24px;
+  margin-bottom: 20px;
+  box-shadow: var(--sombra-suave);
+  border-left: 5px solid var(--pietrobon-orange);
+}
+
+.produto-almox-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--gray-borda);
+}
+
+.produto-almox-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.produto-almox-info strong {
+  font-size: 1.05rem;
+}
+
+.grid-insumos-almox {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.card-insumo-almox {
+  background: #FAFAFA;
+  border: 1px solid var(--gray-borda);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.card-insumo-almox h4 {
+  margin: 0 0 10px;
+  color: var(--pietrobon-orange);
+  font-size: 0.95rem;
+}
+
+.btn-salvar-produto {
+  margin-top: 12px;
+  width: 100%;
+  transition: background 0.3s ease;
+}
