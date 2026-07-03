@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Insumos - Exportação</title>
+    <link rel="stylesheet" href="/CSS/style.css">
+</head>
+<body data-pagina="cadastro.html" >
+    <div class="app-shell">
+        <div id="cabecalho"></div>
+        <main class="content">
+            <h1>Cadastro de PI e Produtos</h1>
+            <p class="subtitulo">Essas informações ficam disponíveis automaticamente para o Almoxarifado e o Recebimento B2.</p>
+
+            <section class="bloco-cadastro">
+                <h2>Novo PI</h2>
+                <form id="form-novo-pi" class="form-linha">
+                    <input type="text" id="numero-pi" placeholder="Número do PI (ex: 159 VEN)" required>
+                    <input type="date" id="data-embarque">
+                    <input type="text" id="cliente-pi" placeholder="Cliente">
+                    <input type="text" id="destino-pi" placeholder="Destino / País">
+                    <button type="submit" class="btn-primary">Cadastrar PI</button>
+                </form>
+            </section>
+
+            <section class="bloco-cadastro">
+                <h2>Novo Produto dentro de um PI</h2>
+                <form id="form-novo-produto" class="form-linha">
+                    <select id="pi-do-produto" required>
+                        <option value="">Selecione o PI</option>
+                    </select>
+                    <input type="text" id="nome-produto" placeholder="Nome do produto" required>
+                    <input type="number" id="quantidade-produto" placeholder="Quantidade" required>
+                    <input type="text" id="observacoes-produto" placeholder="Observações (opcional)">
+                    <button type="submit" class="btn-primary">Cadastrar Produto</button>
+                </form>
+            </section>
+
+            <section>
+                <h2>PIs cadastrados</h2>
+                <div id="lista-pedidos"></div>
+            </section>
+        </main>
+    </div>
+
+    <script type="module" src="/JS/cadastro.js"></script>
+</body>
+</html>

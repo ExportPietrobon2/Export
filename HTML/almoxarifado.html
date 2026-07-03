@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Insumos - Exportação</title>
+    <link rel="stylesheet" href="/CSS/style.css">
+</head>
+<body data-pagina="almoxarifado.html" >
+    <div class="app-shell">
+        <div id="cabecalho"></div>
+        <main class="content">
+            <h1>Almoxarifado</h1>
+            <p class="subtitulo">Selecione o PI e o produto para informar estoque e disponibilidade dos insumos.</p>
+
+            <div class="seletor-item">
+                <select id="select-pi">
+                    <option value="">Selecione o PI</option>
+                </select>
+                <select id="select-produto" disabled>
+                    <option value="">Selecione o produto</option>
+                </select>
+            </div>
+
+            <div id="formulario-container"></div>
+        </main>
+    </div>
+
+    <script type="module" src="/JS/almoxarifado.js"></script>
+</body>
+</html>

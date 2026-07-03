@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Insumos - Exportação</title>
+    <link rel="stylesheet" href="/CSS/style.css">
+</head>
+<body data-pagina="admin.html" >
+    <div class="app-shell">
+        <div id="cabecalho"></div>
+        <main class="content">
+            <h1>Painel Administrativo</h1>
+            <p class="subtitulo">Visão completa por PI — recebimento, almoxarifado e status</p>
+
+            <div class="resumo-cards">
+                <div class="resumo-card resumo-ok">
+                    <span class="resumo-numero" id="numero-liberados">0</span>
+                    <span>PIs Liberados</span>
+                </div>
+                <div class="resumo-card resumo-bloqueado">
+                    <span class="resumo-numero" id="numero-bloqueados">0</span>
+                    <span>PIs Bloqueados</span>
+                </div>
+                <div class="resumo-card resumo-total">
+                    <span class="resumo-numero" id="numero-total">0</span>
+                    <span>PIs Ativas</span>
+                </div>
+                <div class="resumo-card resumo-concluida">
+                    <span class="resumo-numero" id="numero-concluidas">0</span>
+                    <span>PIs Concluídas</span>
+                </div>
+            </div>
+
+            <div class="linha-opcoes">
+                <label class="toggle-label">
+                    <input type="checkbox" id="toggle-concluidas">
+                    Mostrar PIs concluídas
+                </label>
+            </div>
+
+            <div id="container-pis"></div>
+
+            <h2 class="secao-titulo">Fotos de Recebimento</h2>
+            <div id="container-fotos" class="grid-fotos"></div>
+        </main>
+    </div>
+
+    <script type="module" src="/JS/admin.js"></script>
+</body>
+</html>
