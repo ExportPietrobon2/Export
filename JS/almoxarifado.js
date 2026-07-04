@@ -56,15 +56,15 @@ async function carregarPi(piId) {
     const topo = document.createElement('div')
     topo.className = 'linha-produto-topo'
     topo.innerHTML = `
-      <div class="linha-produto-info">
-        <span class="linha-produto-nome">${produto.produto}</span>
-        <span class="qtd-produto">${formatarQuantidade(produto.quantidade)}</span>
-      </div>
-      <div class="linha-produto-acoes">
-        <span class="indicador-status ${liberado ? 'indicador-ok' : 'indicador-nok'}" data-status="${produto.id}">
-          ${liberado ? '✔ OK' : '✗ Pendente'}
-        </span>
-        <button class="btn-expandir-produto" data-id="${produto.id}">Editar ▾</button>
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 w-100">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <span class="fw-semibold">${produto.produto}</span>
+          <span class="badge bg-secondary">${formatarQuantidade(produto.quantidade)}</span>
+          <span class="indicador-status ${liberado ? 'indicador-ok' : 'indicador-nok'}" data-status="${produto.id}">
+            ${liberado ? '✔ OK' : '✗ Pendente'}
+          </span>
+        </div>
+        <button class="btn btn-sm btn-outline-danger btn-expandir-produto" data-id="${produto.id}">Editar ▾</button>
       </div>
     `
 

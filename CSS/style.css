@@ -1,4 +1,5 @@
 :root {
+  --bs-primary: #ED3237;
   --pietrobon-red: #ED3237;
   --pietrobon-red-escuro: #C6242A;
   --pietrobon-orange: #F79733;
@@ -11,219 +12,157 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ── NAVBAR ── */
 .navbar-pietrobon {
-  background: linear-gradient(120deg, var(--pietrobon-red), var(--pietrobon-red-escuro));
+  background: linear-gradient(120deg, #ED3237, #C6242A) !important;
   box-shadow: 0 2px 10px rgba(0,0,0,0.2);
 }
-
-.navbar-pietrobon .navbar-brand {
-  font-weight: 700;
-  font-size: 1rem;
+.navbar-pietrobon .navbar-brand,
+.navbar-pietrobon .nav-link {
   color: #fff !important;
 }
-
 .navbar-pietrobon .nav-link {
-  color: rgba(255,255,255,0.85) !important;
-  font-weight: 500;
   border-radius: 8px;
   padding: 6px 12px !important;
+  font-weight: 500;
+  opacity: 0.88;
 }
-
-.navbar-pietrobn .nav-link:hover,
+.navbar-pietrobon .nav-link:hover,
 .navbar-pietrobon .nav-link.active {
   background: rgba(255,255,255,0.2);
-  color: #fff !important;
+  opacity: 1;
 }
-
 .navbar-pietrobon .navbar-toggler {
-  border-color: rgba(255,255,255,0.4);
+  border-color: rgba(255,255,255,0.5);
 }
-
 .navbar-pietrobon .navbar-toggler-icon {
   filter: invert(1);
 }
-
 .nav-link-sair {
-  border: 1px solid rgba(255,255,255,0.5) !important;
+  border: 1px solid rgba(255,255,255,0.55) !important;
   margin-left: 4px;
 }
 
+/* ── LOGIN ── */
 .tela-login {
   min-height: 100vh;
-  background: linear-gradient(135deg, var(--pietrobon-red) 0%, #8a1418 100%);
+  background: linear-gradient(135deg, #ED3237 0%, #8a1418 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
 }
-
 .card-login {
-  border: none;
-  border-radius: 18px;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+  border: none !important;
+  border-radius: 18px !important;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.3) !important;
   max-width: 380px;
   width: 100%;
 }
-
 .card-login .card-header {
-  background: var(--pietrobon-red);
+  background: #ED3237 !important;
   border-radius: 18px 18px 0 0 !important;
-  padding: 24px;
+  padding: 22px !important;
   text-align: center;
   color: #fff;
   font-weight: 700;
-  font-size: 1.1rem;
-  border: none;
+  font-size: 1.05rem;
+  border: none !important;
 }
 
+/* ── BOTÕES ── */
 .btn-pietrobon {
-  background: var(--pietrobon-red);
-  border-color: var(--pietrobon-red);
-  color: #fff;
+  background-color: #ED3237 !important;
+  border-color: #ED3237 !important;
+  color: #fff !important;
   font-weight: 600;
   border-radius: 10px;
-  padding: 12px 20px;
 }
-
-.btn-pietrobon:hover, .btn-pietrobon:focus {
-  background: var(--pietrobon-red-escuro);
-  border-color: var(--pietrobon-red-escuro);
-  color: #fff;
+.btn-pietrobon:hover,
+.btn-pietrobon:focus,
+.btn-pietrobon:active {
+  background-color: #C6242A !important;
+  border-color: #C6242A !important;
+  color: #fff !important;
 }
 
 .btn-ok-grande {
-  background: var(--green-ok);
-  border: none;
-  color: #fff;
+  background-color: #2E7D32 !important;
+  border: none !important;
+  color: #fff !important;
   font-weight: 700;
   font-size: 1.1rem;
   border-radius: 14px;
-  padding: 18px 28px;
+  padding: 18px;
   width: 100%;
   touch-action: manipulation;
 }
-
-.btn-ok-grande:hover {
-  background: #1b5e20;
-  color: #fff;
+.btn-ok-grande:hover,
+.btn-ok-grande:active {
+  background-color: #1b5e20 !important;
+  color: #fff !important;
 }
 
-.card-recebimento {
-  border: none;
-  border-left: 5px solid var(--pietrobon-orange);
-  border-radius: 14px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-  margin-bottom: 14px;
-}
-
-.card-pi-admin {
-  border: none;
-  border-left: 5px solid var(--pietrobon-orange);
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-  margin-bottom: 12px;
-  overflow: hidden;
-}
-
-.pi-concluida {
-  border-left-color: #ccc;
-  opacity: 0.55;
-}
-
-.card-insumo-almox {
-  background: #FAFAFA;
-  border: 1px solid #E5E7EB;
+.btn-foto {
+  background: #fff;
+  border: 1.5px solid #dee2e6;
   border-radius: 10px;
-  padding: 14px;
-}
-
-.card-insumo-almox h4 {
-  color: var(--pietrobon-orange);
+  padding: 12px 14px;
   font-size: 0.95rem;
-  font-weight: 700;
-  margin-bottom: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  flex: 1;
+  min-width: 140px;
+  touch-action: manipulation;
+  transition: border-color 0.15s ease;
 }
-
-.saldo-positivo {
-  background: #E8F5E9;
-  color: var(--green-ok);
-  border-radius: 8px;
-  padding: 7px 10px;
-  font-weight: 700;
-  font-size: 0.88rem;
-  text-align: center;
-  margin-top: 8px;
-}
-
-.saldo-negativo {
-  background: #FDECEA;
-  color: var(--pietrobon-red);
-  border-radius: 8px;
-  padding: 7px 10px;
-  font-weight: 700;
-  font-size: 0.88rem;
-  text-align: center;
-  margin-top: 8px;
-}
-
-.saldo-alerta {
-  background: #FFF8E1;
-  color: #E65100;
-  border-radius: 8px;
-  padding: 7px 10px;
-  font-weight: 700;
-  font-size: 0.88rem;
-  text-align: center;
-  margin-top: 8px;
-}
-
-.indicador-ok {
-  background: #E8F5E9;
-  color: var(--green-ok);
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-.indicador-nok {
-  background: #FDECEA;
-  color: var(--pietrobon-red);
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-.texto-ok { color: var(--green-ok); font-weight: 600; }
-.texto-erro { color: var(--pietrobon-red); font-weight: 600; }
-.texto-alerta { color: #E65100; font-weight: 600; }
-
-.preview-foto {
-  width: 100%;
-  max-height: 180px;
-  object-fit: cover;
-  border-radius: 10px;
-  margin: 8px 0;
-}
-
-.foto-detalhe-img {
-  width: 100%;
-  max-width: 220px;
-  height: 150px;
-  object-fit: cover;
-  border-radius: 8px;
-}
+.btn-foto:hover { border-color: #F79733; }
+.btn-foto-ok { border-color: #2E7D32 !important; color: #2E7D32; }
 
 .btn-remover-foto {
   background: none;
   border: none;
-  color: var(--pietrobon-red);
+  color: #ED3237;
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
   padding: 2px 0;
   text-decoration: underline;
+}
+
+/* ── CARDS ── */
+.card-recebimento {
+  border: none !important;
+  border-left: 5px solid #F79733 !important;
+  border-radius: 14px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07) !important;
+}
+
+.card-pi-admin {
+  border: none !important;
+  border-left: 5px solid #F79733 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07) !important;
+  overflow: hidden;
+}
+.pi-concluida {
+  border-left-color: #ccc !important;
+  opacity: 0.55;
+}
+
+/* ── ALMOXARIFADO ── */
+.card-insumo-almox {
+  background: #FAFAFA;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  padding: 14px;
+  height: 100%;
+}
+.card-insumo-almox h4 {
+  color: #F79733;
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 10px;
 }
 
 .linha-produto-almox {
@@ -233,58 +172,81 @@ body {
   box-shadow: 0 2px 8px rgba(0,0,0,0.07);
   overflow: hidden;
 }
-
-.linha-produto-topo {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
 .formulario-produto-almox {
-  padding: 0 18px 18px;
+  padding: 0 16px 16px;
   border-top: 1px solid #E5E7EB;
 }
 
-.bloco-produto {
-  background: #FAFAFA;
-  border-radius: 10px;
-  padding: 14px;
-  margin-bottom: 12px;
+/* ── STATUS / SALDOS ── */
+.saldo-positivo {
+  background: #E8F5E9;
+  color: #2E7D32;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-align: center;
+  margin-top: 8px;
 }
-
-.produto-cabecalho {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
+.saldo-negativo {
+  background: #FDECEA;
+  color: #ED3237;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-align: center;
+  margin-top: 8px;
 }
-
-.tabela-insumos-admin th {
-  background: var(--pietrobon-red);
-  color: #fff;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  padding: 8px 12px;
-}
-
-.tabela-insumos-admin td {
-  padding: 8px 12px;
-  font-size: 0.9rem;
-}
-
-.recebimento-fotos {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
+.saldo-alerta {
+  background: #FFF8E1;
+  color: #E65100;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-align: center;
   margin-top: 8px;
 }
 
+.indicador-ok {
+  background: #E8F5E9;
+  color: #2E7D32;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.indicador-nok {
+  background: #FDECEA;
+  color: #ED3237;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.texto-ok { color: #2E7D32; font-weight: 600; }
+.texto-erro { color: #ED3237; font-weight: 600; }
+.texto-alerta { color: #E65100; font-weight: 600; }
+
+/* ── FOTOS ── */
+.preview-foto {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin: 8px 0;
+}
+.foto-detalhe-img {
+  width: 100%;
+  max-width: 220px;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 8px;
+}
 .foto-detalhe-label {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: #6B7280;
   text-transform: uppercase;
@@ -293,65 +255,32 @@ body {
   margin-bottom: 4px;
 }
 
-.vazio-inline {
-  font-size: 0.85rem;
-  color: #999;
-  font-style: italic;
-}
-
-.campo-quantidade-recebimento {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #6B7280;
-  margin-bottom: 10px;
-}
-
+/* ── RECEBIMENTO ── */
 .input-quantidade {
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid #E5E7EB;
+  border: 1px solid #dee2e6;
   font-size: 1rem;
   width: 100%;
 }
 
-.area-botoes-recebimento {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
+/* ── TABELA INSUMOS ADMIN ── */
+.tabela-insumos-admin thead th {
+  background: #ED3237 !important;
+  color: #fff;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  padding: 8px 12px;
+}
+.tabela-insumos-admin td {
+  padding: 7px 12px;
+  font-size: 0.88rem;
 }
 
-.btn-foto {
-  background: #fff;
-  border: 1px solid #E5E7EB;
-  border-radius: 10px;
-  padding: 12px 16px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  flex: 1;
-  min-width: 140px;
-  touch-action: manipulation;
-}
-
-.btn-foto-ok {
-  border-color: var(--green-ok);
-  color: var(--green-ok);
-}
-
+/* ── MOBILE ── */
 @media (max-width: 576px) {
-  .navbar-pietrobon .navbar-brand {
-    font-size: 0.9rem;
-  }
-  .btn-ok-grande {
-    font-size: 1rem;
-    padding: 16px;
-  }
-  .foto-detalhe-img {
-    max-width: 100%;
-  }
-  h1 { font-size: 1.4rem; }
+  .btn-ok-grande { font-size: 1rem; padding: 15px; }
+  .foto-detalhe-img { max-width: 100%; }
+  h1.h3 { font-size: 1.3rem; }
+  .card-insumo-almox { padding: 10px; }
 }
