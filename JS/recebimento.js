@@ -43,24 +43,24 @@ async function carregarRecebimentos() {
     const containerProdutos = card.querySelector(`#produtos-${pi.id}`)
 
     pi.produtos.forEach((produto) => {
-      const todoRecebido = pi.insumos.every((i) => i.status_recebimento === 'recebido')
-      const algumRecebido = pi.insumos.some((i) => i.status_recebimento === 'recebido')
+      const todoRecebido = produto.insumos.length > 0 && produto.insumos.every((i) => i.status_recebimento === 'recebido')
+      const algumRecebido = produto.insumos.some((i) => i.status_recebimento === 'recebido')
 
       const btnProduto = document.createElement('button')
-      btnProduto.className = `btn btn-sm text-start ${todoRecebido ? 'btn-success' : 'btn-outline-secondary'}`
+      btnProduto.className = `btn btn-sm text-start w-100 ${todoRecebido ? 'btn-success' : 'btn-outline-secondary'}`
       btnProduto.style.borderRadius = '10px'
       btnProduto.style.padding = '10px 14px'
       btnProduto.dataset.produtoId = produto.id
       btnProduto.innerHTML = `
         <span class="fw-semibold">${produto.produto}</span>
-        <span class="ms-2 small opacity-75">${todoRecebido ? '✔ Tudo recebido' : algumRecebido ? '⚠ Parcial' : 'Pendente'}</span>
+        <span class="ms-2 small opacity-75">${todoRecebido ? '✔ Tudo recebido' : algumRecebido ? '⚠ Parcial' : '○ Pendente'}</span>
       `
 
       const containerInsumos = document.createElement('div')
-      containerInsumos.className = 'd-none d-flex flex-column gap-2 ps-2'
+      containerInsumos.className = 'd-none d-flex flex-column gap-2 ps-2 pt-2'
       containerInsumos.id = `insumos-${produto.id}`
 
-      pi.insumos.forEach((insumo) => {
+      produto.insumos.forEach((insumo) => {
         const recebido = insumo.status_recebimento === 'recebido'
 
         const blocoInsumo = document.createElement('div')

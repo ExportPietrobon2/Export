@@ -112,6 +112,11 @@ body {
   touch-action: manipulation;
   transition: border-color 0.15s ease;
 }
+
+[id^="insumos-"] .btn {
+  min-width: 120px;
+  text-align: center;
+}
 .btn-foto:hover { border-color: #F79733; }
 .btn-foto-ok { border-color: #2E7D32 !important; color: #2E7D32; }
 

@@ -103,12 +103,6 @@ app.post('/api/pedidos', autenticar(['admin']), async (req, res) => {
   )
   const piId = resultado.insertId
   const tiposRecebimento = ['embalagem', 'rotulo', 'caixa']
-  for (const tipo of tiposRecebimento) {
-    await pool.query(
-      'INSERT INTO recebimentos_b2 (pi_id, tipo, status_recebimento) VALUES (?, ?, ?)',
-      [piId, tipo, 'pendente']
-    )
-  }
   res.json({ id: piId })
 })
 
@@ -142,6 +136,14 @@ app.post('/api/produtos', autenticar(['admin']), async (req, res) => {
     await pool.query(
       'INSERT INTO insumos_produto (produto_id, tipo, confirmado, sobra, quantidade_por_pacote) VALUES (?, ?, 0, 0, 0)',
       [produtoId, tipo]
+    )
+  }
+  const tiposRecebimento = ['embalagem', 'rotulo', 'caixa']
+  const piId = req.body.pi_id
+  for (const tipo of tiposRecebimento) {
+    await pool.query(
+      'INSERT INTO recebimentos_b2 (pi_id, produto_id, tipo, status_recebimento) VALUES (?, ?, ?, ?)',
+      [piId, produtoId, tipo, 'pendente']
     )
   }
   res.json({ id: produtoId })
@@ -189,12 +191,14 @@ app.get('/api/recebimentos/pendentes', autenticar(['admin', 'deposito']), async 
       'SELECT id, produto FROM produtos_pi WHERE pi_id = ? ORDER BY criado_em',
       [pedido.id]
     )
-    const [insumos] = await pool.query(
-      'SELECT id, tipo, status_recebimento, quantidade_recebida FROM recebimentos_b2 WHERE pi_id = ?',
-      [pedido.id]
-    )
+    for (const produto of produtos) {
+      const [insumos] = await pool.query(
+        'SELECT id, tipo, status_recebimento, quantidade_recebida FROM recebimentos_b2 WHERE pi_id = ? AND produto_id = ?',
+        [pedido.id, produto.id]
+      )
+      produto.insumos = insumos
+    }
     pedido.produtos = produtos
-    pedido.insumos = insumos
   }
 
   res.json(pedidos)
