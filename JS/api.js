@@ -47,6 +47,7 @@ export const api = {
   produtos: {
     listar: (piId) => requisitar('GET', `/api/pedidos/${piId}/produtos`),
     criar: (dados) => requisitar('POST', '/api/produtos', dados),
+    editarQuantidade: (id, quantidade) => requisitar('PATCH', `/api/produtos/${id}/quantidade`, { quantidade }),
     insumos: (produtoId) => requisitar('GET', `/api/produtos/${produtoId}/insumos`),
     salvarInsumos: (produtoId, dados) => requisitar('PATCH', `/api/produtos/${produtoId}/insumos`, dados)
   },

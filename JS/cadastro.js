@@ -49,14 +49,39 @@ async function carregarPedidos() {
     } else {
       produtos.forEach((produto) => {
         const item = document.createElement('li')
-        item.className = 'list-group-item small'
-        item.textContent = `${produto.produto} — ${formatarQuantidade(produto.quantidade)}`
+        item.className = 'list-group-item d-flex align-items-center justify-content-between gap-2 py-2'
+        item.innerHTML = `
+          <span class="small fw-semibold">${produto.produto}</span>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-light text-dark border" id="qtd-label-${produto.id}">${formatarQuantidade(produto.quantidade)}</span>
+            <button class="btn btn-sm btn-outline-warning btn-editar-qtd d-flex align-items-center gap-1"
+              data-produto-id="${produto.id}" data-quantidade="${produto.quantidade}"
+              style="border-radius:8px">
+              ✏️ Editar
+            </button>
+          </div>
+        `
         lista.appendChild(item)
       })
     }
     bloco.appendChild(lista)
     listaPedidos.appendChild(bloco)
   }
+
+  document.querySelectorAll('.btn-editar-qtd').forEach((btn) => {
+    btn.addEventListener('click', () => editarQuantidade(btn.dataset.produtoId, btn.dataset.quantidade))
+  })
+}
+
+async function editarQuantidade(produtoId, quantidadeAtual) {
+  const novaQtd = prompt(`Nova quantidade (cx):`, quantidadeAtual)
+  if (!novaQtd || isNaN(novaQtd) || Number(novaQtd) <= 0) return
+  const resultado = await api.produtos.editarQuantidade(produtoId, novaQtd)
+  if (resultado?.erro) { alert('Erro ao atualizar quantidade.'); return }
+  const label = document.getElementById(`qtd-label-${produtoId}`)
+  if (label) label.textContent = formatarQuantidade(novaQtd)
+  const btn = document.querySelector(`.btn-editar-qtd[data-produto-id="${produtoId}"]`)
+  if (btn) btn.dataset.quantidade = novaQtd
 }
 
 async function excluirPi(piId, numeroPi) {

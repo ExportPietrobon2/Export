@@ -220,8 +220,9 @@ function criarInputFoto() {
 
 function criarBtnRemover(texto) {
   const btn = document.createElement('button')
-  btn.className = 'btn-remover-foto'
-  btn.textContent = texto
+  btn.className = 'btn btn-sm btn-outline-danger d-flex align-items-center gap-1'
+  btn.style.borderRadius = '8px'
+  btn.innerHTML = `<span>🗑</span> ${texto}`
   return btn
 }
 

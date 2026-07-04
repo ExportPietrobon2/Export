@@ -122,6 +122,12 @@ app.delete('/api/pedidos/:id', autenticar(['admin']), async (req, res) => {
   res.json({ ok: true })
 })
 
+app.patch('/api/produtos/:id/quantidade', autenticar(['admin']), async (req, res) => {
+  const { quantidade } = req.body
+  await pool.query('UPDATE produtos_pi SET quantidade = ? WHERE id = ?', [quantidade, req.params.id])
+  res.json({ ok: true })
+})
+
 app.get('/api/pedidos/:piId/produtos', autenticar(['admin', 'almoxarifado', 'deposito']), async (req, res) => {
   const [produtos] = await pool.query(
     'SELECT * FROM produtos_pi WHERE pi_id = ?', [req.params.piId]
