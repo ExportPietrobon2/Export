@@ -12,7 +12,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── NAVBAR ── */
 .navbar-pietrobon {
   background: linear-gradient(120deg, #ED3237, #C6242A) !important;
   box-shadow: 0 2px 10px rgba(0,0,0,0.2);
@@ -43,7 +42,6 @@ body {
   margin-left: 4px;
 }
 
-/* ── LOGIN ── */
 .tela-login {
   min-height: 100vh;
   background: linear-gradient(135deg, #ED3237 0%, #8a1418 100%);
@@ -70,7 +68,6 @@ body {
   border: none !important;
 }
 
-/* ── BOTÕES ── */
 .btn-pietrobon {
   background-color: #ED3237 !important;
   border-color: #ED3237 !important;
@@ -106,13 +103,12 @@ body {
 .btn-foto {
   background: #fff;
   border: 1.5px solid #dee2e6;
-  border-radius: 10px;
-  padding: 12px 14px;
-  font-size: 0.95rem;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
   flex: 1;
-  min-width: 140px;
   touch-action: manipulation;
   transition: border-color 0.15s ease;
 }
@@ -130,7 +126,6 @@ body {
   text-decoration: underline;
 }
 
-/* ── CARDS ── */
 .card-recebimento {
   border: none !important;
   border-left: 5px solid #F79733 !important;
@@ -150,7 +145,6 @@ body {
   opacity: 0.55;
 }
 
-/* ── ALMOXARIFADO ── */
 .card-insumo-almox {
   background: #FAFAFA;
   border: 1px solid #E5E7EB;
@@ -177,7 +171,6 @@ body {
   border-top: 1px solid #E5E7EB;
 }
 
-/* ── STATUS / SALDOS ── */
 .saldo-positivo {
   background: #E8F5E9;
   color: #2E7D32;
@@ -230,7 +223,6 @@ body {
 .texto-erro { color: #ED3237; font-weight: 600; }
 .texto-alerta { color: #E65100; font-weight: 600; }
 
-/* ── FOTOS ── */
 .preview-foto {
   width: 100%;
   max-height: 180px;
@@ -255,7 +247,6 @@ body {
   margin-bottom: 4px;
 }
 
-/* ── RECEBIMENTO ── */
 .input-quantidade {
   padding: 10px 12px;
   border-radius: 8px;
@@ -264,7 +255,6 @@ body {
   width: 100%;
 }
 
-/* ── TABELA INSUMOS ADMIN ── */
 .tabela-insumos-admin thead th {
   background: #ED3237 !important;
   color: #fff;
@@ -277,7 +267,6 @@ body {
   font-size: 0.88rem;
 }
 
-/* ── MOBILE ── */
 @media (max-width: 576px) {
   .btn-ok-grande { font-size: 1rem; padding: 15px; }
   .foto-detalhe-img { max-width: 100%; }

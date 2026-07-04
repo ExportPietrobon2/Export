@@ -33,24 +33,6 @@ async function carregarPendentes() {
     const body = document.createElement('div')
     body.className = 'card-body p-3'
 
-    body.innerHTML = `
-      <div class="d-flex justify-content-between align-items-start mb-2">
-        <div>
-          <span class="badge bg-danger me-1">PI ${item.numero_pi ?? ''}</span>
-          <span class="badge bg-secondary">${item.cliente ?? ''}</span>
-        </div>
-        <span class="badge bg-warning text-dark">${labelTipo[item.tipo] ?? item.tipo}</span>
-      </div>
-      ${item.produto ? `<div class="fw-semibold mb-3">${item.produto}</div>` : ''}
-    `
-
-    const campoQtd = document.createElement('div')
-    campoQtd.className = 'mb-3'
-    campoQtd.innerHTML = `
-      <label class="form-label small fw-semibold">Quantidade recebida (${unidade})</label>
-      <input type="number" class="form-control form-control-lg input-quantidade" placeholder="0" min="0" step="any">
-    `
-
     const previewProduto = document.createElement('img')
     previewProduto.className = 'preview-foto'
     previewProduto.hidden = true
@@ -117,20 +99,34 @@ async function carregarPendentes() {
     })
 
     const botaoRegistrar = document.createElement('button')
-    botaoRegistrar.className = 'btn btn-ok-grande mt-1'
+    botaoRegistrar.className = 'btn btn-ok-grande mt-2'
     botaoRegistrar.textContent = '✔ Confirmar recebimento'
     botaoRegistrar.addEventListener('click', () => {
-      const quantidade = campoQtd.querySelector('.input-quantidade').value
+      const quantidade = body.querySelector('.input-quantidade').value
       if (!quantidade) { alert(`Informe a quantidade em ${unidade}.`); return }
       registrar(item.id, quantidade, unidade, inputFotoProduto.files[0] || null, inputFotoNota.files[0] || null, botaoRegistrar)
     })
 
+    body.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
+        <div class="d-flex align-items-center gap-1 flex-wrap">
+          <span class="badge bg-danger">PI ${item.numero_pi ?? ''}</span>
+          <span class="badge bg-secondary">${item.cliente ?? ''}</span>
+        </div>
+        <span class="badge bg-warning text-dark">${labelTipo[item.tipo] ?? item.tipo}</span>
+      </div>
+      ${item.produto ? `<div class="fw-semibold small mb-2">${item.produto}</div>` : ''}
+      <div class="input-group input-group-sm mb-2">
+        <span class="input-group-text">${unidade}</span>
+        <input type="number" class="form-control input-quantidade" placeholder="0" min="0" step="any">
+      </div>
+    `
+
     const areaBotoes = document.createElement('div')
-    areaBotoes.className = 'd-flex gap-2 mb-2'
+    areaBotoes.className = 'd-flex gap-2 mb-1'
     areaBotoes.appendChild(botaoProduto)
     areaBotoes.appendChild(botaoNota)
 
-    body.appendChild(campoQtd)
     body.appendChild(previewProduto)
     body.appendChild(btnRemoverProduto)
     body.appendChild(previewNota)
