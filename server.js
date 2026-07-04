@@ -177,17 +177,37 @@ app.patch('/api/produtos/:produtoId/insumos', autenticar(['admin', 'almoxarifado
 
 app.get('/api/recebimentos/pendentes', autenticar(['admin', 'deposito']), async (req, res) => {
   const [rows] = await pool.query(`
-    SELECT r.id, r.tipo,
-           p.numero_pi, p.cliente,
+    SELECT r.id, r.tipo, r.status_recebimento, r.quantidade_recebida,
+           p.numero_pi, p.cliente, p.id as pi_id,
            pr.produto
     FROM recebimentos_b2 r
     JOIN pedidos p ON p.id = r.pi_id
     LEFT JOIN produtos_pi pr ON pr.pi_id = p.id
-    WHERE r.status_recebimento = 'pendente' AND p.concluida = 0
-    GROUP BY r.id, p.numero_pi, p.cliente, pr.produto
+    WHERE p.concluida = 0
+    GROUP BY r.id, p.numero_pi, p.cliente, p.id, pr.produto
     ORDER BY p.numero_pi, r.tipo ASC
   `)
-  res.json(rows)
+
+  const porPi = {}
+  rows.forEach((row) => {
+    if (!porPi[row.pi_id]) {
+      porPi[row.pi_id] = {
+        pi_id: row.pi_id,
+        numero_pi: row.numero_pi,
+        cliente: row.cliente,
+        produto: row.produto,
+        insumos: []
+      }
+    }
+    porPi[row.pi_id].insumos.push({
+      id: row.id,
+      tipo: row.tipo,
+      status: row.status_recebimento,
+      quantidade_recebida: row.quantidade_recebida
+    })
+  })
+
+  res.json(Object.values(porPi))
 })
 
 app.patch('/api/recebimentos/:id', autenticar(['admin', 'deposito']), upload.fields([{ name: 'foto_produto', maxCount: 1 }, { name: 'foto_nota', maxCount: 1 }]), async (req, res) => {

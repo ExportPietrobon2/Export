@@ -2,142 +2,188 @@ import { api } from './api.js'
 import { exigirPapel } from './auth.js'
 import { montarCabecalho } from './cabecalho.js'
 
-const labelTipo = { embalagem: '📦 Embalagem', rotulo: '🏷️ Rótulo', caixa: '📫 Caixa' }
+const labelTipo = { embalagem: 'Embalagem', rotulo: 'Rótulo', caixa: 'Caixa' }
 const unidadeTipo = { embalagem: 'kg', rotulo: 'kg', caixa: 'paletes' }
 
 const containerCards = document.getElementById('cards-recebimento')
 const mensagemVazio = document.getElementById('mensagem-vazio')
 
-async function carregarPendentes() {
-  const itens = await api.recebimentos.pendentes()
-  if (!itens) return
+async function carregarRecebimentos() {
+  const pis = await api.recebimentos.pendentes()
+  if (!pis) return
 
   containerCards.innerHTML = ''
   mensagemVazio.innerHTML = ''
 
-  if (itens.length === 0) {
+  const todas = pis.flatMap((pi) => pi.insumos)
+  if (todas.every((i) => i.status === 'recebido')) {
     mensagemVazio.innerHTML = `
       <div class="text-center py-5">
         <div style="font-size:3rem">✅</div>
-        <p class="fw-semibold mt-2 text-muted">Nenhum item pendente no momento.</p>
+        <p class="fw-semibold mt-2 text-muted">Tudo recebido por hoje.</p>
       </div>`
     return
   }
 
-  itens.forEach((item) => {
-    const unidade = unidadeTipo[item.tipo] || 'unidades'
-
+  pis.forEach((pi) => {
     const card = document.createElement('div')
     card.className = 'card card-recebimento mb-3'
 
-    const body = document.createElement('div')
-    body.className = 'card-body p-3'
-
-    const previewProduto = document.createElement('img')
-    previewProduto.className = 'preview-foto'
-    previewProduto.hidden = true
-
-    const previewNota = document.createElement('img')
-    previewNota.className = 'preview-foto'
-    previewNota.hidden = true
-
-    const inputFotoProduto = criarInputFoto()
-    const inputFotoNota = criarInputFoto()
-
-    const btnRemoverProduto = criarBtnRemover('✕ Remover foto do produto')
-    btnRemoverProduto.hidden = true
-
-    const btnRemoverNota = criarBtnRemover('✕ Remover foto da nota')
-    btnRemoverNota.hidden = true
-
-    const botaoProduto = document.createElement('button')
-    botaoProduto.className = 'btn btn-outline-secondary btn-foto'
-    botaoProduto.innerHTML = '📦 Foto do produto'
-    botaoProduto.addEventListener('click', () => inputFotoProduto.click())
-
-    const botaoNota = document.createElement('button')
-    botaoNota.className = 'btn btn-outline-secondary btn-foto'
-    botaoNota.innerHTML = '🧾 Foto da nota'
-    botaoNota.addEventListener('click', () => inputFotoNota.click())
-
-    inputFotoProduto.addEventListener('change', () => {
-      const f = inputFotoProduto.files[0]
-      if (!f) return
-      previewProduto.src = URL.createObjectURL(f)
-      previewProduto.hidden = false
-      btnRemoverProduto.hidden = false
-      botaoProduto.className = 'btn btn-foto btn-foto-ok'
-      botaoProduto.innerHTML = '📦 Produto ✅'
-    })
-
-    inputFotoNota.addEventListener('change', () => {
-      const f = inputFotoNota.files[0]
-      if (!f) return
-      previewNota.src = URL.createObjectURL(f)
-      previewNota.hidden = false
-      btnRemoverNota.hidden = false
-      botaoNota.className = 'btn btn-foto btn-foto-ok'
-      botaoNota.innerHTML = '🧾 Nota ✅'
-    })
-
-    btnRemoverProduto.addEventListener('click', () => {
-      inputFotoProduto.value = ''
-      previewProduto.hidden = true
-      previewProduto.src = ''
-      btnRemoverProduto.hidden = true
-      botaoProduto.className = 'btn btn-outline-secondary btn-foto'
-      botaoProduto.innerHTML = '📦 Foto do produto'
-    })
-
-    btnRemoverNota.addEventListener('click', () => {
-      inputFotoNota.value = ''
-      previewNota.hidden = true
-      previewNota.src = ''
-      btnRemoverNota.hidden = true
-      botaoNota.className = 'btn btn-outline-secondary btn-foto'
-      botaoNota.innerHTML = '🧾 Foto da nota'
-    })
-
-    const botaoRegistrar = document.createElement('button')
-    botaoRegistrar.className = 'btn btn-ok-grande mt-2'
-    botaoRegistrar.textContent = '✔ Confirmar recebimento'
-    botaoRegistrar.addEventListener('click', () => {
-      const quantidade = body.querySelector('.input-quantidade').value
-      if (!quantidade) { alert(`Informe a quantidade em ${unidade}.`); return }
-      registrar(item.id, quantidade, unidade, inputFotoProduto.files[0] || null, inputFotoNota.files[0] || null, botaoRegistrar)
-    })
-
-    body.innerHTML = `
-      <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
-        <div class="d-flex align-items-center gap-1 flex-wrap">
-          <span class="badge bg-danger">PI ${item.numero_pi ?? ''}</span>
-          <span class="badge bg-secondary">${item.cliente ?? ''}</span>
+    const cabecalho = document.createElement('div')
+    cabecalho.className = 'card-body pb-2'
+    cabecalho.innerHTML = `
+      <div class="d-flex justify-content-between align-items-start mb-1">
+        <div>
+          <span class="badge bg-danger me-1">PI ${pi.numero_pi}</span>
+          <span class="badge bg-secondary">${pi.cliente ?? ''}</span>
         </div>
-        <span class="badge bg-warning text-dark">${labelTipo[item.tipo] ?? item.tipo}</span>
       </div>
-      ${item.produto ? `<div class="fw-semibold small mb-2">${item.produto}</div>` : ''}
-      <div class="input-group input-group-sm mb-2">
-        <span class="input-group-text">${unidade}</span>
-        <input type="number" class="form-control input-quantidade" placeholder="0" min="0" step="any">
-      </div>
+      ${pi.produto ? `<div class="fw-semibold small">${pi.produto}</div>` : ''}
     `
 
-    const areaBotoes = document.createElement('div')
-    areaBotoes.className = 'd-flex gap-2 mb-1'
-    areaBotoes.appendChild(botaoProduto)
-    areaBotoes.appendChild(botaoNota)
+    const botoes = document.createElement('div')
+    botoes.className = 'd-flex gap-2 flex-wrap px-3 pb-3'
 
-    body.appendChild(previewProduto)
-    body.appendChild(btnRemoverProduto)
-    body.appendChild(previewNota)
-    body.appendChild(btnRemoverNota)
-    body.appendChild(areaBotoes)
-    body.appendChild(inputFotoProduto)
-    body.appendChild(inputFotoNota)
-    body.appendChild(botaoRegistrar)
-    card.appendChild(body)
+    pi.insumos.forEach((insumo) => {
+      const recebido = insumo.status === 'recebido'
+      const btn = document.createElement('button')
+      btn.className = `btn btn-sm ${recebido ? 'btn-success' : 'btn-outline-danger'}`
+      btn.style.borderRadius = '20px'
+      btn.innerHTML = `${recebido ? '✔' : '○'} ${labelTipo[insumo.tipo] ?? insumo.tipo}${recebido && insumo.quantidade_recebida ? ' · ' + insumo.quantidade_recebida : ''}`
+
+      if (!recebido) {
+        btn.addEventListener('click', () => abrirFormulario(insumo, pi, btn, botoes))
+      }
+
+      botoes.appendChild(btn)
+    })
+
+    card.appendChild(cabecalho)
+    card.appendChild(botoes)
     containerCards.appendChild(card)
   })
+}
+
+function abrirFormulario(insumo, pi, btn, botoes) {
+  const idForm = `form-insumo-${insumo.id}`
+  const existente = document.getElementById(idForm)
+  if (existente) {
+    existente.remove()
+    btn.classList.remove('active')
+    return
+  }
+
+  document.querySelectorAll('.form-insumo-expansivel').forEach((f) => f.remove())
+  document.querySelectorAll('.btn-insumo-ativo').forEach((b) => b.classList.remove('btn-insumo-ativo', 'active'))
+
+  btn.classList.add('active')
+
+  const unidade = unidadeTipo[insumo.tipo] || 'unidades'
+
+  const form = document.createElement('div')
+  form.id = idForm
+  form.className = 'form-insumo-expansivel px-3 pb-3 border-top pt-3'
+
+  const previewProduto = document.createElement('img')
+  previewProduto.className = 'preview-foto'
+  previewProduto.hidden = true
+
+  const previewNota = document.createElement('img')
+  previewNota.className = 'preview-foto'
+  previewNota.hidden = true
+
+  const inputFotoProduto = criarInputFoto()
+  const inputFotoNota = criarInputFoto()
+
+  const btnProduto = document.createElement('button')
+  btnProduto.className = 'btn btn-sm btn-outline-secondary btn-foto'
+  btnProduto.innerHTML = '📦 Foto produto'
+  btnProduto.addEventListener('click', () => inputFotoProduto.click())
+
+  const btnNota = document.createElement('button')
+  btnNota.className = 'btn btn-sm btn-outline-secondary btn-foto'
+  btnNota.innerHTML = '🧾 Foto nota'
+  btnNota.addEventListener('click', () => inputFotoNota.click())
+
+  const btnRemoverProduto = criarBtnRemover('✕ produto')
+  btnRemoverProduto.hidden = true
+
+  const btnRemoverNota = criarBtnRemover('✕ nota')
+  btnRemoverNota.hidden = true
+
+  inputFotoProduto.addEventListener('change', () => {
+    const f = inputFotoProduto.files[0]
+    if (!f) return
+    previewProduto.src = URL.createObjectURL(f)
+    previewProduto.hidden = false
+    btnRemoverProduto.hidden = false
+    btnProduto.className = 'btn btn-sm btn-foto btn-foto-ok'
+    btnProduto.innerHTML = '📦 ✅'
+  })
+
+  inputFotoNota.addEventListener('change', () => {
+    const f = inputFotoNota.files[0]
+    if (!f) return
+    previewNota.src = URL.createObjectURL(f)
+    previewNota.hidden = false
+    btnRemoverNota.hidden = false
+    btnNota.className = 'btn btn-sm btn-foto btn-foto-ok'
+    btnNota.innerHTML = '🧾 ✅'
+  })
+
+  btnRemoverProduto.addEventListener('click', () => {
+    inputFotoProduto.value = ''
+    previewProduto.hidden = true
+    previewProduto.src = ''
+    btnRemoverProduto.hidden = true
+    btnProduto.className = 'btn btn-sm btn-outline-secondary btn-foto'
+    btnProduto.innerHTML = '📦 Foto produto'
+  })
+
+  btnRemoverNota.addEventListener('click', () => {
+    inputFotoNota.value = ''
+    previewNota.hidden = true
+    previewNota.src = ''
+    btnRemoverNota.hidden = true
+    btnNota.className = 'btn btn-sm btn-outline-secondary btn-foto'
+    btnNota.innerHTML = '🧾 Foto nota'
+  })
+
+  const inputQtd = document.createElement('input')
+  inputQtd.type = 'number'
+  inputQtd.className = 'form-control form-control-sm'
+  inputQtd.placeholder = `Qtd em ${unidade}`
+  inputQtd.min = '0'
+  inputQtd.step = 'any'
+
+  const btnConfirmar = document.createElement('button')
+  btnConfirmar.className = 'btn btn-ok-grande mt-2'
+  btnConfirmar.textContent = `✔ Confirmar ${labelTipo[insumo.tipo]}`
+  btnConfirmar.addEventListener('click', () => {
+    if (!inputQtd.value) { alert(`Informe a quantidade em ${unidade}.`); return }
+    registrar(insumo.id, inputQtd.value, unidade, inputFotoProduto.files[0] || null, inputFotoNota.files[0] || null, btnConfirmar)
+  })
+
+  const areaBotoesFoto = document.createElement('div')
+  areaBotoesFoto.className = 'd-flex gap-2 mb-2 mt-2'
+  areaBotoesFoto.appendChild(btnProduto)
+  areaBotoesFoto.appendChild(btnNota)
+
+  const areaBtnRemover = document.createElement('div')
+  areaBtnRemover.className = 'd-flex gap-3 mb-2'
+  areaBtnRemover.appendChild(btnRemoverProduto)
+  areaBtnRemover.appendChild(btnRemoverNota)
+
+  form.appendChild(inputQtd)
+  form.appendChild(previewProduto)
+  form.appendChild(previewNota)
+  form.appendChild(areaBotoesFoto)
+  form.appendChild(areaBtnRemover)
+  form.appendChild(inputFotoProduto)
+  form.appendChild(inputFotoNota)
+  form.appendChild(btnConfirmar)
+
+  botoes.parentElement.appendChild(form)
 }
 
 function criarInputFoto() {
@@ -151,7 +197,7 @@ function criarInputFoto() {
 
 function criarBtnRemover(texto) {
   const btn = document.createElement('button')
-  btn.className = 'btn-remover-foto d-block mb-1'
+  btn.className = 'btn-remover-foto'
   btn.textContent = texto
   return btn
 }
@@ -161,19 +207,19 @@ async function registrar(id, quantidade, unidade, fotoProduto, fotoNota, botao) 
   botao.textContent = 'Enviando...'
   const resultado = await api.recebimentos.registrar(id, `${quantidade} ${unidade}`, fotoProduto, fotoNota)
   if (resultado?.erro) {
-    alert('Erro ao registrar. Tente novamente.')
+    alert('Erro ao registrar.')
     botao.disabled = false
-    botao.textContent = '✔ Confirmar recebimento'
+    botao.textContent = 'Tentar de novo'
     return
   }
-  carregarPendentes()
+  carregarRecebimentos()
 }
 
 async function iniciar() {
   const perfil = exigirPapel(['admin', 'deposito'])
   if (!perfil) return
   montarCabecalho(perfil.papel)
-  carregarPendentes()
+  carregarRecebimentos()
 }
 
 iniciar()
