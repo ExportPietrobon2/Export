@@ -186,14 +186,14 @@ app.get('/api/recebimentos/pendentes', autenticar(['admin', 'deposito']), async 
 
   for (const pedido of pedidos) {
     const [produtos] = await pool.query(
-      'SELECT produto FROM produtos_pi WHERE pi_id = ? ORDER BY criado_em',
+      'SELECT id, produto FROM produtos_pi WHERE pi_id = ? ORDER BY criado_em',
       [pedido.id]
     )
     const [insumos] = await pool.query(
-      'SELECT id, tipo, status_recebimento, quantidade_recebida FROM recebimentos_b2 WHERE pi_id = ? ORDER BY tipo',
+      'SELECT id, tipo, status_recebimento, quantidade_recebida FROM recebimentos_b2 WHERE pi_id = ?',
       [pedido.id]
     )
-    pedido.produtos = produtos.map((p) => p.produto)
+    pedido.produtos = produtos
     pedido.insumos = insumos
   }
 
