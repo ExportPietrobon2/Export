@@ -14,7 +14,9 @@ export function montarCabecalho(papel) {
   nav.className = 'navbar navbar-expand-lg navbar-pietrobon sticky-top'
   nav.innerHTML = `
     <div class="container-fluid px-3">
-      <a class="navbar-brand" href="/HTML/admin.html">🏭 Pietrobon · Insumos</a>
+      <a class="navbar-brand d-flex align-items-center gap-2" href="/HTML/admin.html">
+        <img src="/logo.png" alt="Pietrobon" style="height:36px;object-fit:contain;">
+      </a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
         <span class="navbar-toggler-icon"></span>
       </button>
