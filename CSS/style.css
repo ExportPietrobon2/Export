@@ -88,8 +88,32 @@ body {
   padding: 30px 28px 28px;
 }
 
+.page-header {
+  background: var(--bg-card);
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  padding: 18px 20px 14px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.page-header-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--red), var(--red-dark));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(180,20,20,0.25);
+}
+.page-header-texto { flex: 1; }
 .page-titulo {
-  font-size: 1.55rem;
+  font-size: 1.45rem;
   font-weight: 800;
   color: var(--red-dark);
   border-left: 5px solid var(--orange);
@@ -99,10 +123,10 @@ body {
   letter-spacing: -0.01em;
 }
 .page-subtitulo {
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   color: var(--muted);
   padding-left: 17px;
-  margin-bottom: 24px;
+  margin-bottom: 0;
 }
 
 .card {
@@ -359,6 +383,17 @@ body {
 }
 
 .form-check-input:checked { background-color: var(--red) !important; border-color: var(--red) !important; }
+
+.secao-titulo-card {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--red-dark);
+  border-left: 3px solid var(--orange);
+  padding-left: 10px;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 
 .badge { display: inline-flex; align-items: center; justify-content: center; font-weight: 600; }
 
