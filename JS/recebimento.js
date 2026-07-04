@@ -32,20 +32,22 @@ async function carregarRecebimentos() {
     const cabecalho = document.createElement('div')
     cabecalho.className = 'card-body pb-2'
     cabecalho.innerHTML = `
-      <div class="d-flex justify-content-between align-items-start mb-1">
-        <div>
-          <span class="badge bg-danger me-1">PI ${pi.numero_pi}</span>
-          <span class="badge bg-secondary">${pi.cliente ?? ''}</span>
-        </div>
+      <div class="d-flex align-items-center gap-1 flex-wrap mb-2">
+        <span class="badge bg-danger">PI ${pi.numero_pi}</span>
+        <span class="badge bg-secondary">${pi.cliente ?? ''}</span>
       </div>
-      ${pi.produto ? `<div class="fw-semibold small">${pi.produto}</div>` : ''}
+      ${pi.produtos.length > 0 ? `
+        <div class="small text-muted mb-1">Produtos:</div>
+        <ul class="list-unstyled mb-0 small fw-semibold">
+          ${pi.produtos.map((p) => `<li>• ${p}</li>`).join('')}
+        </ul>` : ''}
     `
 
     const botoes = document.createElement('div')
-    botoes.className = 'd-flex gap-2 flex-wrap px-3 pb-3'
+    botoes.className = 'd-flex gap-2 flex-wrap px-3 pb-3 mt-2'
 
     pi.insumos.forEach((insumo) => {
-      const recebido = insumo.status === 'recebido'
+      const recebido = insumo.status_recebimento === 'recebido'
       const btn = document.createElement('button')
       btn.className = `btn btn-sm ${recebido ? 'btn-success' : 'btn-outline-danger'}`
       btn.style.borderRadius = '20px'

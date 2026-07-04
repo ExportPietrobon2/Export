@@ -176,38 +176,28 @@ app.patch('/api/produtos/:produtoId/insumos', autenticar(['admin', 'almoxarifado
 })
 
 app.get('/api/recebimentos/pendentes', autenticar(['admin', 'deposito']), async (req, res) => {
-  const [rows] = await pool.query(`
-    SELECT r.id, r.tipo, r.status_recebimento, r.quantidade_recebida,
-           p.numero_pi, p.cliente, p.id as pi_id,
-           pr.produto
-    FROM recebimentos_b2 r
-    JOIN pedidos p ON p.id = r.pi_id
-    LEFT JOIN produtos_pi pr ON pr.pi_id = p.id
+  const [pedidos] = await pool.query(`
+    SELECT DISTINCT p.id, p.numero_pi, p.cliente
+    FROM pedidos p
+    JOIN recebimentos_b2 r ON r.pi_id = p.id
     WHERE p.concluida = 0
-    GROUP BY r.id, p.numero_pi, p.cliente, p.id, pr.produto
-    ORDER BY p.numero_pi, r.tipo ASC
+    ORDER BY p.numero_pi ASC
   `)
 
-  const porPi = {}
-  rows.forEach((row) => {
-    if (!porPi[row.pi_id]) {
-      porPi[row.pi_id] = {
-        pi_id: row.pi_id,
-        numero_pi: row.numero_pi,
-        cliente: row.cliente,
-        produto: row.produto,
-        insumos: []
-      }
-    }
-    porPi[row.pi_id].insumos.push({
-      id: row.id,
-      tipo: row.tipo,
-      status: row.status_recebimento,
-      quantidade_recebida: row.quantidade_recebida
-    })
-  })
+  for (const pedido of pedidos) {
+    const [produtos] = await pool.query(
+      'SELECT produto FROM produtos_pi WHERE pi_id = ? ORDER BY criado_em',
+      [pedido.id]
+    )
+    const [insumos] = await pool.query(
+      'SELECT id, tipo, status_recebimento, quantidade_recebida FROM recebimentos_b2 WHERE pi_id = ? ORDER BY tipo',
+      [pedido.id]
+    )
+    pedido.produtos = produtos.map((p) => p.produto)
+    pedido.insumos = insumos
+  }
 
-  res.json(Object.values(porPi))
+  res.json(pedidos)
 })
 
 app.patch('/api/recebimentos/:id', autenticar(['admin', 'deposito']), upload.fields([{ name: 'foto_produto', maxCount: 1 }, { name: 'foto_nota', maxCount: 1 }]), async (req, res) => {
