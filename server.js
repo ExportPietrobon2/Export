@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken')
 const cloudinary = require('cloudinary').v2
 const multer = require('multer')
 const path = require('path')
-const nodemailer = require('nodemailer')
+const { Resend } = require('resend')
 
 const app = express()
 app.use(express.json())
@@ -22,13 +22,7 @@ const upload = multer({ storage: multer.memoryStorage() })
 const EMAIL_TESTE = 'export2@pietrobon.com.br'
 const MODO_TESTE = true
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_REMETENTE,
-    pass: process.env.EMAIL_SENHA_APP
-  }
-})
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 async function getDestinatarios() {
   if (MODO_TESTE) return [EMAIL_TESTE]
@@ -39,14 +33,14 @@ async function getDestinatarios() {
 async function enviarEmail(assunto, corpo) {
   try {
     const destinatarios = await getDestinatarios()
-    await transporter.sendMail({
-      from: `"Pietrobon · Insumos" <${process.env.EMAIL_REMETENTE}>`,
-      to: destinatarios.join(', '),
+    await resend.emails.send({
+      from: 'Pietrobon · Insumos <onboarding@resend.dev>',
+      to: destinatarios,
       subject: assunto,
       html: `
         <div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;">
           <div style="background:linear-gradient(120deg,#ED3237,#C6242A);padding:24px 28px;border-radius:12px 12px 0 0;">
-            <img src="https://pietrobon-export-estoque.up.railway.app/logo.png" style="height:48px;filter:brightness(0) invert(1);" alt="Pietrobon">
+            <p style="color:#fff;font-size:1.2rem;font-weight:800;margin:0;">🏭 Pietrobon · Insumos</p>
           </div>
           <div style="background:#fff;padding:28px;border:1px solid #f0d0d0;border-top:none;border-radius:0 0 12px 12px;">
             ${corpo}
@@ -57,6 +51,7 @@ async function enviarEmail(assunto, corpo) {
         </div>
       `
     })
+    console.log('Email enviado:', assunto)
   } catch (e) {
     console.error('Erro ao enviar email:', e.message)
   }
