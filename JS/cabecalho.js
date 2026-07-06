@@ -4,11 +4,11 @@ export function montarCabecalho(papel) {
   const paginaAtual = document.body.dataset.pagina
 
   const links = [
-    { href: '/HTML/admin.html', texto: 'Painel Admin', papeis: ['admin', 'convidado'] },
     { href: '/HTML/cadastro.html', texto: 'Cadastro', papeis: ['admin', 'convidado'] },
     { href: '/HTML/almoxarifado.html', texto: 'Almoxarifado', papeis: ['admin', 'almoxarifado', 'convidado'] },
     { href: '/HTML/recebimento.html', texto: 'Recebimento B2', papeis: ['admin', 'deposito', 'convidado'] },
-    { href: '/HTML/referencia.html', texto: 'Rendimentos', papeis: ['admin', 'deposito', 'convidado'] }
+    { href: '/HTML/referencia.html', texto: 'Rendimentos', papeis: ['admin', 'deposito', 'convidado'] },
+    { href: '/HTML/admin.html', texto: 'Painel Admin', papeis: ['admin', 'convidado'] }
   ].filter((l) => l.papeis.includes(papel))
 
   const nav = document.createElement('nav')
@@ -34,7 +34,7 @@ export function montarCabecalho(papel) {
                 ${link.texto}
               </a>
             </li>`).join('')}
-          <li class="nav-item d-none d-lg-block"><span style="color:rgba(255,255,255,0.25);padding:0 4px">|</span></li>
+          ${links.some(l => l.href === '/HTML/admin.html') ? '<li class="nav-item d-none d-lg-block"><span style="color:rgba(255,255,255,0.25);padding:0 4px">|</span></li>' : ''}
           ${links.filter(l => l.href === '/HTML/admin.html').map((link) => `
             <li class="nav-item">
               <a class="nav-link nav-link-destaque ${link.href.endsWith(paginaAtual) ? 'active' : ''}" href="${link.href}">
