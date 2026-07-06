@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken')
 const cloudinary = require('cloudinary').v2
 const multer = require('multer')
 const path = require('path')
+const nodemailer = require('nodemailer')
 
 const app = express()
 app.use(express.json())
@@ -17,6 +18,49 @@ cloudinary.config({
 })
 
 const upload = multer({ storage: multer.memoryStorage() })
+
+const EMAIL_TESTE = 'export2@pietrobon.com.br'
+const MODO_TESTE = true
+
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_REMETENTE,
+    pass: process.env.EMAIL_SENHA_APP
+  }
+})
+
+async function getDestinatarios() {
+  if (MODO_TESTE) return [EMAIL_TESTE]
+  const [rows] = await pool.query('SELECT email FROM usuarios')
+  return rows.map((r) => r.email)
+}
+
+async function enviarEmail(assunto, corpo) {
+  try {
+    const destinatarios = await getDestinatarios()
+    await transporter.sendMail({
+      from: `"Pietrobon · Insumos" <${process.env.EMAIL_REMETENTE}>`,
+      to: destinatarios.join(', '),
+      subject: assunto,
+      html: `
+        <div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;">
+          <div style="background:linear-gradient(120deg,#ED3237,#C6242A);padding:24px 28px;border-radius:12px 12px 0 0;">
+            <img src="https://pietrobon-export-estoque.up.railway.app/logo.png" style="height:48px;filter:brightness(0) invert(1);" alt="Pietrobon">
+          </div>
+          <div style="background:#fff;padding:28px;border:1px solid #f0d0d0;border-top:none;border-radius:0 0 12px 12px;">
+            ${corpo}
+            <hr style="border:none;border-top:1px solid #f0d0d0;margin:24px 0;">
+            <p style="font-size:0.78rem;color:#8a6a6a;margin:0;">Pietrobon & Cia Ltda · Controle de Insumos Exportação<br>
+            ${MODO_TESTE ? '<strong style="color:#ED3237">⚠ Modo teste — notificação enviada apenas para ' + EMAIL_TESTE + '</strong>' : ''}</p>
+          </div>
+        </div>
+      `
+    })
+  } catch (e) {
+    console.error('Erro ao enviar email:', e.message)
+  }
+}
 
 const pool = mysql.createPool({
   host: process.env.MYSQLHOST,
@@ -187,6 +231,62 @@ app.patch('/api/produtos/:produtoId/insumos', autenticar(['admin', 'almoxarifado
   if (observacoes !== undefined) {
     await pool.query('UPDATE produtos_pi SET observacoes = ? WHERE id = ?', [observacoes, req.params.produtoId])
   }
+
+  const [produtoInfo] = await pool.query(
+    'SELECT pp.pi_id, pp.produto, p.numero_pi, p.cliente FROM produtos_pi pp JOIN pedidos p ON p.id = pp.pi_id WHERE pp.id = ?',
+    [req.params.produtoId]
+  )
+  const [todosInsumos] = await pool.query(
+    'SELECT tipo, confirmado, sobra FROM insumos_produto WHERE produto_id = ?',
+    [req.params.produtoId]
+  )
+
+  if (produtoInfo[0]) {
+    const { numero_pi, cliente, produto } = produtoInfo[0]
+
+    const etiqueta = todosInsumos.find((i) => i.tipo === 'etiqueta')
+    if (etiqueta && Number(etiqueta.sobra) > 0 && Number(etiqueta.sobra) < 100) {
+      enviarEmail(
+        `⚠ Estoque baixo de etiquetas — PI ${numero_pi}`,
+        `<h2 style="color:#E65100;margin:0 0 16px">⚠ Estoque Baixo de Etiquetas</h2>
+         <table style="width:100%;border-collapse:collapse;">
+           <tr><td style="padding:8px 0;color:#8a6a6a;width:140px">PI</td><td style="padding:8px 0;font-weight:600">${numero_pi}</td></tr>
+           <tr><td style="padding:8px 0;color:#8a6a6a">Cliente</td><td style="padding:8px 0;font-weight:600">${cliente || '—'}</td></tr>
+           <tr><td style="padding:8px 0;color:#8a6a6a">Produto</td><td style="padding:8px 0;font-weight:600">${produto}</td></tr>
+           <tr><td style="padding:8px 0;color:#8a6a6a">Etiquetas</td><td style="padding:8px 0;font-weight:600;color:#E65100">${etiqueta.sobra} unidades restantes</td></tr>
+         </table>`
+      )
+    }
+
+    const semEtiqueta = todosInsumos.filter((i) => i.tipo !== 'etiqueta')
+    const tudo = semEtiqueta.every((i) => i.confirmado)
+    const algum = semEtiqueta.some((i) => i.confirmado)
+
+    if (tudo) {
+      enviarEmail(
+        `✅ PI Liberada — ${numero_pi}`,
+        `<h2 style="color:#2E7D32;margin:0 0 16px">✅ PI Liberada para Produção</h2>
+         <table style="width:100%;border-collapse:collapse;">
+           <tr><td style="padding:8px 0;color:#8a6a6a;width:140px">PI</td><td style="padding:8px 0;font-weight:600">${numero_pi}</td></tr>
+           <tr><td style="padding:8px 0;color:#8a6a6a">Cliente</td><td style="padding:8px 0;font-weight:600">${cliente || '—'}</td></tr>
+           <tr><td style="padding:8px 0;color:#8a6a6a">Produto</td><td style="padding:8px 0;font-weight:600">${produto}</td></tr>
+         </table>
+         <p style="margin:16px 0 0;color:#2E7D32;font-weight:600">Todos os insumos estão disponíveis para produção.</p>`
+      )
+    } else if (!algum) {
+      enviarEmail(
+        `🚫 PI Bloqueada — ${numero_pi}`,
+        `<h2 style="color:#ED3237;margin:0 0 16px">🚫 PI com Insumos Insuficientes</h2>
+         <table style="width:100%;border-collapse:collapse;">
+           <tr><td style="padding:8px 0;color:#8a6a6a;width:140px">PI</td><td style="padding:8px 0;font-weight:600">${numero_pi}</td></tr>
+           <tr><td style="padding:8px 0;color:#8a6a6a">Cliente</td><td style="padding:8px 0;font-weight:600">${cliente || '—'}</td></tr>
+           <tr><td style="padding:8px 0;color:#8a6a6a">Produto</td><td style="padding:8px 0;font-weight:600">${produto}</td></tr>
+         </table>
+         <p style="margin:16px 0 0;color:#ED3237;font-weight:600">Um ou mais insumos estão com estoque insuficiente.</p>`
+      )
+    }
+  }
+
   res.json({ ok: true })
 })
 
@@ -242,6 +342,31 @@ app.patch('/api/recebimentos/:id', autenticar(['admin', 'deposito']), upload.fie
     'UPDATE recebimentos_b2 SET status_recebimento = ?, recebido_em = NOW(), quantidade_recebida = ?, foto_url = ?, foto_nota_url = ? WHERE id = ?',
     ['recebido', quantidade_recebida || null, fotoProdutoUrl, fotoNotaUrl, req.params.id]
   )
+
+  const [rec] = await pool.query(`
+    SELECT r.tipo, r.quantidade_recebida, p.numero_pi, p.cliente, pr.produto
+    FROM recebimentos_b2 r
+    JOIN pedidos p ON p.id = r.pi_id
+    LEFT JOIN produtos_pi pr ON pr.id = r.produto_id
+    WHERE r.id = ?
+  `, [req.params.id])
+
+  if (rec[0]) {
+    const { tipo, quantidade_recebida: qtd, numero_pi, cliente, produto } = rec[0]
+    const tipoLabel = { embalagem: 'Embalagem', rotulo: 'Rótulo', caixa: 'Caixa' }[tipo] || tipo
+    enviarEmail(
+      `📦 Recebimento confirmado — PI ${numero_pi}`,
+      `<h2 style="color:#2E7D32;margin:0 0 16px">✅ Recebimento Confirmado</h2>
+       <table style="width:100%;border-collapse:collapse;">
+         <tr><td style="padding:8px 0;color:#8a6a6a;width:140px">PI</td><td style="padding:8px 0;font-weight:600">${numero_pi}</td></tr>
+         <tr><td style="padding:8px 0;color:#8a6a6a">Cliente</td><td style="padding:8px 0;font-weight:600">${cliente || '—'}</td></tr>
+         ${produto ? `<tr><td style="padding:8px 0;color:#8a6a6a">Produto</td><td style="padding:8px 0;font-weight:600">${produto}</td></tr>` : ''}
+         <tr><td style="padding:8px 0;color:#8a6a6a">Insumo</td><td style="padding:8px 0;font-weight:600">${tipoLabel}</td></tr>
+         ${qtd ? `<tr><td style="padding:8px 0;color:#8a6a6a">Quantidade</td><td style="padding:8px 0;font-weight:600">${qtd}</td></tr>` : ''}
+       </table>`
+    )
+  }
+
   res.json({ ok: true })
 })
 
