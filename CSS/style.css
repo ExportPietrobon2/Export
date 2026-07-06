@@ -462,3 +462,16 @@ body {
 .table-hover tbody tr:hover {
   background: #fff8f8 !important;
 }
+
+.nav-link-destaque {
+  background: rgba(255,255,255,0.15) !important;
+  border-radius: 8px !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  padding: 6px 14px !important;
+}
+
+.nav-link-destaque:hover,
+.nav-link-destaque.active {
+  background: rgba(255,255,255,0.28) !important;
+}
