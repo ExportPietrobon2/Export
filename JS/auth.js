@@ -24,7 +24,7 @@ export function exigirPapel(papeisPermitidos) {
     window.location.href = '/index.html'
     return null
   }
-  if (!papeisPermitidos.includes(perfil.papel)) {
+  if (papeisPermitidos !== 'todos' && !papeisPermitidos.includes(perfil.papel)) {
     window.location.href = '/index.html'
     return null
   }

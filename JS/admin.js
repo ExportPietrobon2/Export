@@ -122,9 +122,9 @@ async function carregar() {
       </div>
       <div class="d-flex gap-2 flex-wrap">
         <button class="btn btn-sm btn-outline-danger btn-expandir" data-id="${pedido.id}">Ver detalhes ▾</button>
-        <button class="btn btn-sm ${pedido.concluida ? 'btn-outline-warning' : 'btn-outline-success'} btn-concluir" data-id="${pedido.id}" data-concluida="${pedido.concluida ? 'true' : 'false'}">
+        ${!window._convidado ? `<button class="btn btn-sm ${pedido.concluida ? 'btn-outline-warning' : 'btn-outline-success'} btn-concluir" data-id="${pedido.id}" data-concluida="${pedido.concluida ? 'true' : 'false'}">
           ${pedido.concluida ? '↩ Reabrir' : '✔ Concluir'}
-        </button>
+        </button>` : ''}
       </div>
     `
 
@@ -158,9 +158,10 @@ async function carregar() {
 toggleConcluidas.addEventListener('change', carregar)
 
 async function iniciar() {
-  const perfil = exigirPapel(['admin'])
+  const perfil = exigirPapel(['admin', 'convidado'])
   if (!perfil) return
   montarCabecalho(perfil.papel)
+  window._convidado = perfil.papel === 'convidado'
   carregar()
 }
 

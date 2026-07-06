@@ -4,7 +4,8 @@ import { getPerfil, salvarToken } from './auth.js'
 const paginaPorPapel = {
   admin: '/HTML/admin.html',
   almoxarifado: '/HTML/almoxarifado.html',
-  deposito: '/HTML/recebimento.html'
+  deposito: '/HTML/recebimento.html',
+  convidado: '/HTML/admin.html'
 }
 
 function redirecionarSeLogado() {

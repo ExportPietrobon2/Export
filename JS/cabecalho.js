@@ -4,10 +4,10 @@ export function montarCabecalho(papel) {
   const paginaAtual = document.body.dataset.pagina
 
   const links = [
-    { href: '/HTML/cadastro.html', texto: 'Cadastro', papeis: ['admin'] },
-    { href: '/HTML/recebimento.html', texto: 'Recebimento B2', papeis: ['admin', 'deposito'] },
-    { href: '/HTML/almoxarifado.html', texto: 'Almoxarifado', papeis: ['admin', 'almoxarifado'] },
-    { href: '/HTML/admin.html', texto: 'Painel Admin', papeis: ['admin'] }
+    { href: '/HTML/cadastro.html', texto: 'Cadastro', papeis: ['admin', 'convidado'] },
+    { href: '/HTML/recebimento.html', texto: 'Recebimento B2', papeis: ['admin', 'deposito', 'convidado'] },
+    { href: '/HTML/almoxarifado.html', texto: 'Almoxarifado', papeis: ['admin', 'almoxarifado', 'convidado'] },
+    { href: '/HTML/admin.html', texto: 'Painel Admin', papeis: ['admin', 'convidado'] }
   ].filter((l) => l.papeis.includes(papel))
 
   const nav = document.createElement('nav')

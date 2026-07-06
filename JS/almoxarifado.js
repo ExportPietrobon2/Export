@@ -124,7 +124,7 @@ async function carregarPi(piId) {
         <textarea class="form-control" data-produto="${produto.id}" data-campo="observacoes" rows="2">${produto.observacoes || ''}</textarea>
       </div>
 
-      <button class="btn btn-pietrobon w-100 mt-3 btn-salvar-produto" data-produto="${produto.id}" data-quantidade="${produto.quantidade}">
+      <button class="btn btn-pietrobon w-100 mt-3 btn-salvar-produto${window._convidado ? ' d-none' : ''}" data-produto="${produto.id}" data-quantidade="${produto.quantidade}">
         Salvar
       </button>
     `
@@ -354,9 +354,10 @@ document.querySelectorAll('[data-aba]').forEach((btn) => {
 })
 
 async function iniciar() {
-  const perfil = exigirPapel(['admin', 'almoxarifado'])
+  const perfil = exigirPapel(['admin', 'almoxarifado', 'convidado'])
   if (!perfil) return
   montarCabecalho(perfil.papel)
+  window._convidado = perfil.papel === 'convidado'
   carregarPedidos()
 }
 

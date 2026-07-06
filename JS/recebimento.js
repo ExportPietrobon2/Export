@@ -74,7 +74,7 @@ async function carregarRecebimentos() {
 
         blocoInsumo.appendChild(btnInsumo)
 
-        if (!recebido) {
+        if (!recebido && !window._convidado) {
           const form = criarForm(insumo, produto)
           form.style.display = 'none'
           blocoInsumo.appendChild(form)
@@ -125,10 +125,10 @@ function criarForm(insumo, produto) {
   const inputFotoProduto = criarInputFoto()
   const inputFotoNota = criarInputFoto()
 
-  const btnRemoverProduto = criarBtnRemover('✕ Produto')
+  const btnRemoverProduto = criarBtnRemover('✕ produto')
   btnRemoverProduto.hidden = true
 
-  const btnRemoverNota = criarBtnRemover('✕ Nota')
+  const btnRemoverNota = criarBtnRemover('✕ nota')
   btnRemoverNota.hidden = true
 
   const btnFotoProduto = document.createElement('button')
@@ -240,9 +240,10 @@ async function registrar(id, quantidade, unidade, fotoProduto, fotoNota, botao) 
 }
 
 async function iniciar() {
-  const perfil = exigirPapel(['admin', 'deposito'])
+  const perfil = exigirPapel(['admin', 'deposito', 'convidado'])
   if (!perfil) return
   montarCabecalho(perfil.papel)
+  window._convidado = perfil.papel === 'convidado'
   carregarRecebimentos()
 }
 

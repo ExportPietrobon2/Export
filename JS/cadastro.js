@@ -35,7 +35,7 @@ async function carregarPedidos() {
     botaoExcluir.className = 'btn btn-sm btn-outline-danger'
     botaoExcluir.textContent = 'Excluir PI'
     botaoExcluir.addEventListener('click', () => excluirPi(pedido.id, pedido.numero_pi))
-    cabecalhoPi.appendChild(botaoExcluir)
+    if (!window._convidado) cabecalhoPi.appendChild(botaoExcluir)
 
     bloco.appendChild(cabecalhoPi)
 
@@ -54,11 +54,11 @@ async function carregarPedidos() {
           <span class="small fw-semibold">${produto.produto}</span>
           <div class="d-flex align-items-center gap-2">
             <span class="badge bg-light text-dark border" id="qtd-label-${produto.id}">${formatarQuantidade(produto.quantidade)}</span>
-            <button class="btn btn-sm btn-outline-warning btn-editar-qtd d-flex align-items-center gap-1"
+            ${!window._convidado ? `<button class="btn btn-sm btn-outline-warning btn-editar-qtd d-flex align-items-center gap-1"
               data-produto-id="${produto.id}" data-quantidade="${produto.quantidade}"
               style="border-radius:8px">
               ✏️ Editar
-            </button>
+            </button>` : ''}
           </div>
         `
         lista.appendChild(item)
@@ -129,9 +129,13 @@ document.getElementById('form-novo-produto').addEventListener('submit', async (e
 })
 
 async function iniciar() {
-  const perfil = exigirPapel(['admin'])
+  const perfil = exigirPapel(['admin', 'convidado'])
   if (!perfil) return
   montarCabecalho(perfil.papel)
+  window._convidado = perfil.papel === 'convidado'
+  if (window._convidado) {
+    document.querySelectorAll('.card').forEach((c, i) => { if (i < 2) c.style.display = 'none' })
+  }
   carregarPedidos()
 }
 

@@ -48,6 +48,8 @@ function autenticar(papeis) {
   }
 }
 
+const TODOS = ['admin', 'almoxarifado', 'deposito', 'convidado']
+
 app.post('/api/login', async (req, res) => {
   const { email, senha } = req.body
   const [rows] = await pool.query('SELECT * FROM usuarios WHERE email = ?', [email])
@@ -64,7 +66,7 @@ app.post('/api/login', async (req, res) => {
   res.json({ token, papel: usuario.papel, nome: usuario.nome })
 })
 
-app.get('/api/pedidos', autenticar(['admin', 'almoxarifado', 'deposito']), async (req, res) => {
+app.get('/api/pedidos', autenticar(TODOS), async (req, res) => {
   const incluirConcluidas = req.query.incluirConcluidas === 'true'
   const condicao = incluirConcluidas ? '' : 'WHERE concluida = 0'
   const [pedidos] = await pool.query(`SELECT * FROM pedidos ${condicao} ORDER BY numero_pi DESC`)
@@ -128,7 +130,7 @@ app.patch('/api/produtos/:id/quantidade', autenticar(['admin']), async (req, res
   res.json({ ok: true })
 })
 
-app.get('/api/pedidos/:piId/produtos', autenticar(['admin', 'almoxarifado', 'deposito']), async (req, res) => {
+app.get('/api/pedidos/:piId/produtos', autenticar(TODOS), async (req, res) => {
   const [produtos] = await pool.query(
     'SELECT * FROM produtos_pi WHERE pi_id = ?', [req.params.piId]
   )
@@ -160,7 +162,7 @@ app.post('/api/produtos', autenticar(['admin']), async (req, res) => {
   res.json({ id: produtoId })
 })
 
-app.get('/api/produtos/:produtoId/insumos', autenticar(['admin', 'almoxarifado']), async (req, res) => {
+app.get('/api/produtos/:produtoId/insumos', autenticar(TODOS), async (req, res) => {
   const [produto] = await pool.query('SELECT * FROM produtos_pi WHERE id = ?', [req.params.produtoId])
   const [insumos] = await pool.query('SELECT * FROM insumos_produto WHERE produto_id = ?', [req.params.produtoId])
   res.json({ produto: produto[0], insumos })
@@ -188,7 +190,7 @@ app.patch('/api/produtos/:produtoId/insumos', autenticar(['admin', 'almoxarifado
   res.json({ ok: true })
 })
 
-app.get('/api/recebimentos/pendentes', autenticar(['admin', 'deposito']), async (req, res) => {
+app.get('/api/recebimentos/pendentes', autenticar(TODOS), async (req, res) => {
   const [pedidos] = await pool.query(`
     SELECT DISTINCT p.id, p.numero_pi, p.cliente
     FROM pedidos p
