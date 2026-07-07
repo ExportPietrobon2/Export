@@ -237,7 +237,6 @@ async function salvarProduto(produtoId, quantidade) {
 
 selectPi.addEventListener('change', () => carregarPi(selectPi.value))
 
-const rotuloInsumo = { embalagem: 'Embalagem', rotulo: 'Rótulo', caixa: 'Caixa', etiqueta: 'Etiqueta' }
 
 async function carregarRecebimentos() {
   const container = document.getElementById('conteudo-recebimentos')
@@ -320,104 +319,6 @@ async function carregarRecebimentos() {
     }
   }
 
-  const pis = await api.recebimentos.pendentes()
-  if (!pis || !pis.length) {
-    const vazio = document.createElement('p')
-    vazio.className = 'text-muted fst-italic'
-    vazio.textContent = 'Nenhum recebimento por PI registrado.'
-    container.appendChild(vazio)
-    return
-  }
-
-  pis.forEach((pi) => {
-    const card = document.createElement('div')
-    card.className = 'card border-0 shadow-sm mb-3'
-
-    const topo = document.createElement('div')
-    topo.className = 'card-body pb-2'
-    topo.innerHTML = `
-      <div class="d-flex align-items-center gap-2 mb-2">
-        <span class="badge bg-danger">PI ${pi.numero_pi}</span>
-        <span class="badge bg-secondary">${pi.cliente ?? ''}</span>
-      </div>
-    `
-    card.appendChild(topo)
-
-    pi.produtos.forEach((produto) => {
-      const bloco = document.createElement('div')
-      bloco.className = 'px-3 pb-3'
-
-      const nomeProduto = document.createElement('div')
-      nomeProduto.className = 'small fw-bold text-secondary mb-1'
-      nomeProduto.textContent = `• ${produto.produto}`
-      bloco.appendChild(nomeProduto)
-
-      const filaBotoes = document.createElement('div')
-      filaBotoes.className = 'd-flex gap-2 flex-wrap'
-
-      produto.insumos.forEach((insumo) => {
-        const recebido = insumo.status_recebimento === 'recebido'
-
-        const blocoInsumo = document.createElement('div')
-        blocoInsumo.className = 'd-flex flex-column gap-1 mb-1'
-
-        const badge = document.createElement('span')
-        badge.className = `badge ${recebido ? 'bg-success' : 'bg-danger'}`
-        badge.style.borderRadius = '20px'
-        badge.style.padding = '6px 12px'
-        badge.style.fontSize = '0.82rem'
-        badge.style.width = 'fit-content'
-        badge.innerHTML = `${recebido ? '✔' : '○'} ${rotuloInsumo[insumo.tipo] ?? insumo.tipo}${recebido && insumo.quantidade_recebida ? ' · ' + insumo.quantidade_recebida : ''}`
-        blocoInsumo.appendChild(badge)
-
-        if (recebido && (insumo.foto_url || insumo.foto_nota_url)) {
-          const fotos = document.createElement('div')
-          fotos.className = 'd-flex gap-2 flex-wrap mt-1'
-
-          if (insumo.foto_url) {
-            const link = document.createElement('a')
-            link.href = insumo.foto_url
-            link.target = '_blank'
-            const img = document.createElement('img')
-            img.src = insumo.foto_url
-            img.className = 'foto-detalhe-img rounded-2'
-            img.alt = 'Foto produto'
-            link.appendChild(img)
-            fotos.appendChild(link)
-          }
-
-          if (insumo.foto_nota_url) {
-            const link = document.createElement('a')
-            link.href = insumo.foto_nota_url
-            link.target = '_blank'
-            const img = document.createElement('img')
-            img.src = insumo.foto_nota_url
-            img.className = 'foto-detalhe-img rounded-2'
-            img.alt = 'Foto nota'
-            link.appendChild(img)
-            fotos.appendChild(link)
-          }
-
-          blocoInsumo.appendChild(fotos)
-        }
-
-        filaBotoes.appendChild(blocoInsumo)
-      })
-
-      bloco.appendChild(filaBotoes)
-
-      if (pi.produtos.indexOf(produto) < pi.produtos.length - 1) {
-        const hr = document.createElement('hr')
-        hr.className = 'my-2 mx-0'
-        bloco.appendChild(hr)
-      }
-
-      card.appendChild(bloco)
-    })
-
-    container.appendChild(card)
-  })
-}
 
 document.querySelectorAll('[data-aba]').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -654,4 +555,5 @@ async function carregarEstoqueGeral() {
     }
     carregarEstoqueGeral()
   }
+}
 }
