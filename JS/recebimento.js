@@ -2,243 +2,191 @@ import { api } from './api.js'
 import { exigirPapel } from './auth.js'
 import { montarCabecalho } from './cabecalho.js'
 
-const labelTipo = { embalagem: 'Embalagem', rotulo: 'Rótulo', caixa: 'Caixa' }
-const unidadeTipo = { embalagem: 'kg', rotulo: 'kg', caixa: 'paletes' }
-
 const containerCards = document.getElementById('cards-recebimento')
 const mensagemVazio = document.getElementById('mensagem-vazio')
 
-async function carregarRecebimentos() {
-  const pis = await api.recebimentos.pendentes()
-  if (!pis) return
+async function carregarHistorico() {
+  const entradas = await api.estoque.historico()
+  if (!entradas) return
 
-  containerCards.innerHTML = ''
-  mensagemVazio.innerHTML = ''
+  const container = document.getElementById('historico-entradas')
+  if (!container) return
 
-  if (!pis.length) {
-    mensagemVazio.innerHTML = `
-      <div class="text-center py-5">
-        <div style="font-size:3rem">✅</div>
-        <p class="fw-semibold mt-2 text-muted">Tudo recebido por hoje.</p>
-      </div>`
+  if (!entradas.length) {
+    container.innerHTML = '<p class="text-muted fst-italic small">Nenhuma entrada registrada ainda.</p>'
     return
   }
 
-  pis.forEach((pi) => {
-    const card = document.createElement('div')
-    card.className = 'card card-recebimento mb-3'
-
-    const topo = document.createElement('div')
-    topo.className = 'card-body pb-2'
-    topo.innerHTML = `
-      <div class="d-flex align-items-center gap-1 mb-3">
-        <span class="badge bg-danger">PI ${pi.numero_pi}</span>
-        <span class="badge bg-secondary">${pi.cliente ?? ''}</span>
-      </div>
-      <div class="d-flex flex-column gap-2" id="produtos-${pi.id}"></div>
-    `
-    card.appendChild(topo)
-    containerCards.appendChild(card)
-
-    const containerProdutos = card.querySelector(`#produtos-${pi.id}`)
-
-    pi.produtos.forEach((produto) => {
-      const todoRecebido = produto.insumos.length > 0 && produto.insumos.every((i) => i.status_recebimento === 'recebido')
-      const algumRecebido = produto.insumos.some((i) => i.status_recebimento === 'recebido')
-
-      const btnProduto = document.createElement('button')
-      btnProduto.className = `btn btn-sm text-start w-100 ${todoRecebido ? 'btn-success' : 'btn-outline-secondary'}`
-      btnProduto.style.borderRadius = '10px'
-      btnProduto.style.padding = '10px 14px'
-      btnProduto.dataset.produtoId = produto.id
-      btnProduto.innerHTML = `
-        <span class="fw-semibold">${produto.produto}</span>
-        <span class="ms-2 small opacity-75">${todoRecebido ? '✔ Tudo recebido' : algumRecebido ? '⚠ Parcial' : '○ Pendente'}</span>
-      `
-
-      const containerInsumos = document.createElement('div')
-      containerInsumos.className = 'd-none d-flex flex-column gap-2 ps-2 pt-2'
-      containerInsumos.id = `insumos-${produto.id}`
-
-      produto.insumos.forEach((insumo) => {
-        const recebido = insumo.status_recebimento === 'recebido'
-
-        const blocoInsumo = document.createElement('div')
-        blocoInsumo.className = 'd-flex flex-column gap-1'
-
-        const btnInsumo = document.createElement('button')
-        btnInsumo.className = `btn btn-sm ${recebido ? 'btn-success' : 'btn-outline-danger'}`
-        btnInsumo.style.borderRadius = '20px'
-        btnInsumo.style.width = 'fit-content'
-        btnInsumo.innerHTML = `${recebido ? '✔' : '○'} ${labelTipo[insumo.tipo]}${recebido && insumo.quantidade_recebida ? ' · ' + insumo.quantidade_recebida : ''}`
-
-        blocoInsumo.appendChild(btnInsumo)
-
-        if (!recebido && !window._convidado) {
-          const form = criarForm(insumo, produto)
-          form.style.display = 'none'
-          blocoInsumo.appendChild(form)
-
-          btnInsumo.addEventListener('click', () => {
-            const aberto = form.style.display !== 'none'
-            document.querySelectorAll('.form-insumo-expansivel').forEach((f) => f.style.display = 'none')
-            form.style.display = aberto ? 'none' : 'block'
-          })
-        }
-
-        containerInsumos.appendChild(blocoInsumo)
-      })
-
-      btnProduto.addEventListener('click', () => {
-        const aberto = !containerInsumos.classList.contains('d-none')
-        document.querySelectorAll('[id^="insumos-"]').forEach((c) => c.classList.add('d-none'))
-        document.querySelectorAll('.form-insumo-expansivel').forEach((f) => f.style.display = 'none')
-        if (!aberto) containerInsumos.classList.remove('d-none')
-      })
-
-      containerProdutos.appendChild(btnProduto)
-      containerProdutos.appendChild(containerInsumos)
-    })
-  })
+  container.innerHTML = entradas.map((e) => {
+    const data = new Date(e.criado_em).toLocaleString('pt-BR')
+    return `
+      <div class="border rounded-3 p-3 mb-2 bg-light">
+        <div class="small text-muted mb-1">${data}</div>
+        <div class="d-flex gap-3 flex-wrap">
+          ${e.embalagem_kg > 0 ? `<span class="badge bg-primary">📦 ${e.embalagem_kg} kg embalagem</span>` : ''}
+          ${e.rotulo_kg > 0 ? `<span class="badge bg-info text-dark">🏷 ${e.rotulo_kg} kg rótulo</span>` : ''}
+          ${e.pallet_caixas > 0 ? `<span class="badge bg-secondary">🪵 ${e.pallet_caixas} pallet(s) caixa</span>` : ''}
+        </div>
+        ${e.foto_url || e.foto_nota_url ? `
+          <div class="d-flex gap-2 mt-2 flex-wrap">
+            ${e.foto_url ? `<a href="${e.foto_url}" target="_blank"><img src="${e.foto_url}" class="foto-detalhe-img rounded-2" alt="Foto produto"></a>` : ''}
+            ${e.foto_nota_url ? `<a href="${e.foto_nota_url}" target="_blank"><img src="${e.foto_nota_url}" class="foto-detalhe-img rounded-2" alt="Foto nota"></a>` : ''}
+          </div>` : ''}
+      </div>`
+  }).join('')
 }
 
-function criarForm(insumo, produto) {
-  const unidade = unidadeTipo[insumo.tipo] || 'unidades'
+function criarFormEntrada() {
   const form = document.createElement('div')
-  form.className = 'form-insumo-expansivel border rounded-3 p-2 bg-light'
+  form.className = 'card border-0 shadow-sm mb-4'
+  form.innerHTML = `
+    <div class="card-body">
+      <h5 class="fw-bold mb-3">📥 Registrar Entrada</h5>
 
-  const inputQtd = document.createElement('input')
-  inputQtd.type = 'number'
-  inputQtd.className = 'form-control form-control-sm mb-2'
-  inputQtd.placeholder = `Quantidade em ${unidade}`
-  inputQtd.min = '0'
-  inputQtd.step = 'any'
+      <div class="row g-3 mb-3">
+        <div class="col-12 col-md-4">
+          <label class="form-label fw-semibold small">Embalagem (kg)</label>
+          <input type="number" id="inp-embalagem" class="form-control" placeholder="0" min="0" step="any">
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label fw-semibold small">Rótulo (kg)</label>
+          <input type="number" id="inp-rotulo" class="form-control" placeholder="0" min="0" step="any">
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label fw-semibold small">Pallet de caixas</label>
+          <input type="number" id="inp-pallet" class="form-control" placeholder="0" min="0" step="1">
+        </div>
+      </div>
 
-  const previewProduto = document.createElement('img')
-  previewProduto.className = 'preview-foto'
-  previewProduto.hidden = true
+      <div class="d-flex gap-2 mb-3 flex-wrap">
+        <button class="btn btn-sm btn-outline-secondary btn-foto" id="btn-foto-produto">📦 Foto produto</button>
+        <button class="btn btn-sm btn-outline-secondary btn-foto" id="btn-foto-nota">🧾 Foto nota</button>
+      </div>
 
-  const previewNota = document.createElement('img')
-  previewNota.className = 'preview-foto'
-  previewNota.hidden = true
+      <div class="d-flex gap-3 mb-3" id="area-remover-fotos"></div>
 
-  const inputFotoProduto = criarInputFoto()
-  const inputFotoNota = criarInputFoto()
+      <div class="d-flex gap-2 flex-wrap mb-3" id="previews-fotos"></div>
 
-  const btnRemoverProduto = criarBtnRemover('produto')
-  btnRemoverProduto.hidden = true
+      <input type="file" id="input-foto-produto" accept="image/*" capture="environment" hidden>
+      <input type="file" id="input-foto-nota" accept="image/*" capture="environment" hidden>
 
-  const btnRemoverNota = criarBtnRemover('nota')
-  btnRemoverNota.hidden = true
+      <button class="btn btn-ok-grande w-100" id="btn-confirmar-entrada">✔ Confirmar Entrada</button>
+    </div>
+  `
+  return form
+}
 
-  const btnFotoProduto = document.createElement('button')
-  btnFotoProduto.className = 'btn btn-sm btn-outline-secondary btn-foto'
-  btnFotoProduto.innerHTML = '📦 Foto produto'
+function iniciarForm() {
+  const form = criarFormEntrada()
+  containerCards.appendChild(form)
+
+  const inpEmbalagem = document.getElementById('inp-embalagem')
+  const inpRotulo = document.getElementById('inp-rotulo')
+  const inpPallet = document.getElementById('inp-pallet')
+  const inputFotoProduto = document.getElementById('input-foto-produto')
+  const inputFotoNota = document.getElementById('input-foto-nota')
+  const btnFotoProduto = document.getElementById('btn-foto-produto')
+  const btnFotoNota = document.getElementById('btn-foto-nota')
+  const previews = document.getElementById('previews-fotos')
+  const areaRemover = document.getElementById('area-remover-fotos')
+
   btnFotoProduto.addEventListener('click', () => inputFotoProduto.click())
-
-  const btnFotoNota = document.createElement('button')
-  btnFotoNota.className = 'btn btn-sm btn-outline-secondary btn-foto'
-  btnFotoNota.innerHTML = '🧾 Foto nota'
   btnFotoNota.addEventListener('click', () => inputFotoNota.click())
 
   inputFotoProduto.addEventListener('change', () => {
     const f = inputFotoProduto.files[0]
     if (!f) return
-    previewProduto.src = URL.createObjectURL(f)
-    previewProduto.hidden = false
-    btnRemoverProduto.hidden = false
-    btnFotoProduto.className = 'btn btn-sm btn-foto btn-foto-ok'
-    btnFotoProduto.innerHTML = '📦 ✅'
+    atualizarPreview('produto', f, previews, areaRemover, btnFotoProduto, inputFotoProduto)
   })
 
   inputFotoNota.addEventListener('change', () => {
     const f = inputFotoNota.files[0]
     if (!f) return
-    previewNota.src = URL.createObjectURL(f)
-    previewNota.hidden = false
-    btnRemoverNota.hidden = false
-    btnFotoNota.className = 'btn btn-sm btn-foto btn-foto-ok'
-    btnFotoNota.innerHTML = '🧾 ✅'
+    atualizarPreview('nota', f, previews, areaRemover, btnFotoNota, inputFotoNota)
   })
 
-  btnRemoverProduto.addEventListener('click', () => {
+  document.getElementById('btn-confirmar-entrada').addEventListener('click', async () => {
+    const embalagem = parseFloat(inpEmbalagem.value) || 0
+    const rotulo = parseFloat(inpRotulo.value) || 0
+    const pallet = parseInt(inpPallet.value) || 0
+
+    if (embalagem === 0 && rotulo === 0 && pallet === 0) {
+      alert('Informe ao menos uma quantidade.')
+      return
+    }
+
+    const btn = document.getElementById('btn-confirmar-entrada')
+    btn.disabled = true
+    btn.textContent = 'Enviando...'
+
+    const resultado = await api.estoque.registrarEntrada(
+      embalagem, rotulo, pallet,
+      inputFotoProduto.files[0] || null,
+      inputFotoNota.files[0] || null
+    )
+
+    if (resultado?.erro || !resultado?.ok) {
+      alert('Erro ao registrar entrada.')
+      btn.disabled = false
+      btn.textContent = '✔ Confirmar Entrada'
+      return
+    }
+
+    inpEmbalagem.value = ''
+    inpRotulo.value = ''
+    inpPallet.value = ''
     inputFotoProduto.value = ''
-    previewProduto.hidden = true
-    previewProduto.src = ''
-    btnRemoverProduto.hidden = true
+    inputFotoNota.value = ''
+    previews.innerHTML = ''
+    areaRemover.innerHTML = ''
     btnFotoProduto.className = 'btn btn-sm btn-outline-secondary btn-foto'
     btnFotoProduto.innerHTML = '📦 Foto produto'
-  })
-
-  btnRemoverNota.addEventListener('click', () => {
-    inputFotoNota.value = ''
-    previewNota.hidden = true
-    previewNota.src = ''
-    btnRemoverNota.hidden = true
     btnFotoNota.className = 'btn btn-sm btn-outline-secondary btn-foto'
     btnFotoNota.innerHTML = '🧾 Foto nota'
+    btn.textContent = '✔ Registrado!'
+    btn.style.background = 'var(--green-ok)'
+    setTimeout(() => {
+      btn.disabled = false
+      btn.textContent = '✔ Confirmar Entrada'
+      btn.style.background = ''
+    }, 1800)
+
+    carregarHistorico()
   })
-
-  const btnConfirmar = document.createElement('button')
-  btnConfirmar.className = 'btn btn-ok-grande mt-1'
-  btnConfirmar.textContent = `✔ Confirmar ${labelTipo[insumo.tipo]}`
-  btnConfirmar.addEventListener('click', () => {
-    if (!inputQtd.value) { alert(`Informe a quantidade em ${unidade}.`); return }
-    registrar(insumo.id, inputQtd.value, unidade, inputFotoProduto.files[0] || null, inputFotoNota.files[0] || null, btnConfirmar)
-  })
-
-  const areaBotoesFoto = document.createElement('div')
-  areaBotoesFoto.className = 'd-flex gap-2 mb-1'
-  areaBotoesFoto.appendChild(btnFotoProduto)
-  areaBotoesFoto.appendChild(btnFotoNota)
-
-  const areaRemover = document.createElement('div')
-  areaRemover.className = 'd-flex gap-3'
-  areaRemover.appendChild(btnRemoverProduto)
-  areaRemover.appendChild(btnRemoverNota)
-
-  form.appendChild(inputQtd)
-  form.appendChild(previewProduto)
-  form.appendChild(previewNota)
-  form.appendChild(areaBotoesFoto)
-  form.appendChild(areaRemover)
-  form.appendChild(inputFotoProduto)
-  form.appendChild(inputFotoNota)
-  form.appendChild(btnConfirmar)
-
-  return form
 }
 
-function criarInputFoto() {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = 'image/*'
-  input.capture = 'environment'
-  input.hidden = true
-  return input
-}
+function atualizarPreview(tipo, file, previews, areaRemover, btnFoto, input) {
+  const idImg = `preview-${tipo}`
+  const idBtn = `btn-remover-${tipo}`
 
-function criarBtnRemover(tipo) {
-  const btn = document.createElement('button')
-  btn.className = 'btn btn-sm btn-outline-danger d-flex align-items-center gap-1 fw-semibold'
-  btn.style.cssText = 'border-radius:8px;font-size:0.8rem;padding:5px 10px;'
-  btn.innerHTML = tipo === 'produto'
-    ? '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg> Foto do Produto'
-    : '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg> Nota Fiscal'
-  return btn
-}
-
-async function registrar(id, quantidade, unidade, fotoProduto, fotoNota, botao) {
-  botao.disabled = true
-  botao.textContent = 'Enviando...'
-  const resultado = await api.recebimentos.registrar(id, `${quantidade} ${unidade}`, fotoProduto, fotoNota)
-  if (resultado?.erro) {
-    alert('Erro ao registrar.')
-    botao.disabled = false
-    botao.textContent = 'Tentar de novo'
-    return
+  let img = document.getElementById(idImg)
+  if (!img) {
+    img = document.createElement('img')
+    img.id = idImg
+    img.className = 'foto-detalhe-img rounded-2'
+    previews.appendChild(img)
   }
-  carregarRecebimentos()
+  img.src = URL.createObjectURL(file)
+
+  let btnRemover = document.getElementById(idBtn)
+  if (!btnRemover) {
+    btnRemover = document.createElement('button')
+    btnRemover.id = idBtn
+    btnRemover.className = 'btn btn-sm btn-outline-danger fw-semibold'
+    btnRemover.style.cssText = 'border-radius:8px;font-size:0.8rem;padding:5px 10px;'
+    btnRemover.innerHTML = tipo === 'produto' ? '🗑 Foto Produto' : '🗑 Nota Fiscal'
+    btnRemover.addEventListener('click', () => {
+      input.value = ''
+      img.remove()
+      btnRemover.remove()
+      btnFoto.className = 'btn btn-sm btn-outline-secondary btn-foto'
+      btnFoto.innerHTML = tipo === 'produto' ? '📦 Foto produto' : '🧾 Foto nota'
+    })
+    areaRemover.appendChild(btnRemover)
+  }
+
+  btnFoto.className = 'btn btn-sm btn-foto btn-foto-ok'
+  btnFoto.innerHTML = tipo === 'produto' ? '📦 ✅' : '🧾 ✅'
 }
 
 async function iniciar() {
@@ -246,7 +194,21 @@ async function iniciar() {
   if (!perfil) return
   montarCabecalho(perfil.papel)
   window._convidado = perfil.papel === 'convidado'
-  carregarRecebimentos()
+
+  mensagemVazio.innerHTML = ''
+
+  if (!window._convidado) {
+    iniciarForm()
+  }
+
+  const secaoHistorico = document.createElement('div')
+  secaoHistorico.innerHTML = `
+    <h5 class="fw-bold mb-3 mt-2">📋 Últimas Entradas</h5>
+    <div id="historico-entradas"><p class="text-muted small">Carregando...</p></div>
+  `
+  containerCards.appendChild(secaoHistorico)
+
+  carregarHistorico()
 }
 
 iniciar()

@@ -348,9 +348,11 @@ document.querySelectorAll('[data-aba]').forEach((btn) => {
 
     const aba = btn.dataset.aba
     document.getElementById('aba-estoque').style.display = aba === 'estoque' ? 'block' : 'none'
+    document.getElementById('aba-estoque-geral').style.display = aba === 'estoque-geral' ? 'block' : 'none'
     document.getElementById('aba-recebimentos').style.display = aba === 'recebimentos' ? 'block' : 'none'
     document.getElementById('aba-rendimentos').style.display = aba === 'rendimentos' ? 'block' : 'none'
 
+    if (aba === 'estoque-geral') carregarEstoqueGeral()
     if (aba === 'recebimentos') carregarRecebimentos()
     if (aba === 'rendimentos') iniciarReferencia(document.getElementById('conteudo-referencia-wrapper-almox'))
   })
@@ -365,3 +367,149 @@ async function iniciar() {
 }
 
 iniciar()
+// =============================================
+// ESTOQUE GERAL (entradas B2 + vínculos PI)
+// =============================================
+
+async function carregarEstoqueGeral() {
+  const container = document.getElementById('conteudo-estoque-geral')
+  container.innerHTML = '<p class="text-muted">Carregando...</p>'
+
+  const [saldo, pis, vinculos] = await Promise.all([
+    api.estoque.saldo(),
+    api.pedidos.listar(),
+    api.estoque.vinculos()
+  ])
+
+  if (!saldo) { container.innerHTML = '<p class="text-danger">Erro ao carregar.</p>'; return }
+
+  container.innerHTML = ''
+
+  // --- Saldo disponível ---
+  const cardSaldo = document.createElement('div')
+  cardSaldo.className = 'card border-0 shadow-sm mb-4'
+  cardSaldo.innerHTML = `
+    <div class="card-body">
+      <h5 class="fw-bold mb-3">📊 Saldo Disponível</h5>
+      <div class="row g-3">
+        <div class="col-4">
+          <div class="card-insumo-almox h-100 text-center">
+            <h4>Embalagem</h4>
+            <div class="fs-4 fw-bold ${saldo.embalagem_kg > 0 ? 'text-success' : 'text-danger'}">${saldo.embalagem_kg} kg</div>
+          </div>
+        </div>
+        <div class="col-4">
+          <div class="card-insumo-almox h-100 text-center">
+            <h4>Rótulo</h4>
+            <div class="fs-4 fw-bold ${saldo.rotulo_kg > 0 ? 'text-success' : 'text-danger'}">${saldo.rotulo_kg} kg</div>
+          </div>
+        </div>
+        <div class="col-4">
+          <div class="card-insumo-almox h-100 text-center">
+            <h4>Pallets Caixa</h4>
+            <div class="fs-4 fw-bold ${saldo.pallet_caixas > 0 ? 'text-success' : 'text-danger'}">${saldo.pallet_caixas}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+  container.appendChild(cardSaldo)
+
+  if (window._convidado) return
+
+  // --- Vincular ao PI ---
+  const cardVincular = document.createElement('div')
+  cardVincular.className = 'card border-0 shadow-sm mb-4'
+  cardVincular.innerHTML = `
+    <div class="card-body">
+      <h5 class="fw-bold mb-3">🔗 Vincular Estoque a uma PI</h5>
+      <div class="mb-3">
+        <label class="form-label fw-semibold small">PI</label>
+        <select id="select-pi-vinculo" class="form-select">
+          <option value="">Selecione a PI</option>
+          ${(pis || []).map((p) => `<option value="${p.id}">PI ${p.numero_pi}${p.cliente ? ' — ' + p.cliente : ''}</option>`).join('')}
+        </select>
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col-12 col-md-4">
+          <label class="form-label fw-semibold small">Embalagem (kg)</label>
+          <input type="number" id="vinc-embalagem" class="form-control" placeholder="0" min="0" step="any">
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label fw-semibold small">Rótulo (kg)</label>
+          <input type="number" id="vinc-rotulo" class="form-control" placeholder="0" min="0" step="any">
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label fw-semibold small">Pallets de caixa</label>
+          <input type="number" id="vinc-pallet" class="form-control" placeholder="0" min="0" step="1">
+        </div>
+      </div>
+      <button class="btn btn-pietrobon w-100" id="btn-vincular">🔗 Vincular</button>
+    </div>
+  `
+  container.appendChild(cardVincular)
+
+  document.getElementById('btn-vincular').addEventListener('click', async () => {
+    const piId = document.getElementById('select-pi-vinculo').value
+    const embalagem = parseFloat(document.getElementById('vinc-embalagem').value) || 0
+    const rotulo = parseFloat(document.getElementById('vinc-rotulo').value) || 0
+    const pallet = parseInt(document.getElementById('vinc-pallet').value) || 0
+
+    if (!piId) { alert('Selecione uma PI.'); return }
+    if (embalagem === 0 && rotulo === 0 && pallet === 0) { alert('Informe ao menos uma quantidade.'); return }
+
+    const btn = document.getElementById('btn-vincular')
+    btn.disabled = true
+    btn.textContent = 'Salvando...'
+
+    const resultado = await api.estoque.vincular({ pi_id: piId, embalagem_kg: embalagem, rotulo_kg: rotulo, pallet_caixas: pallet })
+    if (resultado?.erro) {
+      alert(resultado.erro)
+      btn.disabled = false
+      btn.textContent = '🔗 Vincular'
+      return
+    }
+
+    document.getElementById('vinc-embalagem').value = ''
+    document.getElementById('vinc-rotulo').value = ''
+    document.getElementById('vinc-pallet').value = ''
+    document.getElementById('select-pi-vinculo').value = ''
+    btn.textContent = '✔ Vinculado!'
+    btn.style.background = 'var(--green-ok)'
+    setTimeout(() => {
+      btn.disabled = false
+      btn.textContent = '🔗 Vincular'
+      btn.style.background = ''
+    }, 1800)
+
+    carregarEstoqueGeral()
+  })
+
+  // --- Histórico de vínculos ---
+  if (vinculos && vinculos.length) {
+    const cardHistorico = document.createElement('div')
+    cardHistorico.className = 'card border-0 shadow-sm mb-4'
+    cardHistorico.innerHTML = `
+      <div class="card-body">
+        <h5 class="fw-bold mb-3">📋 Vínculos Registrados</h5>
+        ${vinculos.map((v) => {
+          const data = new Date(v.criado_em).toLocaleString('pt-BR')
+          return `
+            <div class="border rounded-3 p-3 mb-2 bg-light">
+              <div class="d-flex justify-content-between align-items-start flex-wrap gap-1 mb-1">
+                <span class="badge bg-danger">PI ${v.numero_pi}</span>
+                <span class="small text-muted">${data}</span>
+              </div>
+              ${v.cliente ? `<div class="small text-secondary mb-1">${v.cliente}</div>` : ''}
+              <div class="d-flex gap-2 flex-wrap">
+                ${v.embalagem_kg > 0 ? `<span class="badge bg-primary">📦 ${v.embalagem_kg} kg emb.</span>` : ''}
+                ${v.rotulo_kg > 0 ? `<span class="badge bg-info text-dark">🏷 ${v.rotulo_kg} kg rót.</span>` : ''}
+                ${v.pallet_caixas > 0 ? `<span class="badge bg-secondary">🪵 ${v.pallet_caixas} pallet(s)</span>` : ''}
+              </div>
+            </div>`
+        }).join('')}
+      </div>
+    `
+    container.appendChild(cardHistorico)
+  }
+}

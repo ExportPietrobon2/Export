@@ -415,6 +415,124 @@ app.delete('/api/usuarios/:id', autenticar(['admin']), async (req, res) => {
   res.json({ ok: true })
 })
 
+
+// =============================================
+// ESTOQUE GERAL (entradas B2 sem PI)
+// =============================================
+
+app.post('/api/estoque/entrada', autenticar(['admin', 'deposito']), upload.fields([{ name: 'foto_produto', maxCount: 1 }, { name: 'foto_nota', maxCount: 1 }]), async (req, res) => {
+  const { embalagem_kg, rotulo_kg, pallet_caixas } = req.body
+  let fotoUrl = null
+  let fotoNotaUrl = null
+
+  async function uploadFoto(buffer, pasta) {
+    return new Promise((resolve, reject) => {
+      cloudinary.uploader.upload_stream(
+        { folder: pasta, resource_type: 'image' },
+        (erro, resultado) => erro ? reject(erro) : resolve(resultado.secure_url)
+      ).end(buffer)
+    })
+  }
+
+  if (req.files?.foto_produto?.[0]) {
+    fotoUrl = await uploadFoto(req.files.foto_produto[0].buffer, 'estoque/produtos')
+  }
+  if (req.files?.foto_nota?.[0]) {
+    fotoNotaUrl = await uploadFoto(req.files.foto_nota[0].buffer, 'estoque/notas')
+  }
+
+  await pool.query(
+    'INSERT INTO estoque_insumos (embalagem_kg, rotulo_kg, pallet_caixas, foto_url, foto_nota_url) VALUES (?, ?, ?, ?, ?)',
+    [parseFloat(embalagem_kg) || 0, parseFloat(rotulo_kg) || 0, parseInt(pallet_caixas) || 0, fotoUrl, fotoNotaUrl]
+  )
+
+  const tipoEntrada = []
+  if (parseFloat(embalagem_kg) > 0) tipoEntrada.push(`${embalagem_kg} kg embalagem`)
+  if (parseFloat(rotulo_kg) > 0) tipoEntrada.push(`${rotulo_kg} kg rótulo`)
+  if (parseInt(pallet_caixas) > 0) tipoEntrada.push(`${pallet_caixas} pallet(s) de caixa`)
+
+  enviarEmail(
+    '📥 Nova entrada no estoque B2',
+    `<h2 style="color:#1565C0;margin:0 0 16px">📥 Entrada de Insumos — B2</h2>
+     <table style="width:100%;border-collapse:collapse;">
+       ${parseFloat(embalagem_kg) > 0 ? `<tr><td style="padding:8px 0;color:#8a6a6a;width:160px">Embalagem</td><td style="padding:8px 0;font-weight:600">${embalagem_kg} kg</td></tr>` : ''}
+       ${parseFloat(rotulo_kg) > 0 ? `<tr><td style="padding:8px 0;color:#8a6a6a">Rótulo</td><td style="padding:8px 0;font-weight:600">${rotulo_kg} kg</td></tr>` : ''}
+       ${parseInt(pallet_caixas) > 0 ? `<tr><td style="padding:8px 0;color:#8a6a6a">Pallets de caixa</td><td style="padding:8px 0;font-weight:600">${pallet_caixas} pallet(s)</td></tr>` : ''}
+     </table>`
+  )
+
+  res.json({ ok: true })
+})
+
+app.get('/api/estoque/historico', autenticar(['admin', 'almoxarifado', 'deposito', 'convidado']), async (req, res) => {
+  const [rows] = await pool.query('SELECT * FROM estoque_insumos ORDER BY criado_em DESC LIMIT 50')
+  res.json(rows)
+})
+
+app.get('/api/estoque/saldo', autenticar(['admin', 'almoxarifado', 'convidado']), async (req, res) => {
+  const [[entradas]] = await pool.query(
+    'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM estoque_insumos'
+  )
+  const [[vinculos]] = await pool.query(
+    'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM vinculos_insumos'
+  )
+  res.json({
+    embalagem_kg: Math.max(0, parseFloat(entradas.emb) - parseFloat(vinculos.emb)),
+    rotulo_kg: Math.max(0, parseFloat(entradas.rot) - parseFloat(vinculos.rot)),
+    pallet_caixas: Math.max(0, parseInt(entradas.pal) - parseInt(vinculos.pal))
+  })
+})
+
+app.get('/api/estoque/vinculos', autenticar(['admin', 'almoxarifado', 'convidado']), async (req, res) => {
+  const [rows] = await pool.query(`
+    SELECT v.*, p.numero_pi, p.cliente
+    FROM vinculos_insumos v
+    JOIN pedidos p ON p.id = v.pi_id
+    ORDER BY v.criado_em DESC LIMIT 100
+  `)
+  res.json(rows)
+})
+
+app.post('/api/estoque/vincular', autenticar(['admin', 'almoxarifado']), async (req, res) => {
+  const { pi_id, embalagem_kg, rotulo_kg, pallet_caixas } = req.body
+
+  // Verificar saldo disponível
+  const [[entradas]] = await pool.query(
+    'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM estoque_insumos'
+  )
+  const [[vinculos]] = await pool.query(
+    'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM vinculos_insumos'
+  )
+  const saldoEmb = parseFloat(entradas.emb) - parseFloat(vinculos.emb)
+  const saldoRot = parseFloat(entradas.rot) - parseFloat(vinculos.rot)
+  const saldoPal = parseInt(entradas.pal) - parseInt(vinculos.pal)
+
+  if ((parseFloat(embalagem_kg) || 0) > saldoEmb) return res.status(400).json({ erro: `Saldo insuficiente de embalagem. Disponível: ${saldoEmb} kg` })
+  if ((parseFloat(rotulo_kg) || 0) > saldoRot) return res.status(400).json({ erro: `Saldo insuficiente de rótulo. Disponível: ${saldoRot} kg` })
+  if ((parseInt(pallet_caixas) || 0) > saldoPal) return res.status(400).json({ erro: `Saldo insuficiente de pallets. Disponível: ${saldoPal}` })
+
+  await pool.query(
+    'INSERT INTO vinculos_insumos (pi_id, embalagem_kg, rotulo_kg, pallet_caixas) VALUES (?, ?, ?, ?)',
+    [pi_id, parseFloat(embalagem_kg) || 0, parseFloat(rotulo_kg) || 0, parseInt(pallet_caixas) || 0]
+  )
+
+  const [[pi]] = await pool.query('SELECT numero_pi, cliente FROM pedidos WHERE id = ?', [pi_id])
+
+  enviarEmail(
+    `🔗 Estoque vinculado — PI ${pi?.numero_pi}`,
+    `<h2 style="color:#6A1B9A;margin:0 0 16px">🔗 Insumos Vinculados à PI</h2>
+     <table style="width:100%;border-collapse:collapse;">
+       <tr><td style="padding:8px 0;color:#8a6a6a;width:160px">PI</td><td style="padding:8px 0;font-weight:600">${pi?.numero_pi}</td></tr>
+       ${pi?.cliente ? `<tr><td style="padding:8px 0;color:#8a6a6a">Cliente</td><td style="padding:8px 0;font-weight:600">${pi.cliente}</td></tr>` : ''}
+       ${parseFloat(embalagem_kg) > 0 ? `<tr><td style="padding:8px 0;color:#8a6a6a">Embalagem</td><td style="padding:8px 0;font-weight:600">${embalagem_kg} kg</td></tr>` : ''}
+       ${parseFloat(rotulo_kg) > 0 ? `<tr><td style="padding:8px 0;color:#8a6a6a">Rótulo</td><td style="padding:8px 0;font-weight:600">${rotulo_kg} kg</td></tr>` : ''}
+       ${parseInt(pallet_caixas) > 0 ? `<tr><td style="padding:8px 0;color:#8a6a6a">Pallets caixa</td><td style="padding:8px 0;font-weight:600">${pallet_caixas}</td></tr>` : ''}
+     </table>`
+  )
+
+  res.json({ ok: true })
+})
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'))
 })

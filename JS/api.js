@@ -67,5 +67,21 @@ export const api = {
     listar: () => requisitar('GET', '/api/usuarios'),
     criar: (dados) => requisitar('POST', '/api/usuarios', dados),
     excluir: (id) => requisitar('DELETE', `/api/usuarios/${id}`)
+  },
+
+  estoque: {
+    saldo: () => requisitar('GET', '/api/estoque/saldo'),
+    historico: () => requisitar('GET', '/api/estoque/historico'),
+    vinculos: () => requisitar('GET', '/api/estoque/vinculos'),
+    vincular: (dados) => requisitar('POST', '/api/estoque/vincular', dados),
+    registrarEntrada: (embalagem_kg, rotulo_kg, pallet_caixas, fotoProduto, fotoNota) => {
+      const formData = new FormData()
+      formData.append('embalagem_kg', embalagem_kg)
+      formData.append('rotulo_kg', rotulo_kg)
+      formData.append('pallet_caixas', pallet_caixas)
+      if (fotoProduto) formData.append('foto_produto', fotoProduto)
+      if (fotoNota) formData.append('foto_nota', fotoNota)
+      return requisitar('POST', '/api/estoque/entrada', null, formData)
+    }
   }
 }
