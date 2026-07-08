@@ -8,14 +8,19 @@ export function montarCabecalho(papel) {
     { href: '/HTML/almoxarifado.html', texto: 'Almoxarifado', papeis: ['admin', 'almoxarifado', 'convidado'] },
     { href: '/HTML/recebimento.html', texto: 'Recebimento B2', papeis: ['admin', 'deposito', 'convidado'] },
     { href: '/HTML/referencia.html', texto: 'Rendimentos', papeis: ['admin', 'deposito', 'convidado'] },
-    { href: '/HTML/admin.html', texto: 'Painel Admin', papeis: ['admin', 'convidado'] }
+    { href: '/HTML/admin.html', texto: 'Painel Admin', papeis: ['admin', 'convidado'] },
+    { href: '/HTML/embarques.html', texto: 'Painel de Embarques', papeis: ['admin', 'gerente_producao'] }
   ].filter((l) => l.papeis.includes(papel))
+
+  const brandHref = links.some((l) => l.href === '/HTML/admin.html')
+    ? '/HTML/admin.html'
+    : (links[0] ? links[0].href : '/HTML/admin.html')
 
   const nav = document.createElement('nav')
   nav.className = 'navbar navbar-expand-lg navbar-pietrobon sticky-top'
   nav.innerHTML = `
     <div class="container-fluid px-3">
-      <a class="navbar-brand d-flex align-items-center gap-2" href="/HTML/admin.html">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="${brandHref}">
         <img src="/logo.png" alt="Pietrobon" style="height:36px;object-fit:contain;">
       </a>
       <div class="d-flex align-items-center gap-2 ms-auto d-lg-none">

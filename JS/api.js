@@ -50,6 +50,7 @@ export const api = {
       requisitar('GET', `/api/pedidos/completo?incluirConcluidas=${incluirConcluidas}`),
     criar: (dados) => requisitar('POST', '/api/pedidos', dados),
     concluir: (id, concluida) => requisitar('PATCH', `/api/pedidos/${id}/concluir`, { concluida }),
+    editarEmbarque: (id, data_embarque) => requisitar('PATCH', `/api/pedidos/${id}/embarque`, { data_embarque }),
     excluir: (id) => requisitar('DELETE', `/api/pedidos/${id}`)
   },
 

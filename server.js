@@ -112,7 +112,7 @@ app.get('/api/pedidos', autenticar(TODOS), async (req, res) => {
   res.json(pedidos)
 })
 
-app.get('/api/pedidos/completo', autenticar(['admin']), async (req, res) => {
+app.get('/api/pedidos/completo', autenticar(['admin', 'gerente_producao']), async (req, res) => {
   const incluirConcluidas = req.query.incluirConcluidas === 'true'
   const condicao = incluirConcluidas ? '' : 'WHERE p.concluida = 0'
   const [pedidos] = await pool.query(`SELECT * FROM pedidos p ${condicao} ORDER BY p.numero_pi DESC`)
@@ -164,6 +164,27 @@ app.post('/api/pedidos', autenticar(['admin']), async (req, res) => {
   const piId = resultado.insertId
   const tiposRecebimento = ['embalagem', 'rotulo', 'caixa']
   res.json({ id: piId })
+})
+
+app.patch('/api/pedidos/:id/embarque', autenticar(['admin', 'gerente_producao']), async (req, res) => {
+  const { data_embarque } = req.body
+  await pool.query('UPDATE pedidos SET data_embarque = ? WHERE id = ?', [data_embarque || null, req.params.id])
+
+  const [[pi]] = await pool.query('SELECT numero_pi, cliente, destino FROM pedidos WHERE id = ?', [req.params.id])
+  if (pi) {
+    const dataFmt = data_embarque ? new Date(data_embarque + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
+    enviarEmail(
+      `🚢 Data de embarque definida — PI ${pi.numero_pi}`,
+      `<h2 style="color:#1565C0;margin:0 0 16px">🚢 Data de Embarque Definida</h2>
+       <table style="width:100%;border-collapse:collapse;">
+         <tr><td style="padding:8px 0;color:#8a6a6a;width:160px">PI</td><td style="padding:8px 0;font-weight:600">${pi.numero_pi}</td></tr>
+         ${pi.cliente ? `<tr><td style="padding:8px 0;color:#8a6a6a">Cliente</td><td style="padding:8px 0;font-weight:600">${pi.cliente}</td></tr>` : ''}
+         ${pi.destino ? `<tr><td style="padding:8px 0;color:#8a6a6a">Destino</td><td style="padding:8px 0;font-weight:600">${pi.destino}</td></tr>` : ''}
+         <tr><td style="padding:8px 0;color:#8a6a6a">Data de embarque</td><td style="padding:8px 0;font-weight:600;color:#1565C0">${dataFmt}</td></tr>
+       </table>`
+    )
+  }
+  res.json({ ok: true })
 })
 
 app.patch('/api/pedidos/:id/concluir', autenticar(['admin']), async (req, res) => {
