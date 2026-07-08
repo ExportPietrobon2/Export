@@ -292,6 +292,12 @@ async function carregar() {
 toggleConcluidas.addEventListener('change', carregar)
 toggleSoProntas.addEventListener('change', carregar)
 
+function editandoData() {
+  const el = document.activeElement
+  return !!(el && el.id && el.id.startsWith('embarque-input-'))
+}
+setInterval(() => { if (!editandoData()) carregar() }, 5 * 60 * 1000)
+
 async function iniciar() {
   const perfil = exigirPapel(['admin', 'gerente_producao'])
   if (!perfil) return

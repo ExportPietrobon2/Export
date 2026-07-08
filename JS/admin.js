@@ -309,6 +309,8 @@ async function carregar() {
 
 toggleConcluidas.addEventListener('change', carregar)
 
+setInterval(carregar, 5 * 60 * 1000)
+
 async function iniciar() {
   const perfil = exigirPapel(['admin', 'convidado'])
   if (!perfil) return
