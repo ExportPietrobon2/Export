@@ -53,6 +53,28 @@ export function piNaoDeclarada(pedido) {
   return (pedido.produtos_pi || []).some(produtoPendenteDeclaracao)
 }
 
+export function horasRestantesDeclaracao(produto) {
+  if (!produto || produto.declarado_em || !produto.criado_em) return null
+  const restanteMs = PRAZO_DECLARACAO_MS - (Date.now() - new Date(produto.criado_em).getTime())
+  return Math.ceil(restanteMs / 3600000)
+}
+
+export function seloPrazoDeclaracaoHtml(produto) {
+  const h = horasRestantesDeclaracao(produto)
+  if (h === null) return ''
+  if (h > 0) return `<span class="selo-prazo-declaracao">⏳ faltam ${h}h para declarar</span>`
+  return `<span class="selo-prazo-vencido">⏰ vencido há ${Math.abs(h)}h</span>`
+}
+
+export function seloPrazoDeclaracaoPiHtml(pedido) {
+  if (pedido.concluida) return ''
+  const pendentes = (pedido.produtos_pi || []).filter((p) => !p.declarado_em && p.criado_em)
+  const dentroDoPrazo = pendentes.map(horasRestantesDeclaracao).filter((h) => h !== null && h > 0)
+  if (!dentroDoPrazo.length) return ''
+  const menor = Math.min(...dentroDoPrazo)
+  return `<span class="selo-prazo-declaracao">⏳ Declarar estoque: faltam ${menor}h</span>`
+}
+
 export function bannerDeclaracaoHtml(pedido) {
   const pendentes = (pedido.produtos_pi || []).filter(produtoPendenteDeclaracao)
   const nomes = pendentes.map((p) => p.produto).join(', ')

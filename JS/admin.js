@@ -2,7 +2,7 @@ import { api } from './api.js'
 import { calcularStatusProduto, formatarQuantidade } from './constants.js'
 import { exigirPapel } from './auth.js'
 import { montarCabecalho } from './cabecalho.js'
-import { piEmAlerta, bannerAlertaHtml, resumoAlertasHtml, piNaoDeclarada, bannerDeclaracaoHtml, resumoDeclaracaoHtml } from './alertas.js'
+import { piEmAlerta, bannerAlertaHtml, resumoAlertasHtml, piNaoDeclarada, bannerDeclaracaoHtml, resumoDeclaracaoHtml, seloPrazoDeclaracaoPiHtml } from './alertas.js'
 
 const containerPis = document.getElementById('container-pis')
 const toggleConcluidas = document.getElementById('toggle-concluidas')
@@ -205,6 +205,7 @@ function renderCard(pedido) {
       </div>
       <div class="mt-1 d-flex align-items-center gap-2 flex-wrap">
         <span class="badge ${liberado ? 'bg-success' : bloqueado ? 'bg-danger' : 'bg-secondary'}">${status}</span>
+        ${seloPrazoDeclaracaoPiHtml(pedido)}
         ${totalRecb > 0 ? `<span class="small text-muted">📦 Receb. PI: ${recebidos}/${totalRecb}</span>` : ''}
         ${temVinculos ? `<span class="small text-muted">🔗 ${pedido.vinculos_estoque.length} vínculo(s)</span>` : ''}
       </div>

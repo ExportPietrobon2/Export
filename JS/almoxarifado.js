@@ -3,6 +3,7 @@ import { TIPOS_INSUMO, formatarQuantidade } from './constants.js'
 import { exigirPapel } from './auth.js'
 import { montarCabecalho } from './cabecalho.js'
 import { iniciarReferencia } from './referencia.js'
+import { seloPrazoDeclaracaoHtml } from './alertas.js'
 
 const selectPi = document.getElementById('select-pi')
 const containerConteudo = document.getElementById('conteudo-pi')
@@ -64,6 +65,7 @@ async function carregarPi(piId) {
           <span class="indicador-status ${liberado ? 'indicador-ok' : 'indicador-nok'}" data-status="${produto.id}">
             ${liberado ? '✔ OK' : '✗ Pendente'}
           </span>
+          ${seloPrazoDeclaracaoHtml(produto)}
         </div>
         <button class="btn btn-sm btn-outline-danger btn-expandir-produto" data-id="${produto.id}">Editar ▾</button>
       </div>
