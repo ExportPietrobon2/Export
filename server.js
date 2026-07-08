@@ -262,6 +262,8 @@ app.patch('/api/produtos/:produtoId/insumos', autenticar(['admin', 'almoxarifado
     await pool.query('UPDATE produtos_pi SET observacoes = ? WHERE id = ?', [observacoes, req.params.produtoId])
   }
 
+  await pool.query('UPDATE produtos_pi SET declarado_em = NOW() WHERE id = ? AND declarado_em IS NULL', [req.params.produtoId])
+
   const [produtoInfo] = await pool.query(
     'SELECT pp.pi_id, pp.produto, p.numero_pi, p.cliente FROM produtos_pi pp JOIN pedidos p ON p.id = pp.pi_id WHERE pp.id = ?',
     [req.params.produtoId]
@@ -677,6 +679,58 @@ async function verificarAlertasEmbarque() {
 
 setTimeout(verificarAlertasEmbarque, 60 * 1000)
 setInterval(verificarAlertasEmbarque, 24 * 60 * 60 * 1000)
+
+const SQL_DECLARACAO_PENDENTE = `
+  SELECT pp.id as produto_id, pp.produto, pp.criado_em,
+         p.id as pi_id, p.numero_pi, p.cliente
+  FROM produtos_pi pp
+  JOIN pedidos p ON p.id = pp.pi_id
+  WHERE p.concluida = 0 AND pp.declarado_em IS NULL
+    AND pp.criado_em <= DATE_SUB(NOW(), INTERVAL 48 HOUR)
+  ORDER BY pp.criado_em ASC`
+
+async function verificarAlertasDeclaracao() {
+  try {
+    const [rows] = await pool.query(SQL_DECLARACAO_PENDENTE)
+    if (!rows.length) return
+
+    const linhas = rows.map((r) => {
+      const horas = Math.floor((Date.now() - new Date(r.criado_em).getTime()) / 3600000)
+      return `<tr>
+        <td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;font-weight:700">PI ${r.numero_pi}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${r.cliente || '—'}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${r.produto}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;color:#E65100;font-weight:700">há ${horas}h sem declarar</td>
+      </tr>`
+    }).join('')
+
+    enviarEmail(
+      `⏰ ALERTA: ${rows.length} produto(s) sem estoque declarado há mais de 48h`,
+      `<h2 style="color:#E65100;margin:0 0 16px">⏰ Estoque não declarado pelo Almoxarifado</h2>
+       <p style="margin:0 0 12px;color:#8a6a6a">Os produtos abaixo foram cadastrados há mais de 48h e ainda não tiveram o informe de estoque salvo no almoxarifado:</p>
+       <table style="width:100%;border-collapse:collapse;">
+         <thead><tr>
+           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid #E65100">PI</th>
+           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid #E65100">Cliente</th>
+           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid #E65100">Produto</th>
+           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid #E65100">Situação</th>
+         </tr></thead>
+         <tbody>${linhas}</tbody>
+       </table>`
+    )
+    console.log(`Alerta de declaração enviado: ${rows.length} produto(s)`)
+  } catch (e) {
+    console.error('Erro no alerta de declaração:', e.message)
+  }
+}
+
+setTimeout(verificarAlertasDeclaracao, 90 * 1000)
+setInterval(verificarAlertasDeclaracao, 24 * 60 * 60 * 1000)
+
+app.get('/api/alertas/declaracao', autenticar(['admin', 'almoxarifado', 'gerente_producao']), async (req, res) => {
+  const [rows] = await pool.query(SQL_DECLARACAO_PENDENTE)
+  res.json(rows)
+})
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'))

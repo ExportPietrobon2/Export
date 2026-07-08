@@ -221,6 +221,8 @@ async function salvarProduto(produtoId, quantidade) {
 
   if (resultado?.erro) { alert('Erro ao salvar.'); return }
 
+  carregarAlertaDeclaracao()
+
   const btn = containerConteudo.querySelector(`.btn-salvar-produto[data-produto="${produtoId}"]`)
   const form = document.getElementById(`form-produto-${produtoId}`)
   const btnExpandir = containerConteudo.querySelector(`.btn-expandir-produto[data-id="${produtoId}"]`)
@@ -383,12 +385,44 @@ document.querySelectorAll('[data-aba]').forEach((btn) => {
   })
 })
 
+async function carregarAlertaDeclaracao() {
+  const container = document.getElementById('alerta-declaracao-almox')
+  if (!container) return
+  const rows = await api.alertas.declaracaoPendente()
+  if (!Array.isArray(rows) || !rows.length) { container.innerHTML = ''; return }
+
+  const porPi = {}
+  rows.forEach((r) => {
+    if (!porPi[r.numero_pi]) porPi[r.numero_pi] = { cliente: r.cliente, produtos: [] }
+    const horas = Math.floor((Date.now() - new Date(r.criado_em).getTime()) / 3600000)
+    porPi[r.numero_pi].produtos.push(`${r.produto} (há ${horas}h)`)
+  })
+
+  const blocos = Object.entries(porPi).map(([numeroPi, info]) => `
+    <div class="mb-1">
+      <span class="fw-bold">PI ${numeroPi}</span>${info.cliente ? ` — ${info.cliente}` : ''}:
+      <span style="opacity:.95">${info.produtos.join(', ')}</span>
+    </div>`).join('')
+
+  container.innerHTML = `
+    <div class="resumo-alerta-declaracao-topo">
+      <div style="font-size:1.1rem;margin-bottom:8px">⏰ ${rows.length} PRODUTO(S) SEM ESTOQUE DECLARADO (48h+)</div>
+      <div style="font-weight:600;opacity:.95;margin-bottom:8px">Declare o estoque destes produtos na aba "Estoque PI":</div>
+      ${blocos}
+    </div>`
+}
+
 async function iniciar() {
   const perfil = exigirPapel(['admin', 'almoxarifado', 'convidado'])
   if (!perfil) return
   montarCabecalho(perfil.papel)
   window._convidado = perfil.papel === 'convidado'
   carregarPedidos()
+  carregarAlertaDeclaracao()
+  setInterval(carregarAlertaDeclaracao, 5 * 60 * 1000)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') carregarAlertaDeclaracao()
+  })
 }
 
 iniciar()

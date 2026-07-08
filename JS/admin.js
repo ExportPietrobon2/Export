@@ -2,7 +2,7 @@ import { api } from './api.js'
 import { calcularStatusProduto, formatarQuantidade } from './constants.js'
 import { exigirPapel } from './auth.js'
 import { montarCabecalho } from './cabecalho.js'
-import { piEmAlerta, bannerAlertaHtml, resumoAlertasHtml } from './alertas.js'
+import { piEmAlerta, bannerAlertaHtml, resumoAlertasHtml, piNaoDeclarada, bannerDeclaracaoHtml, resumoDeclaracaoHtml } from './alertas.js'
 
 const containerPis = document.getElementById('container-pis')
 const toggleConcluidas = document.getElementById('toggle-concluidas')
@@ -178,12 +178,18 @@ function renderCard(pedido) {
   const recebidos = (pedido.recebimentos_b2 || []).filter(r => r.status_recebimento === 'recebido').length
 
   const emAlerta = piEmAlerta(pedido)
+  const naoDeclarada = piNaoDeclarada(pedido)
   const card = document.createElement('div')
-  card.className = `card card-pi-admin mb-3${pedido.concluida ? ' pi-concluida' : ''}${emAlerta ? ' card-alerta-embarque' : ''}`
+  card.className = `card card-pi-admin mb-3${pedido.concluida ? ' pi-concluida' : ''}${emAlerta ? ' card-alerta-embarque' : ''}${naoDeclarada ? ' card-alerta-declaracao' : ''}`
 
   if (emAlerta) {
     const banner = document.createElement('div')
     banner.innerHTML = bannerAlertaHtml(pedido)
+    card.appendChild(banner.firstElementChild)
+  }
+  if (naoDeclarada) {
+    const banner = document.createElement('div')
+    banner.innerHTML = bannerDeclaracaoHtml(pedido)
     card.appendChild(banner.firstElementChild)
   }
 
@@ -267,6 +273,9 @@ async function carregar() {
 
   const resumoAlerta = resumoAlertasHtml(pedidos)
   if (resumoAlerta) containerPis.insertAdjacentHTML('beforeend', resumoAlerta)
+
+  const resumoDecl = resumoDeclaracaoHtml(pedidos)
+  if (resumoDecl) containerPis.insertAdjacentHTML('beforeend', resumoDecl)
 
   const entradas = await api.estoque.historico()
   if (entradas && entradas.length) {

@@ -35,6 +35,45 @@ export function bannerAlertaHtml(pedido) {
   return `<div class="banner-alerta-embarque">🚨 ALERTA MÁXIMO — ${textoPrazoEmbarque(dias)} E A PI NÃO ESTÁ PRONTA PARA PRODUZIR</div>`
 }
 
+const PRAZO_DECLARACAO_MS = 48 * 3600 * 1000
+
+export function horasDesde(dataStr) {
+  if (!dataStr) return null
+  return Math.floor((Date.now() - new Date(dataStr).getTime()) / 3600000)
+}
+
+export function produtoPendenteDeclaracao(produto) {
+  if (!produto || produto.declarado_em) return false
+  if (!produto.criado_em) return false
+  return (Date.now() - new Date(produto.criado_em).getTime()) >= PRAZO_DECLARACAO_MS
+}
+
+export function piNaoDeclarada(pedido) {
+  if (pedido.concluida) return false
+  return (pedido.produtos_pi || []).some(produtoPendenteDeclaracao)
+}
+
+export function bannerDeclaracaoHtml(pedido) {
+  const pendentes = (pedido.produtos_pi || []).filter(produtoPendenteDeclaracao)
+  const nomes = pendentes.map((p) => p.produto).join(', ')
+  return `<div class="banner-alerta-declaracao">⏰ ESTOQUE NÃO DECLARADO — ${pendentes.length} produto(s) há mais de 48h sem informe do almoxarifado${nomes ? ': ' + nomes : ''}</div>`
+}
+
+export function resumoDeclaracaoHtml(pedidos) {
+  const emAlerta = (pedidos || []).filter(piNaoDeclarada)
+  if (!emAlerta.length) return ''
+  const chips = emAlerta.map((p) => {
+    const qtd = (p.produtos_pi || []).filter(produtoPendenteDeclaracao).length
+    return `<span class="pi-chip">PI ${p.numero_pi} — ${qtd} produto(s)</span>`
+  }).join('')
+  return `
+    <div class="resumo-alerta-declaracao-topo">
+      <div style="font-size:1.1rem;margin-bottom:6px">⏰ ${emAlerta.length} PI(s) COM ESTOQUE NÃO DECLARADO (48h+)</div>
+      <div style="font-weight:600;opacity:.95;margin-bottom:8px">PIs com produtos cadastrados há mais de 48h e ainda sem informe salvo no almoxarifado:</div>
+      <div>${chips}</div>
+    </div>`
+}
+
 export function resumoAlertasHtml(pedidos) {
   const emAlerta = (pedidos || []).filter(piEmAlerta)
     .sort((a, b) => diasParaEmbarque(a.data_embarque) - diasParaEmbarque(b.data_embarque))

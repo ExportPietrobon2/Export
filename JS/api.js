@@ -79,6 +79,10 @@ export const api = {
     excluir: (id) => requisitar('DELETE', `/api/usuarios/${id}`)
   },
 
+  alertas: {
+    declaracaoPendente: () => requisitar('GET', '/api/alertas/declaracao')
+  },
+
   estoque: {
     saldo: () => requisitar('GET', '/api/estoque/saldo'),
     historico: () => requisitar('GET', '/api/estoque/historico'),
