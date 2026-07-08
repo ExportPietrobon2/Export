@@ -2,6 +2,7 @@ import { api } from './api.js'
 import { calcularStatusProduto, formatarQuantidade } from './constants.js'
 import { exigirPapel } from './auth.js'
 import { montarCabecalho } from './cabecalho.js'
+import { piEmAlerta, bannerAlertaHtml, resumoAlertasHtml } from './alertas.js'
 
 const containerPis = document.getElementById('container-pis')
 const toggleConcluidas = document.getElementById('toggle-concluidas')
@@ -134,8 +135,15 @@ function renderCard(pedido) {
   const totalRecb = (pedido.recebimentos_b2 || []).length
   const recebidos = (pedido.recebimentos_b2 || []).filter((r) => r.status_recebimento === 'recebido').length
 
+  const emAlerta = piEmAlerta(pedido)
   const card = document.createElement('div')
-  card.className = `card card-pi-admin mb-3${pedido.concluida ? ' pi-concluida' : ''}`
+  card.className = `card card-pi-admin mb-3${pedido.concluida ? ' pi-concluida' : ''}${emAlerta ? ' card-alerta-embarque' : ''}`
+
+  if (emAlerta) {
+    const banner = document.createElement('div')
+    banner.innerHTML = bannerAlertaHtml(pedido)
+    card.appendChild(banner.firstElementChild)
+  }
 
   const cabecalho = document.createElement('div')
   cabecalho.className = 'card-body d-flex justify-content-between align-items-start flex-wrap gap-2'
@@ -250,6 +258,10 @@ async function carregar() {
   if (toggleSoProntas.checked) lista = lista.filter((p) => prontaParaProduzir(p))
 
   containerPis.innerHTML = ''
+
+  const resumoAlerta = resumoAlertasHtml(pedidos)
+  if (resumoAlerta) containerPis.insertAdjacentHTML('beforeend', resumoAlerta)
+
   if (!lista.length) {
     const vazio = document.createElement('p')
     vazio.className = 'text-muted fst-italic'

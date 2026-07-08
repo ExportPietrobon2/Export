@@ -616,6 +616,68 @@ app.delete('/api/estoque/vinculos/:id', autenticar(['admin', 'almoxarifado']), a
   res.json({ ok: true })
 })
 
+async function verificarAlertasEmbarque() {
+  try {
+    const [pis] = await pool.query(
+      `SELECT id, numero_pi, cliente, destino, data_embarque
+       FROM pedidos
+       WHERE concluida = 0 AND data_embarque IS NOT NULL
+         AND data_embarque <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+       ORDER BY data_embarque ASC`
+    )
+
+    const alertas = []
+    for (const pi of pis) {
+      const [[tot]] = await pool.query('SELECT COUNT(*) as total FROM produtos_pi WHERE pi_id = ?', [pi.id])
+      const [[pend]] = await pool.query(
+        `SELECT COUNT(*) as pendentes
+         FROM produtos_pi pp
+         JOIN insumos_produto ip ON ip.produto_id = pp.id
+         WHERE pp.pi_id = ? AND ip.confirmado = 0`,
+        [pi.id]
+      )
+      const pronta = tot.total > 0 && pend.pendentes === 0
+      if (!pronta) alertas.push(pi)
+    }
+
+    if (!alertas.length) return
+
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+    const linhas = alertas.map((pi) => {
+      const alvo = new Date(String(pi.data_embarque).slice(0, 10) + 'T00:00:00')
+      const dias = Math.round((alvo - hoje) / 86400000)
+      const quando = dias < 0 ? `VENCIDO há ${Math.abs(dias)} dia(s)` : dias === 0 ? 'HOJE' : `em ${dias} dia(s)`
+      const dataFmt = alvo.toLocaleDateString('pt-BR')
+      return `<tr>
+        <td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;font-weight:700">PI ${pi.numero_pi}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${pi.cliente || '—'}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;color:#ED3237;font-weight:700">${dataFmt} (${quando})</td>
+      </tr>`
+    }).join('')
+
+    enviarEmail(
+      `🚨 ALERTA: ${alertas.length} PI(s) perto do embarque e SEM estar pronta`,
+      `<h2 style="color:#ED3237;margin:0 0 16px">🚨 PIs em Risco de Embarque</h2>
+       <p style="margin:0 0 12px;color:#8a6a6a">As PIs abaixo têm embarque em até 7 dias (ou já vencido) e ainda possuem itens pendentes no almoxarifado:</p>
+       <table style="width:100%;border-collapse:collapse;">
+         <thead><tr>
+           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">PI</th>
+           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Cliente</th>
+           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Embarque</th>
+         </tr></thead>
+         <tbody>${linhas}</tbody>
+       </table>`
+    )
+    console.log(`Alerta de embarque enviado: ${alertas.length} PI(s)`)
+  } catch (e) {
+    console.error('Erro no alerta de embarque:', e.message)
+  }
+}
+
+setTimeout(verificarAlertasEmbarque, 60 * 1000)
+setInterval(verificarAlertasEmbarque, 24 * 60 * 60 * 1000)
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'))
 })
