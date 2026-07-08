@@ -236,6 +236,8 @@ async function salvarEmbarque(piId, numeroPi) {
   msg.textContent = input.value ? '✔ Data salva' : '✔ Data removida'
   btn.disabled = false
   btn.textContent = '💾 Salvar data'
+
+  setTimeout(carregar, 900)
 }
 
 async function carregar() {
@@ -297,6 +299,11 @@ function editandoData() {
   return !!(el && el.id && el.id.startsWith('embarque-input-'))
 }
 setInterval(() => { if (!editandoData()) carregar() }, 5 * 60 * 1000)
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !editandoData()) carregar()
+})
+window.addEventListener('focus', () => { if (!editandoData()) carregar() })
 
 async function iniciar() {
   const perfil = exigirPapel(['admin', 'gerente_producao'])

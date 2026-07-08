@@ -311,6 +311,11 @@ toggleConcluidas.addEventListener('change', carregar)
 
 setInterval(carregar, 5 * 60 * 1000)
 
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') carregar()
+})
+window.addEventListener('focus', carregar)
+
 async function iniciar() {
   const perfil = exigirPapel(['admin', 'convidado'])
   if (!perfil) return
