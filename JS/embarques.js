@@ -7,6 +7,7 @@ import { piEmAlerta, bannerAlertaHtml, resumoAlertasHtml } from './alertas.js'
 const containerPis = document.getElementById('container-pis')
 const toggleConcluidas = document.getElementById('toggle-concluidas')
 const toggleSoProntas = document.getElementById('toggle-so-prontas')
+const abertos = new Set()
 
 const rotuloInsumo = { embalagem: 'Embalagem', rotulo: 'Rótulo', caixa: 'Caixa', etiqueta: 'Etiqueta' }
 
@@ -136,6 +137,7 @@ function renderCard(pedido) {
   const recebidos = (pedido.recebimentos_b2 || []).filter((r) => r.status_recebimento === 'recebido').length
 
   const emAlerta = piEmAlerta(pedido)
+  const aberto = abertos.has(String(pedido.id))
   const card = document.createElement('div')
   card.className = `card card-pi-admin mb-3${pedido.concluida ? ' pi-concluida' : ''}${emAlerta ? ' card-alerta-embarque' : ''}`
 
@@ -160,12 +162,12 @@ function renderCard(pedido) {
         ${totalRecb > 0 ? `<span class="small text-muted">📦 Receb. B2: ${recebidos}/${totalRecb}</span>` : ''}
       </div>
     </div>
-    <button class="btn btn-sm btn-outline-danger btn-expandir" data-id="${pedido.id}">Ver detalhes ▾</button>
+    <button class="btn btn-sm btn-outline-danger btn-expandir" data-id="${pedido.id}">${aberto ? 'Fechar ▴' : 'Ver detalhes ▾'}</button>
   `
 
   const detalhe = document.createElement('div')
   detalhe.id = `detalhe-${pedido.id}`
-  detalhe.style.display = 'none'
+  detalhe.style.display = aberto ? 'block' : 'none'
   detalhe.className = 'border-top px-3 pb-3'
 
   const secEmbarque = document.createElement('div')
@@ -276,20 +278,23 @@ async function carregar() {
     containerPis.appendChild(renderCard(pedido))
   })
 
-  document.querySelectorAll('.btn-expandir').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const detalhe = document.getElementById(`detalhe-${btn.dataset.id}`)
-      const aberto = detalhe.style.display !== 'none'
-      detalhe.style.display = aberto ? 'none' : 'block'
-      btn.textContent = aberto ? 'Ver detalhes ▾' : 'Fechar ▴'
-    })
-  })
-
   lista.forEach((pedido) => {
     const btn = document.getElementById(`embarque-btn-${pedido.id}`)
     if (btn) btn.addEventListener('click', () => salvarEmbarque(pedido.id, pedido.numero_pi))
   })
 }
+
+containerPis.addEventListener('click', (e) => {
+  const btnExpandir = e.target.closest('.btn-expandir')
+  if (!btnExpandir) return
+  const id = btnExpandir.dataset.id
+  const detalhe = document.getElementById(`detalhe-${id}`)
+  if (!detalhe) return
+  const aberto = detalhe.style.display !== 'none'
+  detalhe.style.display = aberto ? 'none' : 'block'
+  btnExpandir.textContent = aberto ? 'Ver detalhes ▾' : 'Fechar ▴'
+  if (aberto) abertos.delete(String(id)); else abertos.add(String(id))
+})
 
 toggleConcluidas.addEventListener('change', carregar)
 toggleSoProntas.addEventListener('change', carregar)
@@ -303,7 +308,6 @@ setInterval(() => { if (!editandoData()) carregar() }, 5 * 60 * 1000)
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && !editandoData()) carregar()
 })
-window.addEventListener('focus', () => { if (!editandoData()) carregar() })
 
 async function iniciar() {
   const perfil = exigirPapel(['admin', 'gerente_producao'])

@@ -6,6 +6,7 @@ import { piEmAlerta, bannerAlertaHtml, resumoAlertasHtml, piNaoDeclarada, banner
 
 const containerPis = document.getElementById('container-pis')
 const toggleConcluidas = document.getElementById('toggle-concluidas')
+const abertos = new Set()
 
 const rotuloInsumo = { embalagem: 'Embalagem', rotulo: 'Rótulo', caixa: 'Caixa', etiqueta: 'Etiqueta' }
 
@@ -180,6 +181,7 @@ function renderCard(pedido) {
 
   const emAlerta = piEmAlerta(pedido)
   const naoDeclarada = piNaoDeclarada(pedido)
+  const aberto = abertos.has(String(pedido.id))
   const card = document.createElement('div')
   card.className = `card card-pi-admin mb-3${pedido.concluida ? ' pi-concluida' : ''}${emAlerta ? ' card-alerta-embarque' : ''}${naoDeclarada ? ' card-alerta-declaracao' : ''}`
 
@@ -212,7 +214,7 @@ function renderCard(pedido) {
       </div>
     </div>
     <div class="d-flex gap-2 flex-wrap">
-      <button class="btn btn-sm btn-outline-danger btn-expandir" data-id="${pedido.id}">Ver detalhes ▾</button>
+      <button class="btn btn-sm btn-outline-danger btn-expandir" data-id="${pedido.id}">${aberto ? 'Fechar ▴' : 'Ver detalhes ▾'}</button>
       ${!window._convidado ? `<button class="btn btn-sm ${pedido.concluida ? 'btn-outline-warning' : 'btn-outline-success'} btn-concluir" data-id="${pedido.id}" data-concluida="${pedido.concluida ? 'true' : 'false'}">
         ${pedido.concluida ? '↩ Reabrir' : '✔ Concluir'}
       </button>` : ''}
@@ -221,7 +223,7 @@ function renderCard(pedido) {
 
   const detalhe = document.createElement('div')
   detalhe.id = `detalhe-${pedido.id}`
-  detalhe.style.display = 'none'
+  detalhe.style.display = aberto ? 'block' : 'none'
   detalhe.className = 'border-top px-3 pb-3'
 
   const secAlmox = document.createElement('div')
@@ -303,20 +305,25 @@ async function carregar() {
   pedidos.forEach((pedido) => {
     containerPis.appendChild(renderCard(pedido))
   })
-
-  document.querySelectorAll('.btn-expandir').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const detalhe = document.getElementById(`detalhe-${btn.dataset.id}`)
-      const aberto = detalhe.style.display !== 'none'
-      detalhe.style.display = aberto ? 'none' : 'block'
-      btn.textContent = aberto ? 'Ver detalhes ▾' : 'Fechar ▴'
-    })
-  })
-
-  document.querySelectorAll('.btn-concluir').forEach((btn) => {
-    btn.addEventListener('click', () => concluirPi(btn.dataset.id, btn.dataset.concluida === 'true', btn))
-  })
 }
+
+containerPis.addEventListener('click', (e) => {
+  const btnExpandir = e.target.closest('.btn-expandir')
+  if (btnExpandir) {
+    const id = btnExpandir.dataset.id
+    const detalhe = document.getElementById(`detalhe-${id}`)
+    if (!detalhe) return
+    const aberto = detalhe.style.display !== 'none'
+    detalhe.style.display = aberto ? 'none' : 'block'
+    btnExpandir.textContent = aberto ? 'Ver detalhes ▾' : 'Fechar ▴'
+    if (aberto) abertos.delete(String(id)); else abertos.add(String(id))
+    return
+  }
+  const btnConcluir = e.target.closest('.btn-concluir')
+  if (btnConcluir) {
+    concluirPi(btnConcluir.dataset.id, btnConcluir.dataset.concluida === 'true', btnConcluir)
+  }
+})
 
 toggleConcluidas.addEventListener('change', carregar)
 
@@ -325,7 +332,6 @@ setInterval(carregar, 5 * 60 * 1000)
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') carregar()
 })
-window.addEventListener('focus', carregar)
 
 async function iniciar() {
   const perfil = exigirPapel(['admin', 'convidado', 'compras'])
