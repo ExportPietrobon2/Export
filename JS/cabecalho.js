@@ -4,12 +4,12 @@ export function montarCabecalho(papel) {
   const paginaAtual = document.body.dataset.pagina
 
   const links = [
-    { href: '/HTML/cadastro.html', texto: 'Cadastro', papeis: ['admin', 'convidado'] },
+    { href: '/HTML/cadastro.html', texto: 'Cadastrar PIs', papeis: ['admin', 'convidado'] },
     { href: '/HTML/almoxarifado.html', texto: 'Almoxarifado', papeis: ['admin', 'almoxarifado', 'convidado'] },
     { href: '/HTML/recebimento.html', texto: 'Recebimento B2', papeis: ['admin', 'deposito', 'convidado'] },
     { href: '/HTML/referencia.html', texto: 'Rendimentos', papeis: ['admin', 'deposito', 'convidado'] },
-    { href: '/HTML/admin.html', texto: 'Painel Admin', papeis: ['admin', 'convidado', 'compras'] },
-    { href: '/HTML/embarques.html', texto: 'Painel de Embarques', papeis: ['admin', 'gerente_producao'] },
+    { href: '/HTML/admin.html', texto: 'Visão Geral das PIs', papeis: ['admin', 'convidado', 'compras'] },
+    { href: '/HTML/embarques.html', texto: 'Embarques', papeis: ['admin', 'gerente_producao'] },
     { href: '/HTML/compras.html', texto: 'Compras', papeis: ['admin', 'compras'] }
   ].filter((l) => l.papeis.includes(papel))
 
