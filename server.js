@@ -732,6 +732,149 @@ app.get('/api/alertas/declaracao', autenticar(['admin', 'almoxarifado', 'gerente
   res.json(rows)
 })
 
+// =============================================
+// COMPRAS
+// =============================================
+
+const tipoLabelCompra = { embalagem: 'Embalagem', rotulo: 'Rótulo', caixa: 'Caixa', etiqueta: 'Etiqueta', outro: 'Outro' }
+
+app.get('/api/compras', autenticar(['admin', 'compras', 'almoxarifado']), async (req, res) => {
+  const [rows] = await pool.query(`
+    SELECT c.*, p.numero_pi, p.cliente, p.data_embarque
+    FROM compras c
+    LEFT JOIN pedidos p ON p.id = c.pi_id
+    ORDER BY c.criado_em DESC LIMIT 300`)
+  res.json(rows)
+})
+
+app.post('/api/compras', autenticar(['admin', 'compras']), async (req, res) => {
+  const { descricao, tipo, quantidade, unidade, fornecedor, data_compra, data_prevista, custo, pi_id, observacoes, status } = req.body
+  if (!descricao) return res.status(400).json({ erro: 'Informe o que está sendo comprado.' })
+
+  const [r] = await pool.query(
+    `INSERT INTO compras (descricao, tipo, quantidade, unidade, fornecedor, data_compra, data_prevista, custo, pi_id, observacoes, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [descricao, tipo || 'outro', parseFloat(quantidade) || 0, unidade || null, fornecedor || null,
+     data_compra || null, data_prevista || null, (custo !== undefined && custo !== null && custo !== '') ? parseFloat(custo) : null,
+     pi_id || null, observacoes || null, status || 'comprado']
+  )
+
+  const prevFmt = data_prevista ? new Date(data_prevista + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
+  enviarEmail(
+    `🛒 Nova compra registrada — ${descricao}`,
+    `<h2 style="color:#1565C0;margin:0 0 16px">🛒 Compra Registrada</h2>
+     <table style="width:100%;border-collapse:collapse;">
+       <tr><td style="padding:8px 0;color:#8a6a6a;width:160px">Item</td><td style="padding:8px 0;font-weight:600">${descricao}</td></tr>
+       <tr><td style="padding:8px 0;color:#8a6a6a">Tipo</td><td style="padding:8px 0;font-weight:600">${tipoLabelCompra[tipo] || 'Outro'}</td></tr>
+       ${parseFloat(quantidade) > 0 ? `<tr><td style="padding:8px 0;color:#8a6a6a">Quantidade</td><td style="padding:8px 0;font-weight:600">${quantidade} ${unidade || ''}</td></tr>` : ''}
+       ${fornecedor ? `<tr><td style="padding:8px 0;color:#8a6a6a">Fornecedor</td><td style="padding:8px 0;font-weight:600">${fornecedor}</td></tr>` : ''}
+       <tr><td style="padding:8px 0;color:#8a6a6a">Chegada prevista</td><td style="padding:8px 0;font-weight:600">${prevFmt}</td></tr>
+     </table>`
+  )
+  res.json({ id: r.insertId })
+})
+
+app.patch('/api/compras/:id', autenticar(['admin', 'compras']), async (req, res) => {
+  const campos = ['descricao', 'tipo', 'quantidade', 'unidade', 'fornecedor', 'data_compra', 'data_prevista', 'custo', 'pi_id', 'observacoes', 'status']
+  const sets = []
+  const vals = []
+  for (const campo of campos) {
+    if (campo in req.body) {
+      let v = req.body[campo]
+      if ((campo === 'quantidade' || campo === 'custo') && v !== '' && v !== null) v = parseFloat(v)
+      if (v === '') v = null
+      sets.push(`${campo} = ?`)
+      vals.push(v)
+    }
+  }
+  if (!sets.length) return res.json({ ok: true })
+  vals.push(req.params.id)
+  await pool.query(`UPDATE compras SET ${sets.join(', ')} WHERE id = ?`, vals)
+  res.json({ ok: true })
+})
+
+app.patch('/api/compras/:id/receber', autenticar(['admin', 'compras']), async (req, res) => {
+  await pool.query(`UPDATE compras SET status = 'recebido', recebido_em = NOW() WHERE id = ?`, [req.params.id])
+  const [[c]] = await pool.query(`SELECT c.*, p.numero_pi FROM compras c LEFT JOIN pedidos p ON p.id = c.pi_id WHERE c.id = ?`, [req.params.id])
+  if (c) {
+    enviarEmail(
+      `📦 Compra recebida — lançar no estoque B2 (${c.descricao})`,
+      `<h2 style="color:#2E7D32;margin:0 0 16px">📦 Compra Recebida</h2>
+       <p style="margin:0 0 12px;color:#8a6a6a">O setor de compras marcou este item como recebido. Depósito/almoxarifado: confiram e lancem no estoque B2.</p>
+       <table style="width:100%;border-collapse:collapse;">
+         <tr><td style="padding:8px 0;color:#8a6a6a;width:160px">Item</td><td style="padding:8px 0;font-weight:600">${c.descricao}</td></tr>
+         <tr><td style="padding:8px 0;color:#8a6a6a">Tipo</td><td style="padding:8px 0;font-weight:600">${tipoLabelCompra[c.tipo] || 'Outro'}</td></tr>
+         ${c.quantidade > 0 ? `<tr><td style="padding:8px 0;color:#8a6a6a">Quantidade</td><td style="padding:8px 0;font-weight:600">${c.quantidade} ${c.unidade || ''}</td></tr>` : ''}
+         ${c.fornecedor ? `<tr><td style="padding:8px 0;color:#8a6a6a">Fornecedor</td><td style="padding:8px 0;font-weight:600">${c.fornecedor}</td></tr>` : ''}
+         ${c.numero_pi ? `<tr><td style="padding:8px 0;color:#8a6a6a">PI vinculada</td><td style="padding:8px 0;font-weight:600">${c.numero_pi}</td></tr>` : ''}
+       </table>`
+    )
+  }
+  res.json({ ok: true })
+})
+
+app.delete('/api/compras/:id', autenticar(['admin', 'compras']), async (req, res) => {
+  await pool.query('DELETE FROM compras WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
+})
+
+app.get('/api/compras/sugestoes', autenticar(['admin', 'compras']), async (req, res) => {
+  const [rows] = await pool.query(`
+    SELECT p.id as pi_id, p.numero_pi, p.cliente, p.data_embarque,
+           pp.id as produto_id, pp.produto, pp.quantidade,
+           ip.tipo as insumo_tipo, ip.sobra
+    FROM pedidos p
+    JOIN produtos_pi pp ON pp.pi_id = p.id
+    JOIN insumos_produto ip ON ip.produto_id = pp.id
+    WHERE p.concluida = 0
+      AND ( ip.confirmado = 0 OR (ip.tipo = 'etiqueta' AND ip.sobra < 100) )
+    ORDER BY (p.data_embarque IS NULL), p.data_embarque ASC, p.numero_pi ASC`)
+  res.json(rows)
+})
+
+async function verificarComprasAtrasadas() {
+  try {
+    const [rows] = await pool.query(`
+      SELECT c.*, p.numero_pi FROM compras c
+      LEFT JOIN pedidos p ON p.id = c.pi_id
+      WHERE c.status <> 'recebido' AND c.data_prevista IS NOT NULL AND c.data_prevista < CURDATE()
+      ORDER BY c.data_prevista ASC`)
+    if (!rows.length) return
+
+    const linhas = rows.map((c) => {
+      const prev = new Date(String(c.data_prevista).slice(0, 10) + 'T00:00:00')
+      const dias = Math.floor((Date.now() - prev.getTime()) / 86400000)
+      return `<tr>
+        <td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;font-weight:700">${c.descricao}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${c.fornecedor || '—'}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${c.numero_pi ? 'PI ' + c.numero_pi : 'Estoque geral'}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;color:#ED3237;font-weight:700">atrasada ${dias} dia(s)</td>
+      </tr>`
+    }).join('')
+
+    enviarEmail(
+      `⏰ ALERTA: ${rows.length} compra(s) atrasada(s) na entrega`,
+      `<h2 style="color:#ED3237;margin:0 0 16px">⏰ Compras com Entrega Atrasada</h2>
+       <p style="margin:0 0 12px;color:#8a6a6a">As compras abaixo passaram da data prevista de chegada e ainda não foram marcadas como recebidas:</p>
+       <table style="width:100%;border-collapse:collapse;">
+         <thead><tr>
+           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Item</th>
+           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Fornecedor</th>
+           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Destino</th>
+           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Situação</th>
+         </tr></thead>
+         <tbody>${linhas}</tbody>
+       </table>`
+    )
+    console.log(`Alerta de compras atrasadas enviado: ${rows.length}`)
+  } catch (e) {
+    console.error('Erro no alerta de compras atrasadas:', e.message)
+  }
+}
+
+setTimeout(verificarComprasAtrasadas, 120 * 1000)
+setInterval(verificarComprasAtrasadas, 24 * 60 * 60 * 1000)
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'))
 })

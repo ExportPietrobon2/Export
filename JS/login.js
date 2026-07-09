@@ -6,7 +6,8 @@ const paginaPorPapel = {
   almoxarifado: '/HTML/almoxarifado.html',
   deposito: '/HTML/recebimento.html',
   convidado: '/HTML/admin.html',
-  gerente_producao: '/HTML/embarques.html'
+  gerente_producao: '/HTML/embarques.html',
+  compras: '/HTML/compras.html'
 }
 
 function redirecionarSeLogado() {
