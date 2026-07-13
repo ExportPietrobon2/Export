@@ -12,14 +12,57 @@ let podeResponderPedido = false
 const selectPi = document.getElementById('select-pi')
 const containerConteudo = document.getElementById('conteudo-pi')
 
-function statusAutomatico(insumos, quantidade) {
-  return TIPOS_INSUMO.every((tipo) => {
-    if (tipo.chave === 'etiqueta') return true
-    const insumo = insumos[tipo.chave]
-    const sobra = Number(insumo?.sobra ?? 0)
-    if (tipo.chave === 'caixa') return sobra >= Number(quantidade)
-    return sobra > 0
-  }) ? 'LIBERADO' : 'NÃO PRODUZ'
+function calcularLiberado(insumos, rotulos, quantidade) {
+  const emb = Number(insumos.embalagem && insumos.embalagem.sobra || 0)
+  const cx = Number(insumos.caixa && insumos.caixa.sobra || 0)
+  if (emb <= 0) return false
+  if (cx < Number(quantidade)) return false
+  if (!rotulos.length || !rotulos.every((r) => Number(r.sobra) > 0)) return false
+  return true
+}
+
+const NOME_INSUMO = { embalagem: 'Embalagem', caixa: 'Caixa', etiqueta: 'Etiqueta' }
+
+function cardInsumoHtml(chave, insumo, produto) {
+  const unidade = chave === 'caixa' ? 'cx' : chave === 'etiqueta' ? 'un' : 'kg'
+  const sobra = Number(insumo.sobra) || 0
+  const necessario = Number(produto.quantidade) || 0
+  let resultado = ''
+  if (chave === 'caixa') {
+    const suf = sobra >= necessario
+    resultado = `<div class="saldo-valor ${suf ? 'saldo-positivo' : 'saldo-negativo'} resultado-${produto.id}-caixa">${suf ? `Suficiente (sobram ${sobra - necessario} cx)` : `Faltam ${necessario - sobra} cx`}</div>`
+  } else if (chave === 'etiqueta') {
+    const baixo = sobra > 0 && sobra < 100, sem = sobra === 0
+    resultado = `<div class="saldo-valor ${sem ? 'saldo-negativo' : baixo ? 'saldo-alerta' : 'saldo-positivo'} resultado-${produto.id}-etiqueta">${sem ? 'Sem estoque' : baixo ? `⚠ Baixo (${sobra} un)` : `${sobra} unidades`}</div>`
+  } else {
+    const pac = Number(insumo.quantidade_por_pacote) || 0
+    resultado = pac > 0 ? `<div class="saldo-valor saldo-positivo">${pac} pacotes possíveis</div>` : ''
+  }
+  return `<div class="col-6 col-md-3"><div class="card-insumo-almox h-100"><h4>${NOME_INSUMO[chave]}</h4>
+    <label class="form-label small fw-semibold">Sobra (${unidade})</label>
+    <input type="number" class="form-control" data-produto="${produto.id}" data-campo="sobra" data-tipo="${chave}" value="${sobra}" placeholder="0">
+    ${chave === 'embalagem' ? `<label class="form-label small fw-semibold mt-2">Pacotes possíveis</label>
+      <input type="number" class="form-control" data-produto="${produto.id}" data-campo="quantidade_por_pacote" data-tipo="${chave}" value="${insumo.quantidade_por_pacote || 0}" placeholder="0">` : ''}
+    ${resultado}
+  </div></div>`
+}
+
+function rotuloRowHtml(produtoId, r) {
+  r = r || {}
+  const sobra = Number(r.sobra) || 0
+  const pac = Number(r.quantidade_por_pacote) || 0
+  const nome = (r.nome || '').replace(/"/g, '&quot;')
+  return `<div class="rotulo-row card-insumo-almox p-2 mb-2" data-produto="${produtoId}">
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <span class="small fw-semibold">🏷 Rótulo</span>
+      <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 btn-remover-rotulo" style="font-size:.75rem">✕</button>
+    </div>
+    <input type="text" class="form-control form-control-sm mb-1 rotulo-nome" list="lista-rotulos" placeholder="Nome do rótulo (ex.: Pirulito)" value="${nome}">
+    <div class="row g-1">
+      <div class="col-6"><label class="form-label small mb-0">Sobra (kg)</label><input type="number" class="form-control form-control-sm rotulo-sobra" value="${sobra}" placeholder="0" min="0" step="any"></div>
+      <div class="col-6"><label class="form-label small mb-0">Pacotes</label><input type="number" class="form-control form-control-sm rotulo-pac" value="${pac}" placeholder="0" min="0" step="any"></div>
+    </div>
+  </div>`
 }
 
 async function carregarPedidos() {
@@ -48,13 +91,14 @@ async function carregarPi(piId) {
   for (const produto of produtos) {
     const { insumos: itensInsumo } = await api.produtos.insumos(produto.id)
     const insumos = {}
-    TIPOS_INSUMO.forEach((tipo) => {
-      const existente = (itensInsumo || []).find((i) => i.tipo === tipo.chave)
-      insumos[tipo.chave] = existente || { tipo: tipo.chave, sobra: 0, quantidade_por_pacote: 0 }
+    ;['embalagem', 'caixa', 'etiqueta'].forEach((chave) => {
+      const existente = (itensInsumo || []).find((i) => i.tipo === chave)
+      insumos[chave] = existente || { tipo: chave, sobra: 0, quantidade_por_pacote: 0 }
     })
+    let rotulos = (itensInsumo || []).filter((i) => i.tipo === 'rotulo')
+    if (!rotulos.length) rotulos = [{ nome: '', sobra: 0, quantidade_por_pacote: 0 }]
 
-    const status = statusAutomatico(insumos, produto.quantidade)
-    const liberado = status === 'LIBERADO'
+    const liberado = calcularLiberado(insumos, rotulos, produto.quantidade)
 
     const linha = document.createElement('div')
     linha.className = 'linha-produto-almox'
@@ -81,49 +125,19 @@ async function carregarPi(piId) {
     formulario.style.display = 'none'
     formulario.innerHTML = `
       <div class="row g-3 mt-1">
-        ${TIPOS_INSUMO.map((tipo) => {
-          const insumo = insumos[tipo.chave]
-          const unidade = tipo.chave === 'caixa' ? 'cx' : tipo.chave === 'etiqueta' ? 'un' : 'kg'
-          const sobra = Number(insumo.sobra) || 0
-          const necessario = Number(produto.quantidade) || 0
+        ${cardInsumoHtml('embalagem', insumos.embalagem, produto)}
+        ${cardInsumoHtml('caixa', insumos.caixa, produto)}
+        ${cardInsumoHtml('etiqueta', insumos.etiqueta, produto)}
+      </div>
 
-          let resultado = ''
-          if (tipo.chave === 'caixa') {
-            const suf = sobra >= necessario
-            resultado = `<div class="saldo-valor ${suf ? 'saldo-positivo' : 'saldo-negativo'} resultado-${produto.id}-caixa">
-              ${suf ? `Suficiente (sobram ${sobra - necessario} cx)` : `Faltam ${necessario - sobra} cx`}
-            </div>`
-          } else if (tipo.chave === 'etiqueta') {
-            const baixo = sobra > 0 && sobra < 100
-            const sem = sobra === 0
-            resultado = `<div class="saldo-valor ${sem ? 'saldo-negativo' : baixo ? 'saldo-alerta' : 'saldo-positivo'} resultado-${produto.id}-etiqueta">
-              ${sem ? 'Sem estoque' : baixo ? `⚠ Baixo (${sobra} un)` : `${sobra} unidades`}
-            </div>`
-          } else {
-            const pacotes = Number(insumo.quantidade_por_pacote) || 0
-            resultado = pacotes > 0 ? `<div class="saldo-valor saldo-positivo">${pacotes} pacotes possíveis</div>` : ''
-          }
-
-          return `<div class="col-6 col-md-3">
-            <div class="card-insumo-almox h-100">
-              <h4>${tipo.rotulo}</h4>
-            <label class="form-label small fw-semibold">Sobra (${unidade})</label>
-            <input type="number" class="form-control"
-                data-produto="${produto.id}"
-                data-campo="sobra"
-                data-tipo="${tipo.chave}"
-                value="${sobra}"
-                placeholder="0">
-            ${tipo.chave !== 'caixa' && tipo.chave !== 'etiqueta' ? `<label class="form-label small fw-semibold mt-2">Pacotes possíveis</label>
-              <input type="number" class="form-control"
-                data-produto="${produto.id}"
-                data-campo="quantidade_por_pacote"
-                data-tipo="${tipo.chave}"
-                value="${insumo.quantidade_por_pacote}"
-                placeholder="0">` : ''}
-            ${resultado}
-          </div></div>`
-        }).join('')}
+      <div class="mt-3">
+        <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-1">
+          <label class="form-label small fw-semibold mb-0">Rótulos <span class="text-muted">(vários para mixes)</span></label>
+          <button type="button" class="btn btn-sm btn-outline-danger btn-add-rotulo" data-produto="${produto.id}" style="border-radius:8px">+ Adicionar rótulo</button>
+        </div>
+        <div id="rotulos-${produto.id}">
+          ${rotulos.map((r) => rotuloRowHtml(produto.id, r)).join('')}
+        </div>
       </div>
 
       <div class="mt-3">
@@ -161,7 +175,30 @@ function adicionarListeners() {
   containerConteudo.querySelectorAll('.btn-salvar-produto').forEach((btn) => {
     btn.addEventListener('click', () => salvarProduto(btn.dataset.produto, btn.dataset.quantidade))
   })
+
+  containerConteudo.querySelectorAll('.btn-add-rotulo').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const cont = document.getElementById(`rotulos-${btn.dataset.produto}`)
+      cont.insertAdjacentHTML('beforeend', rotuloRowHtml(btn.dataset.produto, {}))
+      atualizarIndicador(btn.dataset.produto)
+    })
+  })
 }
+
+containerConteudo.addEventListener('input', (e) => {
+  if (e.target.classList.contains('rotulo-sobra')) {
+    const row = e.target.closest('.rotulo-row')
+    if (row) atualizarIndicador(row.dataset.produto)
+  }
+})
+containerConteudo.addEventListener('click', (e) => {
+  const rem = e.target.closest('.btn-remover-rotulo')
+  if (!rem) return
+  const row = rem.closest('.rotulo-row')
+  const produtoId = row.dataset.produto
+  row.remove()
+  atualizarIndicador(produtoId)
+})
 
 function atualizarResultado(input) {
   const produtoId = input.dataset.produto
@@ -194,12 +231,12 @@ function atualizarIndicador(produtoId) {
   const btn = containerConteudo.querySelector(`.btn-salvar-produto[data-produto="${produtoId}"]`)
   const quantidade = Number(btn?.dataset.quantidade) || 0
   const insumosAtuais = {}
-  TIPOS_INSUMO.forEach((tipo) => {
-    const inputSobra = containerConteudo.querySelector(`input[data-produto="${produtoId}"][data-campo="sobra"][data-tipo="${tipo.chave}"]`)
-    insumosAtuais[tipo.chave] = { sobra: inputSobra ? inputSobra.value : 0 }
+  ;['embalagem', 'caixa'].forEach((chave) => {
+    const inputSobra = containerConteudo.querySelector(`input[data-produto="${produtoId}"][data-campo="sobra"][data-tipo="${chave}"]`)
+    insumosAtuais[chave] = { sobra: inputSobra ? inputSobra.value : 0 }
   })
-  const novoStatus = statusAutomatico(insumosAtuais, quantidade)
-  const liberado = novoStatus === 'LIBERADO'
+  const rotulosAtuais = [...containerConteudo.querySelectorAll(`#rotulos-${produtoId} .rotulo-sobra`)].map((i) => ({ sobra: i.value }))
+  const liberado = calcularLiberado(insumosAtuais, rotulosAtuais, quantidade)
   const indicador = containerConteudo.querySelector(`[data-status="${produtoId}"]`)
   if (indicador) {
     indicador.textContent = liberado ? '✔ OK' : '✗ Pendente'
@@ -208,19 +245,26 @@ function atualizarIndicador(produtoId) {
 }
 
 async function salvarProduto(produtoId, quantidade) {
-  const insumosParaSalvar = TIPOS_INSUMO.map((tipo) => {
-    const inputSobra = containerConteudo.querySelector(`input[data-produto="${produtoId}"][data-campo="sobra"][data-tipo="${tipo.chave}"]`)
-    const inputPacotes = containerConteudo.querySelector(`input[data-produto="${produtoId}"][data-campo="quantidade_por_pacote"][data-tipo="${tipo.chave}"]`)
+  const insumosParaSalvar = ['embalagem', 'caixa', 'etiqueta'].map((chave) => {
+    const inputSobra = containerConteudo.querySelector(`input[data-produto="${produtoId}"][data-campo="sobra"][data-tipo="${chave}"]`)
+    const inputPacotes = containerConteudo.querySelector(`input[data-produto="${produtoId}"][data-campo="quantidade_por_pacote"][data-tipo="${chave}"]`)
     return {
-      tipo: tipo.chave,
+      tipo: chave,
       sobra: inputSobra ? inputSobra.value : 0,
       quantidade_por_pacote: inputPacotes ? inputPacotes.value : 0
     }
   })
 
+  const rotulos = [...containerConteudo.querySelectorAll(`#rotulos-${produtoId} .rotulo-row`)].map((row) => ({
+    nome: row.querySelector('.rotulo-nome').value.trim() || null,
+    sobra: row.querySelector('.rotulo-sobra').value || 0,
+    quantidade_por_pacote: row.querySelector('.rotulo-pac').value || 0
+  })).filter((r) => r.nome || Number(r.sobra) > 0 || Number(r.quantidade_por_pacote) > 0)
+
   const textarea = containerConteudo.querySelector(`textarea[data-produto="${produtoId}"]`)
   const resultado = await api.produtos.salvarInsumos(produtoId, {
     insumos: insumosParaSalvar,
+    rotulos,
     observacoes: textarea ? textarea.value : '',
     quantidade
   })

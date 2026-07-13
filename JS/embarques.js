@@ -52,8 +52,9 @@ function renderAlmoxarifado(produtos) {
         const pacotes = Number(insumo.quantidade_por_pacote) || 0
         detalhes = `Sobra: ${sobra} kg${pacotes > 0 ? ` · ${pacotes} pacotes` : ''}`
       }
+      const nomeInsumo = insumo.tipo === 'rotulo' ? ('Rótulo' + (insumo.nome ? ' – ' + insumo.nome : '')) : (rotuloInsumo[insumo.tipo] || insumo.tipo)
       return `<tr>
-        <td>${rotuloInsumo[insumo.tipo] || insumo.tipo}</td>
+        <td>${nomeInsumo}</td>
         <td>${insumo.confirmado ? '✅' : '❌'}</td>
         <td>${detalhes}</td>
       </tr>`

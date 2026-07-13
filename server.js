@@ -243,8 +243,9 @@ app.get('/api/produtos/:produtoId/insumos', autenticar(TODOS), async (req, res) 
 })
 
 app.patch('/api/produtos/:produtoId/insumos', autenticar(['admin', 'almoxarifado']), async (req, res) => {
-  const { insumos, observacoes, quantidade } = req.body
-  for (const insumo of insumos) {
+  const { insumos, rotulos, observacoes, quantidade } = req.body
+  for (const insumo of (insumos || [])) {
+    if (insumo.tipo === 'rotulo') continue
     let confirmado = 0
     if (insumo.tipo === 'etiqueta') {
       confirmado = 1
@@ -258,6 +259,18 @@ app.patch('/api/produtos/:produtoId/insumos', autenticar(['admin', 'almoxarifado
       [insumo.sobra, insumo.quantidade_por_pacote || 0, confirmado, req.params.produtoId, insumo.tipo]
     )
   }
+
+  if (Array.isArray(rotulos)) {
+    await pool.query('DELETE FROM insumos_produto WHERE produto_id = ? AND tipo = ?', [req.params.produtoId, 'rotulo'])
+    for (const r of rotulos) {
+      const confirmado = Number(r.sobra) > 0 ? 1 : 0
+      await pool.query(
+        'INSERT INTO insumos_produto (produto_id, tipo, nome, confirmado, sobra, quantidade_por_pacote) VALUES (?, ?, ?, ?, ?, ?)',
+        [req.params.produtoId, 'rotulo', r.nome || null, confirmado, r.sobra || 0, r.quantidade_por_pacote || 0]
+      )
+    }
+  }
+
   if (observacoes !== undefined) {
     await pool.query('UPDATE produtos_pi SET observacoes = ? WHERE id = ?', [observacoes, req.params.produtoId])
   }
