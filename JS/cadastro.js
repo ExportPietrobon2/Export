@@ -27,7 +27,8 @@ async function carregarPedidos() {
     cabecalhoPi.className = 'card-body d-flex justify-content-between align-items-center flex-wrap gap-2'
 
     const titulo = document.createElement('div')
-    titulo.innerHTML = `<strong class="text-danger">PI ${pedido.numero_pi}</strong> <span class="text-muted small">— ${pedido.cliente || 'sem cliente'} — ${pedido.destino || 'sem destino'}</span>`
+    const dataCadFmt = pedido.data_cadastro ? ' · 📅 ' + new Date(String(pedido.data_cadastro).slice(0, 10) + 'T00:00:00').toLocaleDateString('pt-BR') : ''
+    titulo.innerHTML = `<strong class="text-danger">PI ${pedido.numero_pi}</strong> <span class="text-muted small">— ${pedido.cliente || 'sem cliente'} — ${pedido.destino || 'sem destino'}${dataCadFmt}</span>`
     cabecalhoPi.appendChild(titulo)
 
     const botaoExcluir = document.createElement('button')
@@ -145,7 +146,7 @@ document.getElementById('form-novo-pi').addEventListener('submit', async (evento
 
   const resultado = await api.pedidos.criar({
     numero_pi: numeroPi,
-    data_embarque: document.getElementById('data-embarque').value || null,
+    data_cadastro: document.getElementById('data-cadastro').value || null,
     cliente: document.getElementById('cliente-pi').value.trim() || null,
     destino: document.getElementById('destino-pi').value.trim() || null
   })

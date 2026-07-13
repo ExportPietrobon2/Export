@@ -156,7 +156,8 @@ function renderCard(pedido) {
       <div class="text-muted small">
         ${pedido.cliente || ''}
         ${pedido.destino ? '· ' + pedido.destino : ''}
-        ${pedido.data_embarque ? '· 🚢 ' + new Date(dataParaInput(pedido.data_embarque) + 'T00:00:00').toLocaleDateString('pt-BR') : ''}
+        ${pedido.data_cadastro ? '· 📅 Cadastro ' + new Date(dataParaInput(pedido.data_cadastro) + 'T00:00:00').toLocaleDateString('pt-BR') : ''}
+        ${pedido.data_embarque ? '· 🚢 Embarque ' + new Date(dataParaInput(pedido.data_embarque) + 'T00:00:00').toLocaleDateString('pt-BR') : ''}
       </div>
       <div class="mt-1 d-flex align-items-center gap-2 flex-wrap">
         <span class="badge ${pronta ? 'bg-success' : 'bg-danger'}">${pronta ? '✅ Pronto para produzir' : '⏳ Não pronto'}</span>

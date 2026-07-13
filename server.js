@@ -156,10 +156,10 @@ app.get('/api/pedidos/completo', autenticar(TODOS), async (req, res) => {
 })
 
 app.post('/api/pedidos', autenticar(['admin']), async (req, res) => {
-  const { numero_pi, data_embarque, cliente, destino } = req.body
+  const { numero_pi, data_cadastro, cliente, destino } = req.body
   const [resultado] = await pool.query(
-    'INSERT INTO pedidos (numero_pi, data_embarque, cliente, destino) VALUES (?, ?, ?, ?)',
-    [numero_pi, data_embarque || null, cliente || null, destino || null]
+    'INSERT INTO pedidos (numero_pi, data_cadastro, cliente, destino) VALUES (?, ?, ?, ?)',
+    [numero_pi, data_cadastro || null, cliente || null, destino || null]
   )
   const piId = resultado.insertId
   const tiposRecebimento = ['embalagem', 'rotulo', 'caixa']
