@@ -5,7 +5,6 @@ const jwt = require('jsonwebtoken')
 const cloudinary = require('cloudinary').v2
 const multer = require('multer')
 const path = require('path')
-const nodemailer = require('nodemailer')
 
 const app = express()
 app.use(express.json())
@@ -22,18 +21,10 @@ const upload = multer({ storage: multer.memoryStorage() })
 const EMAIL_TESTE = process.env.EMAIL_TESTE || 'pietrobonexport2@gmail.com'
 const MODO_TESTE = process.env.MODO_TESTE !== 'false'
 
-const SMTP_USER = process.env.SMTP_USER
-const SMTP_PASS = process.env.SMTP_PASS
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'email-ssl.com.br',
-  port: Number(process.env.SMTP_PORT) || 465,
-  secure: (process.env.SMTP_PORT || '465') === '465',
-  auth: { user: SMTP_USER, pass: SMTP_PASS }
-})
+const BREVO_API_KEY = process.env.BREVO_API_KEY
+const EMAIL_REMETENTE = process.env.EMAIL_REMETENTE || 'export2@pietrobon.com.br'
 
-transporter.verify()
-  .then(() => console.log('✅ SMTP pronto — conexão de e-mail OK'))
-  .catch((e) => console.error('❌ SMTP falhou na verificação:', e && e.message ? e.message : e))
+if (!BREVO_API_KEY) console.warn('⚠ BREVO_API_KEY não configurada — e-mails não serão enviados.')
 
 async function getDestinatarios(papeis) {
   if (MODO_TESTE) return [EMAIL_TESTE]
@@ -47,12 +38,11 @@ async function getDestinatarios(papeis) {
 
 async function enviarEmail(assunto, corpo, papeis) {
   try {
+    if (!BREVO_API_KEY) return
     const destinatarios = await getDestinatarios(papeis)
-    await transporter.sendMail({
-      from: `"Pietrobon · Insumos" <${SMTP_USER}>`,
-      to: destinatarios.join(', '),
-      subject: assunto,
-      html: `
+    if (!destinatarios.length) return
+
+    const html = `
         <div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;">
           <div style="background:linear-gradient(120deg,#ED3237,#C6242A);padding:24px 28px;border-radius:12px 12px 0 0;">
             <p style="color:#fff;font-size:1.2rem;font-weight:800;margin:0;">🏭 Pietrobon · Insumos</p>
@@ -63,10 +53,25 @@ async function enviarEmail(assunto, corpo, papeis) {
             <p style="font-size:0.78rem;color:#8a6a6a;margin:0;">Pietrobon & Cia Ltda · Controle de Insumos Exportação<br>
             ${MODO_TESTE ? '<strong style="color:#ED3237">⚠ Modo teste — notificação enviada apenas para ' + EMAIL_TESTE + '</strong>' : ''}</p>
           </div>
-        </div>
-      `
+        </div>`
+
+    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', 'accept': 'application/json' },
+      body: JSON.stringify({
+        sender: { email: EMAIL_REMETENTE, name: 'Pietrobon · Insumos' },
+        to: destinatarios.map((email) => ({ email })),
+        subject: assunto,
+        htmlContent: html
+      })
     })
-    console.log('Email enviado:', assunto)
+
+    if (!resp.ok) {
+      const txt = await resp.text()
+      console.error('Erro Brevo:', resp.status, txt)
+    } else {
+      console.log('Email enviado:', assunto)
+    }
   } catch (e) {
     console.error('Erro ao enviar email:', e.message)
   }
