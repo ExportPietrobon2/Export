@@ -31,6 +31,10 @@ const transporter = nodemailer.createTransport({
   auth: { user: SMTP_USER, pass: SMTP_PASS }
 })
 
+transporter.verify()
+  .then(() => console.log('✅ SMTP pronto — conexão de e-mail OK'))
+  .catch((e) => console.error('❌ SMTP falhou na verificação:', e && e.message ? e.message : e))
+
 async function getDestinatarios(papeis) {
   if (MODO_TESTE) return [EMAIL_TESTE]
   if (papeis && papeis.length) {

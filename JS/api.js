@@ -96,6 +96,7 @@ export const api = {
     criar: (dados) => requisitar('POST', '/api/compras', dados),
     editar: (id, dados) => requisitar('PATCH', `/api/compras/${id}`, dados),
     receber: (id) => requisitar('PATCH', `/api/compras/${id}/receber`),
+    observacao: (id, observacoes) => requisitar('PATCH', `/api/compras/${id}/observacao`, { observacoes }),
     excluir: (id) => requisitar('DELETE', `/api/compras/${id}`)
   },
 

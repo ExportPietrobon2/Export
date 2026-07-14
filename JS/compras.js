@@ -59,10 +59,29 @@ async function carregarCompras() {
             <select class="form-select form-select-sm" style="max-width:160px" onchange="mudarStatusCompra(${c.id}, this.value)">${opcoesStatus}</select>
             ${c.status !== 'recebido' ? `<button class="btn btn-sm btn-pietrobon" onclick="receberCompra(${c.id})">✅ Recebida</button>` : ''}
             <button class="btn btn-sm btn-outline-danger" onclick="excluirCompra(${c.id})">🗑 Excluir</button>
-          </div>` : ''}
+          </div>
+          <div class="input-group input-group-sm mt-2">
+            <input type="text" class="form-control obs-compra" data-id="${c.id}" placeholder="Observação (ex.: Verificar estoque de caixas)" value="${(c.observacoes || '').replace(/"/g, '&quot;')}">
+            <button class="btn btn-outline-secondary" onclick="salvarObsCompra(${c.id})">📝 Enviar observação</button>
+          </div>` : (c.observacoes ? `<div class="small text-muted mt-1">📝 ${c.observacoes}</div>` : '')}
         </div>
       </div>`
   }).join('')
+}
+
+window.salvarObsCompra = async function (id) {
+  const input = document.querySelector(`.obs-compra[data-id="${id}"]`)
+  if (!input) return
+  const btn = input.nextElementSibling
+  const texto = input.value.trim()
+  const orig = btn.textContent
+  btn.disabled = true
+  btn.textContent = '...'
+  const r = await api.compras.observacao(id, texto)
+  btn.disabled = false
+  if (r?.erro) { btn.textContent = orig; alert('Erro ao salvar observação.'); return }
+  btn.textContent = texto ? '✔ Enviado' : '✔ Salvo'
+  setTimeout(() => { btn.textContent = orig }, 2000)
 }
 
 window.mudarStatusCompra = async function (id, status) {
