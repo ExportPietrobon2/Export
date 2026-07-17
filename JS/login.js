@@ -7,7 +7,8 @@ const paginaPorPapel = {
   deposito: '/HTML/recebimento.html',
   convidado: '/HTML/admin.html',
   gerente_producao: '/HTML/embarques.html',
-  compras: '/HTML/compras.html'
+  compras: '/HTML/compras.html',
+  compras_aromas: '/HTML/compras.html'
 }
 
 function redirecionarSeLogado() {

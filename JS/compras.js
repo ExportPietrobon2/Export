@@ -8,6 +8,7 @@ const statusLabel = { pendente: 'Pendente', comprado: 'Comprado', em_transito: '
 const statusCor = { pendente: 'bg-secondary', comprado: 'bg-primary', em_transito: 'bg-warning text-dark', recebido: 'bg-success' }
 let podeComprar = false
 let podeCriarDemanda = false
+let responderCategorias = []
 
 function dataInput(v) { return v ? String(v).slice(0, 10) : '' }
 function dataBR(v) { return v ? new Date(dataInput(v) + 'T00:00:00').toLocaleDateString('pt-BR') : '—' }
@@ -211,7 +212,7 @@ document.querySelectorAll('[data-aba-compra]').forEach((btn) => {
     document.getElementById('aba-demandas').style.display = aba === 'demandas' ? 'block' : 'none'
     document.getElementById('aba-sugestoes').style.display = aba === 'sugestoes' ? 'block' : 'none'
     document.getElementById('aba-entradas').style.display = aba === 'entradas' ? 'block' : 'none'
-    if (aba === 'demandas') iniciarPedidosCompra(document.getElementById('wrap-pedidos-compra'), { podeCriar: podeCriarDemanda, podeResponder: podeComprar })
+    if (aba === 'demandas') iniciarPedidosCompra(document.getElementById('wrap-pedidos-compra'), { podeCriar: podeCriarDemanda, responderCategorias })
     if (aba === 'sugestoes') carregarSugestoes()
     if (aba === 'entradas') carregarEntradasB2()
   })
@@ -220,8 +221,11 @@ document.querySelectorAll('[data-aba-compra]').forEach((btn) => {
 async function iniciar() {
   const perfil = exigirPapel('todos')
   if (!perfil) return
-  podeComprar = ['admin', 'compras'].includes(perfil.papel)
+  podeComprar = ['admin', 'compras', 'compras_aromas'].includes(perfil.papel)
   podeCriarDemanda = ['admin', 'almoxarifado'].includes(perfil.papel)
+  if (perfil.papel === 'admin') responderCategorias = ['gerais', 'aromas']
+  else if (perfil.papel === 'compras') responderCategorias = ['gerais']
+  else if (perfil.papel === 'compras_aromas') responderCategorias = ['aromas']
   montarCabecalho(perfil.papel)
   if (!podeComprar) {
     const formCard = document.getElementById('form-compra').closest('.card')
