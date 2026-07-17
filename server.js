@@ -107,7 +107,7 @@ function autenticar(papeis) {
   }
 }
 
-const TODOS = ['admin', 'almoxarifado', 'deposito', 'convidado', 'gerente_producao', 'compras']
+const TODOS = ['admin', 'almoxarifado', 'deposito', 'convidado', 'gerente_producao', 'compras', 'compras_aromas']
 
 app.post('/api/login', async (req, res) => {
   const { email, senha } = req.body
@@ -760,7 +760,7 @@ app.get('/api/compras', autenticar(TODOS), async (req, res) => {
   res.json(rows)
 })
 
-app.post('/api/compras', autenticar(['admin', 'compras']), async (req, res) => {
+app.post('/api/compras', autenticar(['admin', 'compras', 'compras_aromas']), async (req, res) => {
   const { descricao, tipo, quantidade, unidade, fornecedor, data_compra, data_prevista, custo, pi_id, observacoes, status } = req.body
   if (!descricao) return res.status(400).json({ erro: 'Informe o que está sendo comprado.' })
 
@@ -775,7 +775,7 @@ app.post('/api/compras', autenticar(['admin', 'compras']), async (req, res) => {
   res.json({ id: r.insertId })
 })
 
-app.patch('/api/compras/:id', autenticar(['admin', 'compras']), async (req, res) => {
+app.patch('/api/compras/:id', autenticar(['admin', 'compras', 'compras_aromas']), async (req, res) => {
   const campos = ['descricao', 'tipo', 'quantidade', 'unidade', 'fornecedor', 'data_compra', 'data_prevista', 'custo', 'pi_id', 'observacoes', 'status']
   const sets = []
   const vals = []
@@ -794,7 +794,7 @@ app.patch('/api/compras/:id', autenticar(['admin', 'compras']), async (req, res)
   res.json({ ok: true })
 })
 
-app.patch('/api/compras/:id/receber', autenticar(['admin', 'compras']), async (req, res) => {
+app.patch('/api/compras/:id/receber', autenticar(['admin', 'compras', 'compras_aromas']), async (req, res) => {
   await pool.query(`UPDATE compras SET status = 'recebido', recebido_em = NOW() WHERE id = ?`, [req.params.id])
   const [[c]] = await pool.query(`SELECT c.*, p.numero_pi FROM compras c LEFT JOIN pedidos p ON p.id = c.pi_id WHERE c.id = ?`, [req.params.id])
   if (c) {
@@ -815,12 +815,12 @@ app.patch('/api/compras/:id/receber', autenticar(['admin', 'compras']), async (r
   res.json({ ok: true })
 })
 
-app.delete('/api/compras/:id', autenticar(['admin', 'compras']), async (req, res) => {
+app.delete('/api/compras/:id', autenticar(['admin', 'compras', 'compras_aromas']), async (req, res) => {
   await pool.query('DELETE FROM compras WHERE id = ?', [req.params.id])
   res.json({ ok: true })
 })
 
-app.patch('/api/compras/:id/observacao', autenticar(['admin', 'compras']), async (req, res) => {
+app.patch('/api/compras/:id/observacao', autenticar(['admin', 'compras', 'compras_aromas']), async (req, res) => {
   const { observacoes } = req.body
   await pool.query('UPDATE compras SET observacoes = ? WHERE id = ?', [observacoes || null, req.params.id])
   const [[c]] = await pool.query('SELECT descricao FROM compras WHERE id = ?', [req.params.id])
@@ -952,18 +952,21 @@ app.get('/api/demandas', autenticar(TODOS), async (req, res) => {
 
 app.post('/api/demandas', autenticar(['admin', 'almoxarifado']), async (req, res) => {
   const { descricao, quantidade, unidade, pi_id, observacoes } = req.body
+  const categoria = req.body.categoria === 'aromas' ? 'aromas' : 'gerais'
   if (!descricao) return res.status(400).json({ erro: 'Informe o que está faltando.' })
 
   const [r] = await pool.query(
-    `INSERT INTO demandas (descricao, quantidade, unidade, pi_id, observacoes, solicitante)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [descricao, parseFloat(quantidade) || 0, unidade || null, pi_id || null, observacoes || null, req.usuario && req.usuario.nome ? req.usuario.nome : null]
+    `INSERT INTO demandas (descricao, quantidade, unidade, pi_id, observacoes, solicitante, categoria)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [descricao, parseFloat(quantidade) || 0, unidade || null, pi_id || null, observacoes || null, req.usuario && req.usuario.nome ? req.usuario.nome : null, categoria]
   )
 
+  const destino = categoria === 'aromas' ? ['admin', 'compras_aromas'] : ['admin', 'compras']
+  const label = categoria === 'aromas' ? 'Aromas' : 'Insumos gerais'
   const [[pi]] = pi_id ? await pool.query('SELECT numero_pi FROM pedidos WHERE id = ?', [pi_id]) : [[null]]
   enviarEmail(
-    `📌 Nova demanda de compra — ${descricao}`,
-    `<h2 style="color:#6A1B9A;margin:0 0 16px">📌 Nova Demanda de Compra</h2>
+    `Novo pedido ao Compras (${label}) — ${descricao}`,
+    `<h2 style="color:#6A1B9A;margin:0 0 16px">📌 Novo Pedido ao Compras — ${label}</h2>
      <table style="width:100%;border-collapse:collapse;">
        <tr><td style="padding:8px 0;color:#8a6a6a;width:160px">Item</td><td style="padding:8px 0;font-weight:600">${descricao}</td></tr>
        ${parseFloat(quantidade) > 0 ? `<tr><td style="padding:8px 0;color:#8a6a6a">Quantidade</td><td style="padding:8px 0;font-weight:600">${quantidade} ${unidade || ''}</td></tr>` : ''}
@@ -971,12 +974,12 @@ app.post('/api/demandas', autenticar(['admin', 'almoxarifado']), async (req, res
        ${req.usuario && req.usuario.nome ? `<tr><td style="padding:8px 0;color:#8a6a6a">Solicitante</td><td style="padding:8px 0;font-weight:600">${req.usuario.nome}</td></tr>` : ''}
      </table>
      <p style="margin:16px 0 0;color:#6A1B9A;font-weight:600">Compras: verificar disponibilidade e marcar "Tenho" ou "Não tenho".</p>`,
-    ['admin', 'compras']
+    destino
   )
   res.json({ id: r.insertId })
 })
 
-app.patch('/api/demandas/:id/status', autenticar(['admin', 'compras']), async (req, res) => {
+app.patch('/api/demandas/:id/status', autenticar(['admin', 'compras', 'compras_aromas']), async (req, res) => {
   const { status } = req.body
   if (!['tem', 'nao_tem', 'pendente'].includes(status)) return res.status(400).json({ erro: 'Status inválido.' })
   const quem = req.usuario && req.usuario.nome ? req.usuario.nome : null
@@ -995,7 +998,7 @@ app.patch('/api/demandas/:id/status', autenticar(['admin', 'compras']), async (r
          <tr><td style="padding:8px 0;color:#8a6a6a">Resposta</td><td style="padding:8px 0;font-weight:700;color:${cor}">${label}</td></tr>
          ${quem ? `<tr><td style="padding:8px 0;color:#8a6a6a">Respondido por</td><td style="padding:8px 0;font-weight:600">${quem}</td></tr>` : ''}
        </table>`,
-      ['admin', 'almoxarifado', 'compras']
+      ['admin', 'almoxarifado', 'compras', 'compras_aromas']
     )
   }
   res.json({ ok: true })
