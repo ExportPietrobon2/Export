@@ -1026,6 +1026,14 @@ const PAPEL_INSTRUCOES = {
 async function montarContexto(papel) {
   const partes = []
   try {
+    // Visão geral das PIs abertas — disponível para todos os papéis
+    const [pis] = await pool.query(`
+      SELECT numero_pi, cliente, destino, data_cadastro, data_embarque
+      FROM pedidos WHERE concluida = 0 ORDER BY numero_pi DESC LIMIT 60`)
+    partes.push(`PIs ABERTAS (${pis.length}):\n` +
+      (pis.length ? pis.map((p) => `- PI ${p.numero_pi} | ${p.cliente || 'sem cliente'} | ${p.destino || 'sem destino'}` +
+        `${p.data_embarque ? ` | embarque ${new Date(p.data_embarque).toLocaleDateString('pt-BR')}` : ' | sem data de embarque'}`).join('\n') : 'Nenhuma PI aberta.'))
+
     if (['admin', 'almoxarifado'].includes(papel)) {
       const [decl] = await pool.query(SQL_DECLARACAO_PENDENTE)
       partes.push(`ESTOQUE AINDA NÃO DECLARADO PELO ALMOXARIFADO (${decl.length} produto(s)):\n` +
@@ -1078,12 +1086,14 @@ app.post('/api/chat', autenticar(TODOS), async (req, res) => {
 
     const system = `${instrucao}
 
-Você está conversando com ${nome} (papel: ${papel}). Data de hoje: ${hoje}.
-Responda em português do Brasil, de forma curta, objetiva e prática. Use os DADOS ATUAIS abaixo para responder com números reais. Se a pergunta for sobre algo fora desses dados, responda com base no conhecimento geral do processo, deixando claro quando for uma estimativa. Nunca invente números que não estejam nos dados.
+Você é um assistente completo e prestativo. Além de ajudar com o sistema Pietrobon, você pode responder QUALQUER pergunta ou pedido do usuário: dúvidas gerais, cálculos, redação de textos e e-mails, explicações, ideias, traduções, conselhos práticos, etc. Nunca recuse por achar que está "fora do escopo" — ajude no que for pedido.
 
-===== DADOS ATUAIS DO SETOR =====
+Você está conversando com ${nome} (papel: ${papel}). Data de hoje: ${hoje}.
+Responda em português do Brasil, de forma clara, objetiva e prática. Quando a pergunta for sobre o sistema/operação da empresa, use os DADOS ATUAIS abaixo para responder com números reais e nunca invente dados do sistema que não estejam listados. Para perguntas gerais, responda normalmente com seu conhecimento.
+
+===== DADOS ATUAIS DO SISTEMA (contexto do setor de ${papel}) =====
 ${contexto || 'Sem dados carregados no momento.'}
-===================================`
+==================================================================`
 
     const contents = [
       ...historico
@@ -1100,24 +1110,27 @@ ${contexto || 'Sem dados carregados no momento.'}
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents,
-          generationConfig: { temperature: 0.4, maxOutputTokens: 800 }
+          generationConfig: { temperature: 0.6, maxOutputTokens: 1600 }
         })
       }
     )
     const data = await resp.json()
     if (data.error) {
       console.error('Erro Gemini:', data.error.message)
-      return res.json({ resposta: '[DEBUG Gemini] ' + (data.error.message || 'erro desconhecido') })
+      const cota = /quota|rate/i.test(data.error.message || '')
+      return res.json({ resposta: cota
+        ? 'O assistente atingiu o limite de uso do momento. Tente novamente em alguns instantes.'
+        : 'Não consegui responder agora. Tente novamente em instantes.' })
     }
     const texto = data.candidates?.[0]?.content?.parts?.[0]?.text
     if (!texto) {
       console.error('Gemini sem texto:', JSON.stringify(data).slice(0, 500))
-      return res.json({ resposta: '[DEBUG] Resposta vazia. Motivo: ' + (data.candidates?.[0]?.finishReason || JSON.stringify(data).slice(0, 300)) })
+      return res.json({ resposta: 'Não consegui elaborar uma resposta para isso. Pode reformular a pergunta?' })
     }
     res.json({ resposta: texto })
   } catch (e) {
     console.error('Erro no /api/chat:', e.message)
-    res.json({ resposta: '[DEBUG] Falha na chamada: ' + (e.message || e) })
+    res.json({ resposta: 'Não consegui responder agora. Tente novamente em instantes.' })
   }
 })
 

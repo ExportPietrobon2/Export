@@ -85,10 +85,20 @@ export function iniciarChat(papel) {
   const inputEl = painel.querySelector('#chat-ia-input')
   const btnEnviar = painel.querySelector('#chat-ia-enviar')
 
+  function formatar(texto) {
+    const esc = texto
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    return esc
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/(^|\n)\s*[-*]\s+(.+)/g, '$1• $2')
+      .replace(/\n/g, '<br>')
+  }
+
   function addBolha(texto, de) {
     const b = document.createElement('div')
     b.className = `chat-ia-bolha ${de}`
-    b.textContent = texto
+    if (de === 'bot') b.innerHTML = formatar(texto)
+    else b.textContent = texto
     msgsEl.appendChild(b)
     msgsEl.scrollTop = msgsEl.scrollHeight
     return b
