@@ -1,6 +1,8 @@
-import { sair } from './auth.js'
+import { sair, getPerfil } from './auth.js'
 import { api } from './api.js'
 import { iniciarChat } from './chat.js'
+
+const EMAIL_CONTABIL = 'export2@pietrobon.com.br'
 
 async function carregarBadgesPendencias() {
   try {
@@ -8,76 +10,66 @@ async function carregarBadgesPendencias() {
     if (!p || p.erro) return
     const add = (href, n, cor) => {
       if (!n) return
-      const link = document.querySelector(`#navMenu a[href="${href}"]`)
+      const link = document.querySelector(`#menu-principal a[href="${href}"]`)
       if (!link) return
       const b = document.createElement('span')
-      b.className = `badge rounded-pill ${cor} ms-1`
+      b.className = `badge rounded-pill ${cor} ms-2`
       b.style.fontSize = '0.68rem'
       b.textContent = n
       link.appendChild(b)
     }
     add('/HTML/almoxarifado.html', p.estoqueNaoDeclarado, 'bg-warning text-dark')
-    add('/HTML/embarques.html', p.embarquesPendentes, 'bg-light text-dark')
+    add('/HTML/embarques.html', p.embarquesPendentes, 'bg-secondary')
     add('/HTML/compras.html', (p.pedidosCompra || 0) + (p.comprasAtrasadas || 0), 'bg-danger')
   } catch (e) { /* silencioso */ }
 }
 
 export function montarCabecalho(papel) {
   const paginaAtual = document.body.dataset.pagina
+  const perfil = getPerfil()
+  const ehContabil = perfil && (perfil.email || '').toLowerCase() === EMAIL_CONTABIL
 
   const links = [
-    { href: '/HTML/cadastro.html', texto: 'Cadastrar PIs', papeis: ['admin', 'convidado'] },
-    { href: '/HTML/almoxarifado.html', texto: 'Almoxarifado', papeis: ['admin', 'almoxarifado', 'convidado'] },
-    { href: '/HTML/recebimento.html', texto: 'Recebimento B2', papeis: ['admin', 'deposito', 'convidado'] },
-    { href: '/HTML/referencia.html', texto: 'Rendimentos', papeis: ['admin', 'deposito', 'convidado'] },
-    { href: '/HTML/admin.html', texto: 'Visão Geral das PIs', papeis: ['admin', 'convidado', 'compras', 'compras_aromas'] },
-    { href: '/HTML/embarques.html', texto: 'Embarques', papeis: ['admin', 'gerente_producao'] },
-    { href: '/HTML/compras.html', texto: 'Compras', papeis: ['admin', 'compras', 'compras_aromas'] }
+    { href: '/HTML/admin.html', texto: '📊 Visão Geral das PIs' },
+    { href: '/HTML/cadastro.html', texto: '📋 Cadastrar PIs' },
+    { href: '/HTML/almoxarifado.html', texto: '📦 Almoxarifado' },
+    { href: '/HTML/recebimento.html', texto: '🚚 Recebimento B2' },
+    { href: '/HTML/referencia.html', texto: '📐 Rendimentos' },
+    { href: '/HTML/embarques.html', texto: '🚢 Embarques' },
+    { href: '/HTML/compras.html', texto: '🛒 Compras' }
   ]
 
-  const brandHref = links.some((l) => l.href === '/HTML/admin.html')
-    ? '/HTML/admin.html'
-    : (links[0] ? links[0].href : '/HTML/admin.html')
+  const brandHref = '/HTML/admin.html'
+
+  const itensMenu = links.map((link) => `
+    <li><a class="dropdown-item ${link.href.endsWith(paginaAtual) ? 'active' : ''}" href="${link.href}">${link.texto}</a></li>`).join('')
+
+  const itemContabil = ehContabil ? `
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item item-contabil ${'/HTML/contabil.html'.endsWith(paginaAtual) ? 'active' : ''}" href="/HTML/contabil.html">💰 Contábil / Faturamento</a></li>` : ''
 
   const nav = document.createElement('nav')
-  nav.className = 'navbar navbar-expand-lg navbar-pietrobon sticky-top'
+  nav.className = 'navbar navbar-pietrobon sticky-top'
   nav.innerHTML = `
     <div class="container-fluid px-3">
       <a class="navbar-brand d-flex align-items-center gap-2" href="${brandHref}">
         <img src="/logo.png" alt="Pietrobon" style="height:36px;object-fit:contain;">
       </a>
-      <div class="d-flex align-items-center gap-2 ms-auto d-lg-none">
-        <button id="btn-instalar-mobile" title="Instalar app" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);border-radius:8px;color:#fff;padding:5px 10px;font-size:0.8rem;font-weight:600;cursor:pointer;">
+      <div class="d-flex align-items-center gap-2 ms-auto">
+        <button id="btn-instalar-topo" title="Instalar app" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);border-radius:8px;color:#fff;padding:6px 12px;font-size:0.82rem;font-weight:600;cursor:pointer;">
           📲 Instalar
         </button>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-      </div>
-      <div class="collapse navbar-collapse" id="navMenu">
-        <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center gap-lg-1">
-          ${links.filter(l => l.href !== '/HTML/admin.html').map((link) => `
-            <li class="nav-item">
-              <a class="nav-link ${link.href.endsWith(paginaAtual) ? 'active fw-bold' : ''}" href="${link.href}">
-                ${link.texto}
-              </a>
-            </li>`).join('')}
-          ${links.some(l => l.href === '/HTML/admin.html') ? '<li class="nav-item d-none d-lg-block"><span style="color:rgba(255,255,255,0.25);padding:0 4px">|</span></li>' : ''}
-          ${links.filter(l => l.href === '/HTML/admin.html').map((link) => `
-            <li class="nav-item">
-              <a class="nav-link nav-link-destaque ${link.href.endsWith(paginaAtual) ? 'active' : ''}" href="${link.href}">
-                ${link.texto}
-              </a>
-            </li>`).join('')}
-          <li class="nav-item d-none d-lg-block">
-            <button id="btn-instalar-desktop" title="Instalar app" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);border-radius:8px;color:#fff;padding:6px 12px;font-size:0.85rem;font-weight:600;cursor:pointer;">
-              📲 Instalar
-            </button>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link nav-link-sair" href="#" id="btn-sair">Sair</a>
-          </li>
-        </ul>
+        <div class="dropdown">
+          <button class="btn btn-menu-pietrobon dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            ☰ Menu
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow" id="menu-principal">
+            ${itensMenu}
+            ${itemContabil}
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item text-danger fw-semibold" href="#" id="btn-sair">🚪 Sair</a></li>
+          </ul>
+        </div>
       </div>
     </div>
   `
@@ -87,35 +79,23 @@ export function montarCabecalho(papel) {
   iniciarChat(papel)
 
   let promptInstalacao = null
-
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault()
     promptInstalacao = e
-
-    const btnMobile = document.getElementById('btn-instalar-mobile')
-    const btnDesktop = document.getElementById('btn-instalar-desktop')
-    if (btnMobile) btnMobile.style.display = 'block'
-    if (btnDesktop) btnDesktop.style.display = 'inline-block'
-
-    const instalar = async () => {
-      if (!promptInstalacao) return
-      promptInstalacao.prompt()
-      const { outcome } = await promptInstalacao.userChoice
-      if (outcome === 'accepted') {
-        if (btnMobile) btnMobile.style.display = 'none'
-        if (btnDesktop) btnDesktop.style.display = 'none'
-      }
-      promptInstalacao = null
+    const btn = document.getElementById('btn-instalar-topo')
+    if (btn) {
+      btn.style.display = 'inline-block'
+      btn.addEventListener('click', async () => {
+        if (!promptInstalacao) return
+        promptInstalacao.prompt()
+        const { outcome } = await promptInstalacao.userChoice
+        if (outcome === 'accepted') btn.style.display = 'none'
+        promptInstalacao = null
+      })
     }
-
-    if (btnMobile) btnMobile.addEventListener('click', instalar)
-    if (btnDesktop) btnDesktop.addEventListener('click', instalar)
   })
-
   window.addEventListener('appinstalled', () => {
-    const btnMobile = document.getElementById('btn-instalar-mobile')
-    const btnDesktop = document.getElementById('btn-instalar-desktop')
-    if (btnMobile) btnMobile.style.display = 'none'
-    if (btnDesktop) btnDesktop.style.display = 'none'
+    const btn = document.getElementById('btn-instalar-topo')
+    if (btn) btn.style.display = 'none'
   })
 }

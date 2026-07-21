@@ -688,3 +688,33 @@ body { letter-spacing: 0.005em; }
 @media (max-width: 576px) {
   .btn-ok-grande { width: 100% !important; padding: 12px; }
 }
+
+/* Menu suspenso no cabeçalho */
+.btn-menu-pietrobon {
+  background: rgba(255,255,255,0.16) !important;
+  border: 1px solid rgba(255,255,255,0.45) !important;
+  color: #fff !important;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 7px 16px;
+}
+.btn-menu-pietrobon:hover, .btn-menu-pietrobon:focus, .btn-menu-pietrobon.show {
+  background: rgba(255,255,255,0.28) !important;
+  color: #fff !important;
+}
+#menu-principal { border: 1px solid var(--border); border-radius: 12px; padding: 6px; min-width: 240px; }
+#menu-principal .dropdown-item {
+  border-radius: 8px; padding: 9px 12px; font-weight: 600; color: var(--text);
+  display: flex; align-items: center; justify-content: space-between;
+}
+#menu-principal .dropdown-item:hover { background: #fbeaea; color: var(--red-dark); }
+#menu-principal .dropdown-item.active { background: var(--red); color: #fff; }
+#menu-principal .item-contabil { color: #1b5e20; }
+#menu-principal .item-contabil:hover { background: #e8f5e9; color: #1b5e20; }
+
+/* Impressão (exportar PDF) da tela contábil */
+@media print {
+  #cabecalho, #chat-ia-botao, #chat-ia-painel, .no-print { display: none !important; }
+  body { background: #fff !important; }
+  .container { max-width: 100% !important; }
+}

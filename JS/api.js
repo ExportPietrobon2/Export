@@ -92,6 +92,14 @@ export const api = {
 
   chat: (mensagem, historico) => requisitar('POST', '/api/chat', { mensagem, historico }),
 
+  contabil: {
+    anos: () => requisitar('GET', '/api/contabil/anos'),
+    listar: (ano) => requisitar('GET', `/api/contabil?ano=${ano}`),
+    criar: (dados) => requisitar('POST', '/api/contabil', dados),
+    editar: (id, dados) => requisitar('PATCH', `/api/contabil/${id}`, dados),
+    excluir: (id) => requisitar('DELETE', `/api/contabil/${id}`)
+  },
+
   demandas: {
     listar: () => requisitar('GET', '/api/demandas'),
     criar: (dados) => requisitar('POST', '/api/demandas', dados),

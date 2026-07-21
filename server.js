@@ -118,7 +118,7 @@ app.post('/api/login', async (req, res) => {
   if (!senhaCorreta) return res.status(401).json({ erro: 'E-mail ou senha incorretos.' })
   const expiracao = '30d'
   const token = jwt.sign(
-    { id: usuario.id, nome: usuario.nome, papel: usuario.papel },
+    { id: usuario.id, nome: usuario.nome, papel: usuario.papel, email: usuario.email },
     JWT_SECRET,
     { expiresIn: expiracao }
   )
@@ -1132,6 +1132,76 @@ ${contexto || 'Sem dados carregados no momento.'}
     console.error('Erro no /api/chat:', e.message)
     res.json({ resposta: 'Não consegui responder agora. Tente novamente em instantes.' })
   }
+})
+
+// =============================================
+// CONTÁBIL / FATURAMENTO NFe — restrito ao export2
+// =============================================
+const EMAIL_CONTABIL = 'export2@pietrobon.com.br'
+
+function autenticarContabil() {
+  const base = autenticar(['admin'])
+  return (req, res, next) => base(req, res, () => {
+    if ((req.usuario.email || '').toLowerCase() !== EMAIL_CONTABIL) {
+      return res.status(403).json({ erro: 'Sem permissão' })
+    }
+    next()
+  })
+}
+
+const CAMPOS_NFE = ['ano', 'mes', 'data', 'nf', 'fatura', 'num_due', 'data_due',
+  'num_conhecimento', 'data_conhecimento', 'tipo', 'valor_nfe', 'peso', 'vendedor', 'produto', 'pais']
+
+app.get('/api/contabil/anos', autenticarContabil(), async (req, res) => {
+  const [rows] = await pool.query('SELECT DISTINCT ano FROM nfe_lancamentos ORDER BY ano DESC')
+  const anos = rows.map((r) => r.ano)
+  const atual = new Date().getFullYear()
+  if (!anos.includes(atual)) anos.unshift(atual)
+  res.json(anos)
+})
+
+app.get('/api/contabil', autenticarContabil(), async (req, res) => {
+  const ano = parseInt(req.query.ano) || new Date().getFullYear()
+  const [rows] = await pool.query(
+    'SELECT * FROM nfe_lancamentos WHERE ano = ? ORDER BY mes ASC, data ASC, id ASC', [ano])
+  res.json(rows)
+})
+
+app.post('/api/contabil', autenticarContabil(), async (req, res) => {
+  const b = req.body
+  if (!b.ano || !b.mes) return res.status(400).json({ erro: 'Ano e mês são obrigatórios.' })
+  const vals = CAMPOS_NFE.map((c) => {
+    let v = b[c]
+    if (v === '' || v === undefined) v = null
+    if ((c === 'valor_nfe' || c === 'peso') && v !== null) v = parseFloat(String(v).replace(',', '.')) || 0
+    if ((c === 'ano' || c === 'mes') && v !== null) v = parseInt(v)
+    return v
+  })
+  const [r] = await pool.query(
+    `INSERT INTO nfe_lancamentos (${CAMPOS_NFE.join(', ')}) VALUES (${CAMPOS_NFE.map(() => '?').join(', ')})`, vals)
+  res.json({ id: r.insertId })
+})
+
+app.patch('/api/contabil/:id', autenticarContabil(), async (req, res) => {
+  const sets = [], vals = []
+  for (const c of CAMPOS_NFE) {
+    if (c in req.body) {
+      let v = req.body[c]
+      if (v === '' || v === undefined) v = null
+      if ((c === 'valor_nfe' || c === 'peso') && v !== null) v = parseFloat(String(v).replace(',', '.')) || 0
+      if ((c === 'ano' || c === 'mes') && v !== null) v = parseInt(v)
+      sets.push(`${c} = ?`); vals.push(v)
+    }
+  }
+  if (!sets.length) return res.json({ ok: true })
+  vals.push(req.params.id)
+  await pool.query(`UPDATE nfe_lancamentos SET ${sets.join(', ')} WHERE id = ?`, vals)
+  res.json({ ok: true })
+})
+
+app.delete('/api/contabil/:id', autenticarContabil(), async (req, res) => {
+  await pool.query('DELETE FROM nfe_lancamentos WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
 })
 
 app.get('*', (req, res) => {

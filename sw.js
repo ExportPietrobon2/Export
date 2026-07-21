@@ -1,4 +1,4 @@
-const CACHE = 'pietrobon-v2'
+const CACHE = 'pietrobon-v3'
 const ARQUIVOS = [
   '/index.html',
   '/CSS/style.css',
