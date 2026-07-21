@@ -758,3 +758,16 @@ body { letter-spacing: 0.005em; }
   color: #fff !important;
   background: var(--red) !important;
 }
+
+/* Cabeçalho de TODAS as tabelas: vermelho sólido + texto branco nítido */
+.table thead th,
+.table > thead th,
+.table thead tr th {
+  background: var(--red) !important;
+  color: #fff !important;
+  border-color: var(--red) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-shadow: none !important;
+}
