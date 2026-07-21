@@ -156,6 +156,25 @@ async function carregarPi(piId) {
   }
 
   adicionarListeners()
+
+  // Restaura rascunhos não salvos (protege contra perda de digitação)
+  let algumRestaurado = false
+  for (const produto of produtos) {
+    if (aplicarRascunho(produto.id)) {
+      algumRestaurado = true
+      const form = document.getElementById(`form-produto-${produto.id}`)
+      const btnExp = containerConteudo.querySelector(`.btn-expandir-produto[data-id="${produto.id}"]`)
+      if (form) form.style.display = 'block'
+      if (btnExp) btnExp.textContent = 'Fechar ▴'
+      atualizarIndicador(produto.id)
+    }
+  }
+  if (algumRestaurado) {
+    const aviso = document.createElement('div')
+    aviso.className = 'alert alert-warning py-2 mb-3'
+    aviso.innerHTML = '💾 Recuperamos o que você havia digitado e ainda não tinha sido salvo. Confira os valores e clique em <strong>Salvar</strong>.'
+    containerConteudo.insertBefore(aviso, containerConteudo.firstChild)
+  }
 }
 
 function adicionarListeners() {
@@ -181,6 +200,7 @@ function adicionarListeners() {
       const cont = document.getElementById(`rotulos-${btn.dataset.produto}`)
       cont.insertAdjacentHTML('beforeend', rotuloRowHtml(btn.dataset.produto, {}))
       atualizarIndicador(btn.dataset.produto)
+      salvarRascunho(btn.dataset.produto)
     })
   })
 }
@@ -198,6 +218,70 @@ containerConteudo.addEventListener('click', (e) => {
   const produtoId = row.dataset.produto
   row.remove()
   atualizarIndicador(produtoId)
+  salvarRascunho(produtoId)
+})
+
+// ==========================================================
+// RASCUNHO AUTOMÁTICO — protege o que foi digitado contra
+// perdas por sessão expirada, recarregamento, celular, etc.
+// ==========================================================
+function chaveRascunho(produtoId) { return 'almox_rascunho_' + produtoId }
+
+function coletarFormulario(produtoId) {
+  const insumos = {}
+  ;['embalagem', 'caixa', 'etiqueta'].forEach((chave) => {
+    const s = containerConteudo.querySelector(`input[data-produto="${produtoId}"][data-campo="sobra"][data-tipo="${chave}"]`)
+    const p = containerConteudo.querySelector(`input[data-produto="${produtoId}"][data-campo="quantidade_por_pacote"][data-tipo="${chave}"]`)
+    insumos[chave] = { sobra: s ? s.value : '', pacote: p ? p.value : '' }
+  })
+  const rotulos = [...containerConteudo.querySelectorAll(`#rotulos-${produtoId} .rotulo-row`)].map((row) => ({
+    nome: row.querySelector('.rotulo-nome').value,
+    sobra: row.querySelector('.rotulo-sobra').value,
+    pac: row.querySelector('.rotulo-pac').value
+  }))
+  const textarea = containerConteudo.querySelector(`textarea[data-produto="${produtoId}"]`)
+  return { insumos, rotulos, observacoes: textarea ? textarea.value : '', ts: Date.now() }
+}
+
+function salvarRascunho(produtoId) {
+  try { localStorage.setItem(chaveRascunho(produtoId), JSON.stringify(coletarFormulario(produtoId))) } catch (e) { /* ignora */ }
+}
+
+function limparRascunho(produtoId) {
+  try { localStorage.removeItem(chaveRascunho(produtoId)) } catch (e) { /* ignora */ }
+}
+
+function aplicarRascunho(produtoId) {
+  let dados
+  try { dados = JSON.parse(localStorage.getItem(chaveRascunho(produtoId))) } catch (e) { return false }
+  if (!dados) return false
+  ;['embalagem', 'caixa', 'etiqueta'].forEach((chave) => {
+    const info = dados.insumos && dados.insumos[chave]
+    if (!info) return
+    const s = containerConteudo.querySelector(`input[data-produto="${produtoId}"][data-campo="sobra"][data-tipo="${chave}"]`)
+    const p = containerConteudo.querySelector(`input[data-produto="${produtoId}"][data-campo="quantidade_por_pacote"][data-tipo="${chave}"]`)
+    if (s && info.sobra !== undefined) s.value = info.sobra
+    if (p && info.pacote !== undefined) p.value = info.pacote
+  })
+  if (Array.isArray(dados.rotulos)) {
+    const cont = document.getElementById(`rotulos-${produtoId}`)
+    if (cont) {
+      cont.innerHTML = (dados.rotulos.length
+        ? dados.rotulos.map((r) => rotuloRowHtml(produtoId, { nome: r.nome, sobra: r.sobra, quantidade_por_pacote: r.pac })).join('')
+        : rotuloRowHtml(produtoId, {}))
+    }
+  }
+  const textarea = containerConteudo.querySelector(`textarea[data-produto="${produtoId}"]`)
+  if (textarea && dados.observacoes !== undefined) textarea.value = dados.observacoes
+  return true
+}
+
+// Salva o rascunho a cada digitação em qualquer campo do formulário
+containerConteudo.addEventListener('input', (e) => {
+  const form = e.target.closest('.formulario-produto-almox')
+  if (!form) return
+  const produtoId = form.id.replace('form-produto-', '')
+  salvarRascunho(produtoId)
 })
 
 function atualizarResultado(input) {
@@ -271,6 +355,7 @@ async function salvarProduto(produtoId, quantidade) {
 
   if (resultado?.erro) { alert(resultado.erro || 'Erro ao salvar. Tente novamente.'); return }
 
+  limparRascunho(produtoId)
   carregarAlertaDeclaracao()
 
   const btn = containerConteudo.querySelector(`.btn-salvar-produto[data-produto="${produtoId}"]`)
