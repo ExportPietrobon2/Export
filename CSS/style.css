@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 :root {
   --red: #ED3237;
   --red-dark: #C6242A;
@@ -778,3 +780,166 @@ body { letter-spacing: 0.005em; }
 /* Esconde caixas de ícone que ficaram vazias após remover emojis */
 .page-header-icon:empty { display: none; }
 .resumo-card-icone:empty { display: none; }
+
+/* ============================================================
+   TEMA PROFISSIONAL (aplicado por último — refina todo o site)
+   ============================================================ */
+:root {
+  --bg: #f3f4f6;
+  --bg-card: #ffffff;
+  --border: #e5e7eb;
+  --text: #1f2733;
+  --muted: #6b7280;
+  --ink-900: #111827;
+  --slate: #334155;
+  --shadow: 0 1px 2px rgba(17,24,39,.05), 0 1px 3px rgba(17,24,39,.08);
+  --shadow-md: 0 6px 20px rgba(17,24,39,.10);
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Barra de navegação mais sóbria */
+.navbar-pietrobon {
+  background: linear-gradient(100deg, #ED3237, #C6242A) !important;
+  box-shadow: 0 1px 0 rgba(0,0,0,.05), 0 4px 16px rgba(198,36,42,.20);
+  padding: 12px 0;
+}
+
+/* Botão do menu no topo */
+.btn-menu-pietrobon {
+  background: rgba(255,255,255,0.14) !important;
+  border: 1px solid rgba(255,255,255,0.35) !important;
+  color: #fff !important;
+  font-weight: 600;
+  letter-spacing: .01em;
+  border-radius: 10px;
+  padding: 8px 18px;
+}
+
+/* Cabeçalho de página: limpo e elegante */
+.page-header {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 20px 24px;
+  margin-bottom: 22px;
+}
+.page-titulo {
+  color: var(--ink-900);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  border-left: 4px solid var(--red);
+  padding-left: 14px;
+  font-size: 1.35rem;
+}
+.page-subtitulo { color: var(--muted); padding-left: 18px; font-size: .85rem; }
+
+/* Cartões refinados */
+.card {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 16px !important;
+  box-shadow: var(--shadow) !important;
+  transition: box-shadow .2s ease, transform .2s ease;
+}
+.card-body { padding: 20px !important; }
+
+/* Títulos de seção */
+.secao-titulo-card {
+  color: var(--ink-900);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  border-left: 3px solid var(--red);
+  padding-left: 10px;
+  font-size: .98rem;
+}
+
+/* Botões: profissionais, cantos suaves, foco de acessibilidade */
+.btn { font-weight: 600; border-radius: 10px; letter-spacing: .005em; }
+.btn-pietrobon {
+  background: var(--red) !important; border-color: var(--red) !important; color: #fff !important;
+  box-shadow: 0 1px 2px rgba(198,36,42,.25);
+}
+.btn-pietrobon:hover { background: var(--red-dark) !important; border-color: var(--red-dark) !important; }
+.btn-ok-grande {
+  background: #157347 !important; border: none !important; color: #fff !important;
+  font-weight: 600 !important; border-radius: 10px !important;
+  box-shadow: 0 1px 2px rgba(21,115,71,.25);
+}
+.btn-ok-grande:hover { background: #12633c !important; }
+.btn:not(.btn-link):hover { transform: translateY(-1px); }
+
+/* Campos de formulário */
+.form-control, .form-select {
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+  color: var(--text);
+  padding: .55rem .8rem;
+}
+.form-control:focus, .form-select:focus {
+  border-color: var(--red) !important;
+  box-shadow: 0 0 0 3px rgba(237,50,55,.12) !important;
+}
+.form-label { color: var(--slate); font-weight: 500; }
+
+/* Tabelas corporativas: cabeçalho claro, texto escuro, linhas com hover */
+.table { --bs-table-bg: transparent; }
+.table thead th, .table > thead th, .table thead tr th {
+  background: #f8fafc !important;
+  color: var(--slate) !important;
+  font-weight: 700 !important;
+  font-size: .74rem !important;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  border-bottom: 2px solid var(--border) !important;
+  border-color: var(--border) !important;
+  text-shadow: none !important;
+  padding: 11px 12px !important;
+}
+.table tbody td { border-color: #f1f2f4; color: var(--text); }
+.table-hover tbody tr:hover { background: #f8fafc !important; }
+
+/* Abas: pílulas discretas e profissionais */
+.nav-tabs { border-bottom: 1px solid var(--border) !important; gap: 4px !important; }
+.nav-tabs .nav-link, .nav-tabs .nav-link:link {
+  background: transparent !important;
+  border: none !important;
+  color: var(--muted) !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  padding: 9px 16px !important;
+  box-shadow: none !important;
+}
+.nav-tabs .nav-link:hover { background: #f1f2f4 !important; color: var(--slate) !important; }
+.nav-tabs .nav-link.active {
+  background: rgba(237,50,55,.08) !important;
+  color: var(--red-dark) !important;
+  box-shadow: inset 0 -2px 0 var(--red) !important;
+}
+[data-aba].active, [data-aba-compra].active { background: rgba(237,50,55,.08) !important; color: var(--red-dark) !important; }
+
+/* Badges mais discretas */
+.badge { font-weight: 600; letter-spacing: .01em; border-radius: 8px; padding: .38em .6em; }
+
+/* Menu suspenso refinado */
+#menu-principal { border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-md); padding: 8px; }
+#menu-principal .dropdown-item { border-radius: 8px; padding: 10px 12px; font-weight: 500; color: var(--text); }
+#menu-principal .dropdown-item:hover { background: #f3f4f6; color: var(--ink-900); }
+#menu-principal .dropdown-item.active { background: var(--red); color: #fff; }
+
+/* Indicadores de status: pílulas suaves */
+.indicador-ok { background: #e7f6ec !important; color: #157347 !important; }
+.indicador-nok { background: #fdecec !important; color: #b42318 !important; }
+.indicador-ok, .indicador-nok { border-radius: 999px; font-weight: 600; padding: 4px 12px; }
+
+/* Rótulos de cartão de insumo */
+.card-insumo-almox { background: #fafafa; border: 1px solid var(--border); border-radius: 12px; }
+.card-insumo-almox h4 { color: var(--slate); font-size: .8rem; letter-spacing: .03em; }
