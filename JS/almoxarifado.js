@@ -112,7 +112,7 @@ async function carregarPi(piId) {
  </div><div class="mt-3"><div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-1"><label class="form-label small fw-semibold mb-0">Rótulos <span class="text-muted">(vários para mixes)</span></label><button type="button" class="btn btn-sm btn-outline-danger btn-add-rotulo" data-produto="${produto.id}" style="border-radius:8px">+ Adicionar rótulo</button></div><div id="rotulos-${produto.id}">
  ${rotulos.map((r) => rotuloRowHtml(produto.id, r)).join('')}
  </div></div><div class="mt-3"><label class="form-label small fw-semibold">Observações</label><textarea class="form-control" data-produto="${produto.id}" data-campo="observacoes" rows="2">${produto.observacoes || ''}</textarea></div><button class="btn btn-pietrobon w-100 mt-3 btn-salvar-produto${window._convidado ? ' d-none' : ''}" data-produto="${produto.id}" data-quantidade="${produto.quantidade}">
- Salvar
+ 💾 Salvar
  </button>
  `
 
@@ -331,7 +331,7 @@ async function salvarProduto(produtoId, quantidade) {
  btn.textContent = 'Salvo!'
  btn.style.background = 'var(--green-ok)'
  setTimeout(() => {
- btn.textContent = 'Salvar'
+ btn.textContent = '💾 Salvar'
  btn.style.background = ''
  form.style.display = 'none'
  if (btnExpandir) btnExpandir.textContent = 'Editar ▾'
@@ -565,7 +565,7 @@ async function carregarEstoqueGeral() {
  ${e.embalagem_kg > 0 ? `<div class="col-4"><label class="form-label small mb-0">Emb. (kg)</label><input type="number" class="form-control form-control-sm edit-emb-${v.id}" value="${v.embalagem_kg}" min="0" step="any"></div>` : ''}
  ${e.rotulo_kg > 0 ? `<div class="col-4"><label class="form-label small mb-0">Rót. (kg)</label><input type="number" class="form-control form-control-sm edit-rot-${v.id}" value="${v.rotulo_kg}" min="0" step="any"></div>` : ''}
  ${e.pallet_caixas > 0 ? `<div class="col-4"><label class="form-label small mb-0">Pallets</label><input type="number" class="form-control form-control-sm edit-pal-${v.id}" value="${v.pallet_caixas}" min="0" step="1"></div>` : ''}
- </div><button class="btn btn-sm btn-pietrobon w-100" onclick="salvarEdicaoVinculo(${v.id})">Salvar</button></div>`
+ </div><button class="btn btn-sm btn-pietrobon w-100" onclick="salvarEdicaoVinculo(${v.id})">💾 Salvar</button></div>`
  ).join('')}
  </div>` : ''
 
@@ -601,7 +601,7 @@ async function carregarEstoqueGeral() {
  ${e.saldo_emb > 0 ? `<div class="col-4"><label class="form-label small mb-0">Emb. (kg) <span class="text-muted">máx ${e.saldo_emb}</span></label><input type="number" id="vinc-emb-${e.id}" class="form-control form-control-sm" placeholder="0" min="0" max="${e.saldo_emb}" step="any"></div>` : ''}
  ${e.saldo_rot > 0 ? `<div class="col-4"><label class="form-label small mb-0">Rót. (kg) <span class="text-muted">máx ${e.saldo_rot}</span></label><input type="number" id="vinc-rot-${e.id}" class="form-control form-control-sm" placeholder="0" min="0" max="${e.saldo_rot}" step="any"></div>` : ''}
  ${e.saldo_pal > 0 ? `<div class="col-4"><label class="form-label small mb-0">Pallets <span class="text-muted">máx ${e.saldo_pal}</span></label><input type="number" id="vinc-pal-${e.id}" class="form-control form-control-sm" placeholder="0" min="0" max="${e.saldo_pal}" step="1"></div>` : ''}
- </div><button class="btn btn-pietrobon btn-sm w-100" onclick="confirmarVinculo(${e.id})">Confirmar Vínculo</button></div>` : ''}
+ </div><button class="btn btn-pietrobon btn-sm w-100" onclick="confirmarVinculo(${e.id})">🔗 Confirmar Vínculo</button></div>` : ''}
  </div>
  `
  container.appendChild(card)
@@ -630,7 +630,7 @@ async function carregarEstoqueGeral() {
  if (resultado?.erro) {
  alert(resultado.erro)
  btn.disabled = false
- btn.textContent = 'Confirmar Vínculo'
+ btn.textContent = '🔗 Confirmar Vínculo'
  return
  }
  carregarEstoqueGeral()
@@ -665,7 +665,7 @@ async function carregarEstoqueGeral() {
  if (resultado?.erro) {
  alert(resultado.erro)
  btn.disabled = false
- btn.textContent = 'Salvar'
+ btn.textContent = '💾 Salvar'
  return
  }
  carregarEstoqueGeral()

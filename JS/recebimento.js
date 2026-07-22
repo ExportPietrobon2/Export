@@ -50,7 +50,7 @@ function criarFormEntrada() {
  const form = document.createElement('div')
  form.className = 'card border-0 shadow-sm mb-4'
  form.innerHTML = `
- <div class="card-body"><h5 class="fw-bold mb-3">Registrar Entrada</h5><div class="mb-3"><label class="form-label fw-semibold small">Produto (opcional)</label><input type="text" id="inp-produto" class="form-control" placeholder="Ex: Bala Dura Cola 34x250g"></div><div class="mb-3"><label class="form-label fw-semibold small">Localização dos insumos</label><input type="text" id="inp-localizacao" class="form-control" placeholder="Ex: Galpão 2, prateleira A3"></div><div class="row g-3 mb-3"><div class="col-12 col-md-4"><label class="form-label fw-semibold small">Embalagem (kg)</label><input type="number" id="inp-embalagem" class="form-control" placeholder="0" min="0" step="any"></div><div class="col-12 col-md-4"><label class="form-label fw-semibold small">Rótulo (kg)</label><input type="number" id="inp-rotulo" class="form-control" placeholder="0" min="0" step="any"></div><div class="col-12 col-md-4"><label class="form-label fw-semibold small">Pallet de caixas</label><input type="number" id="inp-pallet" class="form-control" placeholder="0" min="0" step="1"></div></div><div class="d-flex gap-2 mb-3 flex-wrap"><button class="btn btn-sm btn-outline-secondary btn-foto" id="btn-foto-produto">Foto produto</button><button class="btn btn-sm btn-outline-secondary btn-foto" id="btn-foto-nota">Foto nota</button></div><div class="d-flex gap-3 mb-3" id="area-remover-fotos"></div><div class="d-flex gap-2 flex-wrap mb-3" id="previews-fotos"></div><input type="file" id="input-foto-produto" accept="image/*" capture="environment" hidden><input type="file" id="input-foto-nota" accept="image/*" capture="environment" hidden><button class="btn btn-ok-grande w-100" id="btn-confirmar-entrada">Confirmar Entrada</button></div>
+ <div class="card-body"><h5 class="fw-bold mb-3">Registrar Entrada</h5><div class="mb-3"><label class="form-label fw-semibold small">Produto (opcional)</label><input type="text" id="inp-produto" class="form-control" placeholder="Ex: Bala Dura Cola 34x250g"></div><div class="mb-3"><label class="form-label fw-semibold small">Localização dos insumos</label><input type="text" id="inp-localizacao" class="form-control" placeholder="Ex: Galpão 2, prateleira A3"></div><div class="row g-3 mb-3"><div class="col-12 col-md-4"><label class="form-label fw-semibold small">Embalagem (kg)</label><input type="number" id="inp-embalagem" class="form-control" placeholder="0" min="0" step="any"></div><div class="col-12 col-md-4"><label class="form-label fw-semibold small">Rótulo (kg)</label><input type="number" id="inp-rotulo" class="form-control" placeholder="0" min="0" step="any"></div><div class="col-12 col-md-4"><label class="form-label fw-semibold small">Pallet de caixas</label><input type="number" id="inp-pallet" class="form-control" placeholder="0" min="0" step="1"></div></div><div class="d-flex gap-2 mb-3 flex-wrap"><button class="btn btn-sm btn-outline-secondary btn-foto" id="btn-foto-produto">Foto produto</button><button class="btn btn-sm btn-outline-secondary btn-foto" id="btn-foto-nota">Foto nota</button></div><div class="d-flex gap-3 mb-3" id="area-remover-fotos"></div><div class="d-flex gap-2 flex-wrap mb-3" id="previews-fotos"></div><input type="file" id="input-foto-produto" accept="image/*" capture="environment" hidden><input type="file" id="input-foto-nota" accept="image/*" capture="environment" hidden><button class="btn btn-ok-grande w-100" id="btn-confirmar-entrada">📥 Confirmar Entrada</button></div>
  `
  return form
 }
@@ -111,7 +111,7 @@ function iniciarForm() {
  if (resultado?.erro || !resultado?.ok) {
  alert('Erro ao registrar entrada.')
  btn.disabled = false
- btn.textContent = 'Confirmar Entrada'
+ btn.textContent = '📥 Confirmar Entrada'
  return
  }
 
@@ -132,7 +132,7 @@ function iniciarForm() {
  btn.style.background = 'var(--green-ok)'
  setTimeout(() => {
  btn.disabled = false
- btn.textContent = 'Confirmar Entrada'
+ btn.textContent = '📥 Confirmar Entrada'
  btn.style.background = ''
  }, 1800)
 

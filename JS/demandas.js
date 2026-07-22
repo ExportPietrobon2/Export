@@ -17,7 +17,7 @@ let _responderCategorias = []
 
 function formHtml() {
  return `
- <div class="card border-0 shadow-sm mb-4" id="card-novo-pedido"><div class="card-body"><h5 class="fw-bold mb-3">Novo Pedido ao Compras</h5><form id="form-pedido-compra"><div class="row g-3"><div class="col-12 col-md-5"><label class="form-label fw-semibold small">O que está faltando *</label><input type="text" id="pc-descricao" class="form-control" placeholder="Ex.: Embalagem da Bala Dura 250g" required></div><div class="col-6 col-md-3"><label class="form-label fw-semibold small">Categoria</label><select id="pc-categoria" class="form-select"><option value="gerais">Insumos gerais (embalagem, caixa, rótulo)</option><option value="aromas">Aromas</option></select></div><div class="col-6 col-md-2"><label class="form-label fw-semibold small">Quantidade</label><input type="number" id="pc-quantidade" class="form-control" placeholder="0" min="0" step="any"></div><div class="col-6 col-md-2"><label class="form-label fw-semibold small">Unidade</label><input type="text" id="pc-unidade" class="form-control" placeholder="kg / un / cx"></div><div class="col-12 col-md-3"><label class="form-label fw-semibold small">PI (opcional)</label><select id="pc-pi" class="form-select"><option value="">—</option></select></div></div><button type="submit" class="btn btn-ok-grande w-100 mt-3" id="pc-btn">Enviar pedido</button></form></div></div>`
+ <div class="card border-0 shadow-sm mb-4" id="card-novo-pedido"><div class="card-body"><h5 class="fw-bold mb-3">Novo Pedido ao Compras</h5><form id="form-pedido-compra"><div class="row g-3"><div class="col-12 col-md-5"><label class="form-label fw-semibold small">O que está faltando *</label><input type="text" id="pc-descricao" class="form-control" placeholder="Ex.: Embalagem da Bala Dura 250g" required></div><div class="col-6 col-md-3"><label class="form-label fw-semibold small">Categoria</label><select id="pc-categoria" class="form-select"><option value="gerais">Insumos gerais (embalagem, caixa, rótulo)</option><option value="aromas">Aromas</option></select></div><div class="col-6 col-md-2"><label class="form-label fw-semibold small">Quantidade</label><input type="number" id="pc-quantidade" class="form-control" placeholder="0" min="0" step="any"></div><div class="col-6 col-md-2"><label class="form-label fw-semibold small">Unidade</label><input type="text" id="pc-unidade" class="form-control" placeholder="kg / un / cx"></div><div class="col-12 col-md-3"><label class="form-label fw-semibold small">PI (opcional)</label><select id="pc-pi" class="form-select"><option value="">—</option></select></div></div><button type="submit" class="btn btn-ok-grande w-100 mt-3" id="pc-btn">📨 Enviar pedido</button></form></div></div>`
 }
 
 async function preencherPis() {
@@ -73,7 +73,7 @@ async function enviar(e) {
  }
  const r = await api.demandas.criar(dados)
  btn.disabled = false
- btn.textContent = 'Enviar pedido'
+ btn.textContent = '📨 Enviar pedido'
  if (r?.erro) { alert(r.erro || 'Erro ao enviar.'); return }
  e.target.reset()
  carregar()

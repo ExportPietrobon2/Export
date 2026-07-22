@@ -166,7 +166,7 @@ document.getElementById('form-compra').addEventListener('submit', async (e) => {
 
  const r = await api.compras.criar(dados)
  btn.disabled = false
- btn.textContent = 'Registrar Compra'
+ btn.textContent = '🛒 Registrar Compra'
  if (r?.erro) { alert(r.erro || 'Erro ao registrar compra.'); return }
 
  e.target.reset()

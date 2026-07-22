@@ -151,7 +151,7 @@ function renderCard(pedido) {
  const secEmbarque = document.createElement('div')
  secEmbarque.className = 'mt-3'
  secEmbarque.innerHTML = podeEditarEmbarque ? `
- <div class="secao-titulo-card mb-2">Data de Embarque</div><div class="d-flex align-items-end gap-2 flex-wrap"><div><label class="form-label small fw-semibold mb-1">Data</label><input type="date" id="embarque-input-${pedido.id}" class="form-control form-control-sm" value="${dataParaInput(pedido.data_embarque)}" style="max-width:200px"></div><button class="btn btn-sm btn-pietrobon" id="embarque-btn-${pedido.id}">Salvar data</button><span class="small ms-1" id="embarque-msg-${pedido.id}"></span></div>
+ <div class="secao-titulo-card mb-2">Data de Embarque</div><div class="d-flex align-items-end gap-2 flex-wrap"><div><label class="form-label small fw-semibold mb-1">Data</label><input type="date" id="embarque-input-${pedido.id}" class="form-control form-control-sm" value="${dataParaInput(pedido.data_embarque)}" style="max-width:200px"></div><button class="btn btn-sm btn-pietrobon" id="embarque-btn-${pedido.id}">💾 Salvar data</button><span class="small ms-1" id="embarque-msg-${pedido.id}"></span></div>
  ` : `
  <div class="secao-titulo-card mb-2">Data de Embarque</div><div class="fw-semibold">${pedido.data_embarque ? new Date(dataParaInput(pedido.data_embarque) + 'T00:00:00').toLocaleDateString('pt-BR') : '— não definida'}</div>
  `
@@ -209,14 +209,14 @@ async function salvarEmbarque(piId, numeroPi) {
  msg.className = 'small ms-1 text-danger'
  msg.textContent = 'Erro ao salvar.'
  btn.disabled = false
- btn.textContent = 'Salvar data'
+ btn.textContent = '💾 Salvar data'
  return
  }
 
  msg.className = 'small ms-1 text-success fw-semibold'
  msg.textContent = input.value ? 'Data salva' : 'Data removida'
  btn.disabled = false
- btn.textContent = 'Salvar data'
+ btn.textContent = '💾 Salvar data'
 
  setTimeout(carregar, 900)
 }
