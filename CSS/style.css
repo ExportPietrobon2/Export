@@ -775,3 +775,6 @@ body { letter-spacing: 0.005em; }
   letter-spacing: 0.02em;
   text-shadow: none !important;
 }
+/* Esconde caixas de ícone que ficaram vazias após remover emojis */
+.page-header-icon:empty { display: none; }
+.resumo-card-icone:empty { display: none; }
