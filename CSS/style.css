@@ -717,6 +717,10 @@ body { letter-spacing: 0.005em; }
   #cabecalho, #chat-ia-botao, #chat-ia-painel, .no-print { display: none !important; }
   body { background: #fff !important; }
   .container { max-width: 100% !important; }
+  /* Modo de impressão dedicado (PDF colorido igual à planilha) */
+  body.imprimindo > *:not(#area-impressao) { display: none !important; }
+  #area-impressao { display: block !important; }
+  #area-impressao * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
 
 /* =========================================================

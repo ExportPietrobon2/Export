@@ -279,7 +279,57 @@ async function exportarExcel() {
   URL.revokeObjectURL(url)
 }
 
-function exportarPDF() { window.print() }
+function exportarPDF() {
+  const AZUL = '#000080', VERDE = '#99CC00', TOTAL = '#D9E1F2', BORDA = '1px solid #808080'
+  const thBase = `background:${AZUL};color:#fff;font-weight:bold;border:${BORDA};padding:5px 6px;font-size:10px;text-align:center`
+  const tdBase = (align) => `background:${VERDE};color:#000;font-weight:bold;border:${BORDA};padding:4px 6px;font-size:10px;text-align:${align}`
+
+  let html = `<h2 style="color:${AZUL};text-align:center;margin:0 0 12px">FATURAMENTO NFe — ${anoAtual}</h2>`
+
+  for (let m = 1; m <= 12; m++) {
+    const doMes = dados.filter((d) => d.mes === m)
+    if (!doMes.length) continue
+    const tv = doMes.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
+    const tp = doMes.reduce((s, d) => s + (Number(d.peso) || 0), 0)
+    html += `
+      <div style="background:${AZUL};color:#fff;font-weight:bold;padding:5px 8px;margin-top:10px;font-size:12px">${MESES[m - 1].toUpperCase()}</div>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:2px">
+        <thead><tr>${COLS.map((c) => `<th style="${thBase}">${c.t}</th>`).join('')}</tr></thead>
+        <tbody>
+          ${doMes.map((d) => `<tr>${COLS.map((c) => {
+            let v = d[c.k]
+            if (c.tipo === 'date') v = dBR(v)
+            else if (c.tipo === 'num') v = money(v)
+            return `<td style="${tdBase(c.tipo === 'num' ? 'right' : 'left')}">${v == null ? '' : v}</td>`
+          }).join('')}</tr>`).join('')}
+          <tr>
+            <td colspan="8" style="background:${TOTAL};border:${BORDA};padding:4px 6px;font-size:10px;font-weight:bold;text-align:right">TOTAL ${MESES[m - 1]}</td>
+            <td style="background:${TOTAL};border:${BORDA};padding:4px 6px;font-size:10px;font-weight:bold;text-align:right">${money(tv)}</td>
+            <td style="background:${TOTAL};border:${BORDA};padding:4px 6px;font-size:10px;font-weight:bold;text-align:right">${money(tp)}</td>
+            <td colspan="3" style="background:${TOTAL};border:${BORDA}"></td>
+          </tr>
+        </tbody>
+      </table>`
+  }
+
+  const totalValor = dados.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
+  const totalPeso = dados.reduce((s, d) => s + (Number(d.peso) || 0), 0)
+  html += `
+    <div style="background:${AZUL};color:#fff;font-weight:bold;padding:5px 8px;margin-top:14px;font-size:12px">RELATÓRIO ANUAL</div>
+    <table style="border-collapse:collapse;margin-bottom:10px">
+      <tr><td style="${tdBase('left')}">Valor Comercializado</td><td style="${tdBase('right')}">R$ ${money(totalValor)}</td></tr>
+      <tr><td style="${tdBase('left')}">Kilos Produzidos</td><td style="${tdBase('right')}">${money(totalPeso)} kg</td></tr>
+      <tr><td style="${tdBase('left')}">Total de Notas</td><td style="${tdBase('right')}">${dados.length}</td></tr>
+    </table>`
+
+  let area = document.getElementById('area-impressao')
+  if (!area) { area = document.createElement('div'); area.id = 'area-impressao'; area.style.display = 'none'; document.body.appendChild(area) }
+  area.innerHTML = html
+  document.body.classList.add('imprimindo')
+  const limpar = () => { document.body.classList.remove('imprimindo'); window.removeEventListener('afterprint', limpar) }
+  window.addEventListener('afterprint', limpar)
+  window.print()
+}
 
 function montarInterface() {
   const cont = document.getElementById('conteudo-contabil')
@@ -289,7 +339,7 @@ function montarInterface() {
         <h5 class="secao-titulo-card mb-0">Lançar nota fiscal</h5>
         <div class="d-flex align-items-center gap-2">
           <label class="small fw-semibold mb-0">Ano:</label>
-          <select id="sel-ano" class="form-select form-select-sm" style="width:auto"></select>
+          <select id="sel-ano" class="form-select form-select-sm" style="width:100px;padding-right:30px"></select>
         </div>
       </div>
       <div class="row g-2">
