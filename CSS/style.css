@@ -943,3 +943,84 @@ body {
 /* Rótulos de cartão de insumo */
 .card-insumo-almox { background: #fafafa; border: 1px solid var(--border); border-radius: 12px; }
 .card-insumo-almox h4 { color: var(--slate); font-size: .8rem; letter-spacing: .03em; }
+
+/* ============================================================
+   COR + ÍCONES (camada final) — mais vivo, sem exagero
+   ============================================================ */
+:root {
+  --bg: #f5f6f8;
+  --brand-grad: linear-gradient(100deg, #ED3237, #F0603C);
+}
+body { background:
+  radial-gradient(1200px 500px at 100% -5%, #fdeef0 0%, rgba(253,238,240,0) 60%),
+  radial-gradient(900px 400px at -10% 0%, #eef3fb 0%, rgba(238,243,251,0) 55%),
+  var(--bg);
+}
+
+/* Cabeçalho de página com ícone colorido de volta */
+.page-header-icon, .page-header-icon:empty { display: inline-flex !important; }
+.page-header-icon {
+  width: 46px; height: 46px; border-radius: 12px;
+  background: var(--brand-grad);
+  color: #fff; font-size: 1.35rem;
+  align-items: center; justify-content: center;
+  box-shadow: 0 6px 16px rgba(237,50,55,.28);
+}
+body[data-pagina="admin.html"]       .page-header-icon:empty::before { content: "📊"; }
+body[data-pagina="cadastro.html"]    .page-header-icon:empty::before { content: "📋"; }
+body[data-pagina="almoxarifado.html"].page-header-icon:empty::before { content: "📦"; }
+body[data-pagina="recebimento.html"] .page-header-icon:empty::before { content: "🚚"; }
+body[data-pagina="referencia.html"]  .page-header-icon:empty::before { content: "📐"; }
+body[data-pagina="embarques.html"]   .page-header-icon:empty::before { content: "🚢"; }
+body[data-pagina="compras.html"]     .page-header-icon:empty::before { content: "🛒"; }
+body[data-pagina="contabil.html"]    .page-header-icon:empty::before { content: "💰"; }
+
+/* Ícones nos itens do menu */
+#menu-principal a[href$="admin.html"]::before        { content: "📊"; margin-right: 8px; }
+#menu-principal a[href$="cadastro.html"]::before     { content: "📋"; margin-right: 8px; }
+#menu-principal a[href$="almoxarifado.html"]::before { content: "📦"; margin-right: 8px; }
+#menu-principal a[href$="recebimento.html"]::before  { content: "🚚"; margin-right: 8px; }
+#menu-principal a[href$="referencia.html"]::before   { content: "📐"; margin-right: 8px; }
+#menu-principal a[href$="embarques.html"]::before    { content: "🚢"; margin-right: 8px; }
+#menu-principal a[href$="compras.html"]::before      { content: "🛒"; margin-right: 8px; }
+#menu-principal a[href$="contabil.html"]::before     { content: "💰"; margin-right: 8px; }
+#menu-principal .dropdown-item { justify-content: flex-start; }
+
+/* Tabelas mais vivas: cabeçalho vermelho em degradê */
+.table thead th, .table > thead th, .table thead tr th {
+  background: var(--brand-grad) !important;
+  color: #fff !important;
+  border-bottom: none !important;
+  font-size: .74rem !important;
+  letter-spacing: .04em;
+}
+
+/* Título de seção com barra colorida */
+.secao-titulo-card { border-left: 4px solid transparent; border-image: linear-gradient(180deg, #ED3237, #F79733) 1; }
+
+/* Cards com leve topo colorido e hover animado */
+.card { position: relative; overflow: hidden; }
+.card:hover { box-shadow: var(--shadow-md) !important; transform: translateY(-2px); }
+
+/* Cartões de resumo/contadores mais coloridos */
+.resumo-card-icone { font-size: 1.7rem; }
+.card .fs-5.text-success, .text-success { color: #12805c !important; }
+
+/* Botões-ação com um toque de degradê */
+.btn-pietrobon { background: var(--brand-grad) !important; border: none !important; }
+.btn-pietrobon:hover { filter: brightness(.95); }
+.btn-ok-grande { background: linear-gradient(100deg, #157347, #1E9E63) !important; }
+
+/* Abas ativas coloridas */
+.nav-tabs .nav-link.active {
+  background: rgba(237,50,55,.10) !important;
+  color: var(--red-dark) !important;
+  box-shadow: inset 0 -3px 0 #ED3237 !important;
+}
+
+/* Faixa colorida no topo da navbar para dar vida */
+.navbar-pietrobon { background: linear-gradient(100deg, #ED3237 0%, #F0603C 55%, #F79733 140%) !important; }
+
+/* Badges de status com um pouco mais de vida */
+.indicador-ok  { background: #e4f7ec !important; color: #12805c !important; }
+.indicador-nok { background: #fde7e7 !important; color: #c62828 !important; }
