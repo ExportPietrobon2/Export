@@ -1047,3 +1047,17 @@ body[data-pagina="contabil.html"]    .page-header-icon:empty::before { content: 
   background: rgba(255,255,255,0.26) !important;
   color: #fff !important;
 }
+
+/* ============================================================
+   AJUSTE FINAL DAS TABELAS — cabeçalho uniforme (sem manchas)
+   ============================================================ */
+.table thead th,
+.table > thead th,
+.table thead tr th {
+  background: #E23A34 !important;      /* vermelho sólido uniforme */
+  background-image: none !important;   /* remove o degradê por célula */
+  color: #fff !important;
+  border-bottom: none !important;
+  border-color: rgba(255,255,255,.18) !important;
+}
+.table thead tr { background: #E23A34; }
