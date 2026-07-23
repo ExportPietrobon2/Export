@@ -1078,3 +1078,7 @@ body[data-pagina="contabil.html"] .page-header-icon::before     { content: "💰
 body[data-pagina="exp-contabil.html"] .page-header-icon::before { content: "🌎"; }
 #menu-principal a[href$="contabil.html"]::before { content: "💰"; margin-right: 8px; }
 #menu-principal a[href$="exp-contabil.html"]::before { content: "🌎"; margin-right: 8px; }
+
+/* Ícone da aba Financeiro (Importações) */
+body[data-pagina="financeiro.html"] .page-header-icon::before { content: "🏦"; }
+#menu-principal a[href$="financeiro.html"]::before { content: "🏦"; margin-right: 8px; }

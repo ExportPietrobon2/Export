@@ -1145,6 +1145,27 @@ async function inicializarContabExportacao() {
   }
 }
 setTimeout(inicializarContabExportacao, 4000)
+
+// Cria as tabelas e importa os dados do Financeiro (Importações) automaticamente
+async function inicializarFinanceiro() {
+  let seed
+  try {
+    seed = require('./fin_seed')
+  } catch (e) {
+    return // arquivo já pode ter sido removido após a 1ª importação
+  }
+  try {
+    for (const stmt of seed.schema) await pool.query(stmt)
+    const [[c]] = await pool.query('SELECT COUNT(*) AS n FROM fin_importacoes')
+    if (c.n === 0) {
+      for (const stmt of seed.seed) await pool.query(stmt)
+      console.log('Financeiro (Importações): dados iniciais importados.')
+    }
+  } catch (e) {
+    console.error('Erro ao inicializar Financeiro:', e.message)
+  }
+}
+setTimeout(inicializarFinanceiro, 5000)
 const EC_MOD = {
   exterior: { tabela: 'ec_lanc_exterior', col: 'cliente_id', ent: 'ec_clientes', aumenta: 'debito', diminui: 'baixa', temFatura: true },
   adiant_clientes: { tabela: 'ec_lanc_adiant_clientes', col: 'cliente_id', ent: 'ec_clientes', aumenta: 'credito', diminui: 'debito', temFatura: false },
@@ -1247,6 +1268,153 @@ app.delete('/api/ec/lancamentos/:modulo/:id', autenticarContabil(), async (req, 
   const cfg = ecCfg(req.params.modulo)
   if (!cfg) return res.status(400).json({ erro: 'Módulo inválido.' })
   await pool.query(`DELETE FROM ${cfg.tabela} WHERE id = ?`, [req.params.id])
+  res.json({ ok: true })
+})
+
+// =============================================
+// FINANCEIRO — IMPORTAÇÕES (pagamentos, câmbio, saldos) — restrito ao financeiro
+// =============================================
+function statusImportacao(valorReais, pago) {
+  if (pago >= valorReais - 0.01) return 'PAGO'
+  if (pago > 0.01) return 'PARCIAL'
+  return 'DEVENDO'
+}
+
+async function importacoesComputadas() {
+  const [imps] = await pool.query(`
+    SELECT i.*, f.nome AS fornecedor_nome, f.pais AS fornecedor_pais
+    FROM fin_importacoes i LEFT JOIN fin_fornecedores f ON f.id = i.fornecedor_id
+    ORDER BY i.data_invoice DESC, i.id DESC`)
+  const [pgs] = await pool.query('SELECT importacao_id, COALESCE(SUM(valor_reais),0) AS pago, COALESCE(SUM(valor_moeda),0) AS pago_moeda FROM fin_pagamentos GROUP BY importacao_id')
+  const mapa = {}
+  pgs.forEach((p) => { mapa[p.importacao_id] = { pago: Number(p.pago) || 0, pago_moeda: Number(p.pago_moeda) || 0 } })
+  return imps.map((i) => {
+    const vr = Number(i.valor_reais) || 0
+    const pago = mapa[i.id] ? mapa[i.id].pago : 0
+    const pagoMoeda = mapa[i.id] ? mapa[i.id].pago_moeda : 0
+    const valorMoeda = Number(i.valor_moeda) || 0
+    return { ...i, pago, saldo: vr - pago, saldo_moeda: valorMoeda - pagoMoeda, status: statusImportacao(vr, pago) }
+  })
+}
+
+// Painel + lista
+app.get('/api/fin/resumo', autenticarContabil(), async (req, res) => {
+  const imps = await importacoesComputadas()
+  const totalImportado = imps.reduce((s, i) => s + (Number(i.valor_reais) || 0), 0)
+  const totalPago = imps.reduce((s, i) => s + i.pago, 0)
+  const cont = { PAGO: 0, PARCIAL: 0, DEVENDO: 0 }
+  const porForn = {}
+  imps.forEach((i) => {
+    cont[i.status]++
+    const k = i.fornecedor_nome || '—'
+    if (!porForn[k]) porForn[k] = { fornecedor: k, importado: 0, pago: 0, saldo: 0 }
+    porForn[k].importado += Number(i.valor_reais) || 0
+    porForn[k].pago += i.pago
+    porForn[k].saldo += i.saldo
+  })
+  res.json({
+    totalImportado, totalPago, saldoDevedor: totalImportado - totalPago,
+    qtd: imps.length, contagem: cont,
+    porFornecedor: Object.values(porForn).sort((a, b) => b.saldo - a.saldo),
+    importacoes: imps
+  })
+})
+
+// Fornecedores
+app.get('/api/fin/fornecedores', autenticarContabil(), async (req, res) => {
+  const [rows] = await pool.query('SELECT * FROM fin_fornecedores ORDER BY nome')
+  res.json(rows)
+})
+app.post('/api/fin/fornecedores', autenticarContabil(), async (req, res) => {
+  const b = req.body
+  if (!(b.nome || '').trim()) return res.status(400).json({ erro: 'Informe o nome.' })
+  await pool.query('INSERT INTO fin_fornecedores (nome, pais, moeda, contato, email, obs) VALUES (?,?,?,?,?,?)',
+    [b.nome.trim(), b.pais || null, b.moeda || 'USD', b.contato || null, b.email || null, b.obs || null])
+  res.json({ ok: true })
+})
+app.patch('/api/fin/fornecedores/:id', autenticarContabil(), async (req, res) => {
+  const campos = ['nome', 'pais', 'moeda', 'contato', 'email', 'obs', 'ativo']
+  const sets = [], vals = []
+  for (const c of campos) { if (c in req.body) { sets.push(`${c} = ?`); vals.push(req.body[c] === '' ? null : req.body[c]) } }
+  if (!sets.length) return res.json({ ok: true })
+  vals.push(req.params.id)
+  await pool.query(`UPDATE fin_fornecedores SET ${sets.join(', ')} WHERE id = ?`, vals)
+  res.json({ ok: true })
+})
+app.delete('/api/fin/fornecedores/:id', autenticarContabil(), async (req, res) => {
+  await pool.query('DELETE FROM fin_fornecedores WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
+})
+
+// Importações
+const CAMPOS_IMP = ['fornecedor_id', 'invoice', 'data_invoice', 'mercadoria', 'moeda', 'valor_moeda', 'taxa_cambio', 'banco', 'obs']
+function calcValorReais(b) { return (parseFloat(b.valor_moeda) || 0) * (parseFloat(b.taxa_cambio) || 0) }
+app.post('/api/fin/importacoes', autenticarContabil(), async (req, res) => {
+  const b = req.body
+  if (!b.invoice) return res.status(400).json({ erro: 'Informe o Nº do invoice.' })
+  const valorReais = calcValorReais(b)
+  await pool.query(
+    `INSERT INTO fin_importacoes (fornecedor_id, invoice, data_invoice, mercadoria, moeda, valor_moeda, taxa_cambio, valor_reais, banco, obs)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    [b.fornecedor_id || null, b.invoice, b.data_invoice || null, b.mercadoria || null, b.moeda || 'USD',
+     parseFloat(b.valor_moeda) || 0, parseFloat(b.taxa_cambio) || 0, valorReais, b.banco || null, b.obs || null])
+  res.json({ ok: true })
+})
+app.patch('/api/fin/importacoes/:id', autenticarContabil(), async (req, res) => {
+  const sets = [], vals = []
+  for (const c of CAMPOS_IMP) { if (c in req.body) { let v = req.body[c]; if (v === '') v = null; if (c === 'valor_moeda' || c === 'taxa_cambio') v = parseFloat(v) || 0; sets.push(`${c} = ?`); vals.push(v) } }
+  if ('valor_moeda' in req.body || 'taxa_cambio' in req.body) { sets.push('valor_reais = ?'); vals.push(calcValorReais(req.body)) }
+  if (!sets.length) return res.json({ ok: true })
+  vals.push(req.params.id)
+  await pool.query(`UPDATE fin_importacoes SET ${sets.join(', ')} WHERE id = ?`, vals)
+  res.json({ ok: true })
+})
+app.delete('/api/fin/importacoes/:id', autenticarContabil(), async (req, res) => {
+  await pool.query('DELETE FROM fin_pagamentos WHERE importacao_id = ?', [req.params.id])
+  await pool.query('DELETE FROM fin_contratos WHERE importacao_id = ?', [req.params.id])
+  await pool.query('DELETE FROM fin_importacoes WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
+})
+
+// Pagamentos
+app.get('/api/fin/pagamentos', autenticarContabil(), async (req, res) => {
+  const [rows] = await pool.query('SELECT * FROM fin_pagamentos WHERE importacao_id = ? ORDER BY data_pgto, id', [parseInt(req.query.importacaoId) || 0])
+  res.json(rows)
+})
+app.post('/api/fin/pagamentos', autenticarContabil(), async (req, res) => {
+  const b = req.body
+  if (!b.importacao_id || !(parseFloat(b.valor_reais) >= 0)) return res.status(400).json({ erro: 'Dados inválidos.' })
+  await pool.query('INSERT INTO fin_pagamentos (importacao_id, data_pgto, valor_reais, valor_moeda, forma, obs) VALUES (?,?,?,?,?,?)',
+    [b.importacao_id, b.data_pgto || null, parseFloat(b.valor_reais) || 0, parseFloat(b.valor_moeda) || 0, b.forma || null, b.obs || null])
+  res.json({ ok: true })
+})
+app.delete('/api/fin/pagamentos/:id', autenticarContabil(), async (req, res) => {
+  await pool.query('DELETE FROM fin_pagamentos WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
+})
+
+// Contratos de câmbio
+app.get('/api/fin/contratos', autenticarContabil(), async (req, res) => {
+  const cond = req.query.importacaoId ? 'WHERE c.importacao_id = ?' : ''
+  const args = req.query.importacaoId ? [parseInt(req.query.importacaoId)] : []
+  const [rows] = await pool.query(`
+    SELECT c.*, i.invoice FROM fin_contratos c LEFT JOIN fin_importacoes i ON i.id = c.importacao_id
+    ${cond} ORDER BY c.data_fechamento DESC, c.id DESC`, args)
+  res.json(rows)
+})
+app.post('/api/fin/contratos', autenticarContabil(), async (req, res) => {
+  const b = req.body
+  if (!b.num_contrato) return res.status(400).json({ erro: 'Informe o Nº do contrato.' })
+  await pool.query(
+    `INSERT INTO fin_contratos (num_contrato, banco, data_fechamento, moeda, valor_moeda, taxa, valor_reais, importacao_id, liquidado, data_liquidacao, obs)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    [b.num_contrato, b.banco || null, b.data_fechamento || null, b.moeda || 'USD', parseFloat(b.valor_moeda) || 0,
+     parseFloat(b.taxa) || 0, (parseFloat(b.valor_moeda) || 0) * (parseFloat(b.taxa) || 0), b.importacao_id || null,
+     b.liquidado ? 1 : 0, b.data_liquidacao || null, b.obs || null])
+  res.json({ ok: true })
+})
+app.delete('/api/fin/contratos/:id', autenticarContabil(), async (req, res) => {
+  await pool.query('DELETE FROM fin_contratos WHERE id = ?', [req.params.id])
   res.json({ ok: true })
 })
 

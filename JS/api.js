@@ -113,6 +113,23 @@ export const api = {
  excluirLancamento: (modulo, id) => requisitar('DELETE', `/api/ec/lancamentos/${modulo}/${id}`)
  },
 
+ fin: {
+ resumo: () => requisitar('GET', '/api/fin/resumo'),
+ fornecedores: () => requisitar('GET', '/api/fin/fornecedores'),
+ criarFornecedor: (dados) => requisitar('POST', '/api/fin/fornecedores', dados),
+ editarFornecedor: (id, dados) => requisitar('PATCH', `/api/fin/fornecedores/${id}`, dados),
+ excluirFornecedor: (id) => requisitar('DELETE', `/api/fin/fornecedores/${id}`),
+ criarImportacao: (dados) => requisitar('POST', '/api/fin/importacoes', dados),
+ editarImportacao: (id, dados) => requisitar('PATCH', `/api/fin/importacoes/${id}`, dados),
+ excluirImportacao: (id) => requisitar('DELETE', `/api/fin/importacoes/${id}`),
+ pagamentos: (importacaoId) => requisitar('GET', `/api/fin/pagamentos?importacaoId=${importacaoId}`),
+ criarPagamento: (dados) => requisitar('POST', '/api/fin/pagamentos', dados),
+ excluirPagamento: (id) => requisitar('DELETE', `/api/fin/pagamentos/${id}`),
+ contratos: (importacaoId) => requisitar('GET', `/api/fin/contratos${importacaoId ? '?importacaoId=' + importacaoId : ''}`),
+ criarContrato: (dados) => requisitar('POST', '/api/fin/contratos', dados),
+ excluirContrato: (id) => requisitar('DELETE', `/api/fin/contratos/${id}`)
+ },
+
  demandas: {
  listar: () => requisitar('GET', '/api/demandas'),
  criar: (dados) => requisitar('POST', '/api/demandas', dados),
