@@ -2,7 +2,7 @@ import { api } from './api.js'
 import { exigirPapel } from './auth.js'
 import { montarCabecalho } from './cabecalho.js'
 
-const EMAIL_CONTABIL = 'export2@pietrobon.com.br'
+const EMAILS_FINANCEIRO = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'joaoantonio@pietrobon.com.br']
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
 const MODULOS = {
@@ -305,7 +305,7 @@ function montarInterface() {
 async function iniciar() {
   const perfil = exigirPapel(['admin'])
   if (!perfil) return
-  if ((perfil.email || '').toLowerCase() !== EMAIL_CONTABIL) { window.location.href = '/HTML/admin.html'; return }
+  if (!EMAILS_FINANCEIRO.includes((perfil.email || '').toLowerCase())) { window.location.href = '/HTML/admin.html'; return }
   montarCabecalho(perfil.papel)
   montarInterface()
   carregarMeses()

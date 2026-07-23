@@ -2,7 +2,7 @@ import { sair, getPerfil } from './auth.js'
 import { api } from './api.js'
 import { iniciarChat } from './chat.js'
 
-const EMAIL_CONTABIL = 'export2@pietrobon.com.br'
+const EMAILS_FINANCEIRO = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'joaoantonio@pietrobon.com.br']
 
 async function carregarBadgesPendencias() {
  try {
@@ -27,7 +27,7 @@ async function carregarBadgesPendencias() {
 export function montarCabecalho(papel) {
  const paginaAtual = document.body.dataset.pagina
  const perfil = getPerfil()
- const ehContabil = perfil && (perfil.email || '').toLowerCase() === EMAIL_CONTABIL
+ const ehContabil = perfil && EMAILS_FINANCEIRO.includes((perfil.email || '').toLowerCase())
 
  const links = [
  { href: '/HTML/admin.html', texto: 'Visão Geral das PIs' },

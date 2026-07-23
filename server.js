@@ -1051,12 +1051,12 @@ ${contexto || 'Sem dados carregados no momento.'}
 // =============================================
 // CONTÁBIL / FATURAMENTO NFe — restrito ao export2
 // =============================================
-const EMAIL_CONTABIL = 'export2@pietrobon.com.br'
+const EMAILS_FINANCEIRO = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'joaoantonio@pietrobon.com.br']
 
 function autenticarContabil() {
  const base = autenticar(['admin'])
  return (req, res, next) => base(req, res, () => {
- if ((req.usuario.email || '').toLowerCase() !== EMAIL_CONTABIL) {
+ if (!EMAILS_FINANCEIRO.includes((req.usuario.email || '').toLowerCase())) {
  return res.status(403).json({ erro: 'Sem permissão' })
  }
  next()
