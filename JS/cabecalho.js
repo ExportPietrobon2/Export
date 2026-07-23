@@ -27,7 +27,9 @@ async function carregarBadgesPendencias() {
 export function montarCabecalho(papel) {
  const paginaAtual = document.body.dataset.pagina
  const perfil = getPerfil()
- const ehContabil = perfil && EMAILS_FINANCEIRO.includes((perfil.email || '').toLowerCase())
+ const emailAtual = perfil ? (perfil.email || '').toLowerCase() : ''
+ const ehContabil = EMAILS_FINANCEIRO.includes(emailAtual)
+ const ehChecklist = ['export2@pietrobon.com.br', 'export@pietrobon.com.br'].includes(emailAtual)
 
  const links = [
  { href: '/HTML/admin.html', texto: 'Visão Geral das PIs' },
@@ -47,6 +49,9 @@ export function montarCabecalho(papel) {
  const itemContabil = ehContabil ? `
  <li><hr class="dropdown-divider"></li><li><a class="dropdown-item item-contabil ${'/HTML/contabil.html'.endsWith(paginaAtual) ? 'active' : ''}" href="/HTML/contabil.html">Contábil / Faturamento</a></li><li><a class="dropdown-item item-contabil ${'/HTML/exp-contabil.html'.endsWith(paginaAtual) ? 'active' : ''}" href="/HTML/exp-contabil.html">Contab. de Exportação</a></li><li><a class="dropdown-item item-contabil ${'/HTML/financeiro.html'.endsWith(paginaAtual) ? 'active' : ''}" href="/HTML/financeiro.html">Financeiro (Importações)</a></li>` : ''
 
+ const itemChecklist = ehChecklist ? `
+ <li><a class="dropdown-item item-contabil ${'/HTML/checklist.html'.endsWith(paginaAtual) ? 'active' : ''}" href="/HTML/checklist.html">Check-list de Expedição</a></li>` : ''
+
  const nav = document.createElement('nav')
  nav.className = 'navbar navbar-pietrobon sticky-top'
  nav.innerHTML = `
@@ -57,6 +62,7 @@ export function montarCabecalho(papel) {
  </button><ul class="dropdown-menu dropdown-menu-end shadow" id="menu-principal">
  ${itensMenu}
  ${itemContabil}
+ ${itemChecklist}
  <li><hr class="dropdown-divider"></li><li><a class="dropdown-item text-danger fw-semibold" href="#" id="btn-sair">Sair</a></li></ul></div></div></div>
  `
  document.getElementById('cabecalho').appendChild(nav)

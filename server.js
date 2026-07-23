@@ -1418,6 +1418,81 @@ app.delete('/api/fin/contratos/:id', autenticarContabil(), async (req, res) => {
   res.json({ ok: true })
 })
 
+// =============================================
+// CHECK-LIST DE EXPEDIÇÃO (exportação) — restrito ao export2 e export
+// =============================================
+const EMAILS_CHECKLIST = ['export2@pietrobon.com.br', 'export@pietrobon.com.br']
+function autenticarChecklist() {
+  const base = autenticar(['admin'])
+  return (req, res, next) => base(req, res, () => {
+    if (!EMAILS_CHECKLIST.includes((req.usuario.email || '').toLowerCase())) {
+      return res.status(403).json({ erro: 'Sem permissão' })
+    }
+    next()
+  })
+}
+
+async function inicializarChecklist() {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS checklist_exp (
+      id INT AUTO_INCREMENT PRIMARY KEY, fatura VARCHAR(60), pedido VARCHAR(60), data_emb DATE,
+      cliente_nome VARCHAR(200), cliente_endereco VARCHAR(400), cliente_contato VARCHAR(200),
+      embarque VARCHAR(200), descarga VARCHAR(200), destino VARCHAR(200),
+      peso_liquido VARCHAR(40), peso_bruto VARCHAR(40), volume VARCHAR(40),
+      observacoes VARCHAR(800), criado_por VARCHAR(160), criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`)
+    await pool.query(`CREATE TABLE IF NOT EXISTS checklist_exp_itens (
+      id INT AUTO_INCREMENT PRIMARY KEY, checklist_id INT NOT NULL, ordem INT DEFAULT 0,
+      produto VARCHAR(300), gramatura VARCHAR(80), qtd_cx VARCHAR(40), lote VARCHAR(80), validade VARCHAR(40),
+      INDEX(checklist_id))`)
+  } catch (e) { console.error('Erro init checklist:', e.message) }
+}
+setTimeout(inicializarChecklist, 3000)
+
+app.get('/api/checklist', autenticarChecklist(), async (req, res) => {
+  const [rows] = await pool.query('SELECT id, fatura, pedido, cliente_nome, data_emb, destino, criado_em FROM checklist_exp ORDER BY id DESC LIMIT 300')
+  res.json(rows)
+})
+app.get('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
+  const [[cab]] = await pool.query('SELECT * FROM checklist_exp WHERE id = ?', [req.params.id])
+  if (!cab) return res.status(404).json({ erro: 'Não encontrado.' })
+  const [itens] = await pool.query('SELECT * FROM checklist_exp_itens WHERE checklist_id = ? ORDER BY ordem, id', [req.params.id])
+  res.json({ ...cab, itens })
+})
+const CAMPOS_CL = ['fatura', 'pedido', 'data_emb', 'cliente_nome', 'cliente_endereco', 'cliente_contato', 'embarque', 'descarga', 'destino', 'peso_liquido', 'peso_bruto', 'volume', 'observacoes']
+async function salvarItens(checklistId, itens) {
+  await pool.query('DELETE FROM checklist_exp_itens WHERE checklist_id = ?', [checklistId])
+  if (Array.isArray(itens)) {
+    for (let i = 0; i < itens.length; i++) {
+      const it = itens[i]
+      if (!it || (!it.produto && !it.gramatura && !it.qtd_cx)) continue
+      await pool.query('INSERT INTO checklist_exp_itens (checklist_id, ordem, produto, gramatura, qtd_cx, lote, validade) VALUES (?,?,?,?,?,?,?)',
+        [checklistId, i + 1, it.produto || null, it.gramatura || null, it.qtd_cx || null, it.lote || null, it.validade || null])
+    }
+  }
+}
+app.post('/api/checklist', autenticarChecklist(), async (req, res) => {
+  const b = req.body
+  const vals = CAMPOS_CL.map((c) => (b[c] === '' || b[c] === undefined) ? null : b[c])
+  vals.push(req.usuario.nome || null)
+  const [r] = await pool.query(`INSERT INTO checklist_exp (${CAMPOS_CL.join(', ')}, criado_por) VALUES (${CAMPOS_CL.map(() => '?').join(', ')}, ?)`, vals)
+  await salvarItens(r.insertId, b.itens)
+  res.json({ id: r.insertId })
+})
+app.put('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
+  const b = req.body
+  const sets = CAMPOS_CL.map((c) => `${c} = ?`)
+  const vals = CAMPOS_CL.map((c) => (b[c] === '' || b[c] === undefined) ? null : b[c])
+  vals.push(req.params.id)
+  await pool.query(`UPDATE checklist_exp SET ${sets.join(', ')} WHERE id = ?`, vals)
+  await salvarItens(req.params.id, b.itens)
+  res.json({ ok: true })
+})
+app.delete('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
+  await pool.query('DELETE FROM checklist_exp_itens WHERE checklist_id = ?', [req.params.id])
+  await pool.query('DELETE FROM checklist_exp WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
+})
+
 app.get('*', (req, res) => {
  res.sendFile(path.join(__dirname, 'index.html'))
 })
