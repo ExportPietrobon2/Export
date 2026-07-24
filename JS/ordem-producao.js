@@ -11,6 +11,8 @@ const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</
 const nl = (s) => esc(s).replace(/\n/g, '<br>')
 const dISO = (v) => v ? String(v).slice(0, 10) : ''
 const dBR = (v) => { const s = dISO(v); return s ? s.split('-').reverse().join('/') : '' }
+// Remove casas decimais nulas: "450.00"/"450,00" -> "450", mantém "1.700" e "450,50"
+const fmtQtd = (v) => { if (v == null) return ''; const s = String(v).trim(); return s === '' ? '' : s.replace(/[.,]0+$/, '') }
 const CAMPOS = ['pais', 'cliente_curto', 'imp_nome', 'imp_endereco', 'imp_contato', 'imp_tel', 'imp_email', 'porto_embarque', 'local_entrega', 'data_carregamento', 'total_caixas', 'formula', 'mix_produtos', 'rotulos', 'embalagem', 'rotulos_embalagem', 'caixa_info', 'observacoes']
 
 // ---------- LISTA ----------
@@ -48,7 +50,7 @@ window.excluirOp = async function (id) {
 function linhaItem(it) {
   it = it || {}
   return `<tr class="op-item">
-    <td><input class="form-control form-control-sm it-qtd" value="${esc(it.qtd || '')}" style="min-width:70px"></td>
+    <td><input class="form-control form-control-sm it-qtd" value="${esc(fmtQtd(it.qtd))}" style="min-width:70px"></td>
     <td><input class="form-control form-control-sm it-unidade" value="${esc(it.unidade || 'Caixa')}" style="min-width:70px"></td>
     <td><input class="form-control form-control-sm it-descricao" value="${esc(it.descricao || '')}"></td>
     <td><input class="form-control form-control-sm it-codigo" value="${esc(it.codigo || '')}" style="min-width:80px"></td>
@@ -145,7 +147,7 @@ async function puxarItens() {
   if (!piId) { alert('Selecione uma PI primeiro.'); return }
   const produtos = await api.produtos.listar(piId)
   if (!Array.isArray(produtos) || !produtos.length) { alert('Esta PI não tem produtos cadastrados.'); return }
-  $('op-itens').innerHTML = produtos.map((p) => linhaItem({ qtd: p.quantidade, unidade: 'Caixa', descricao: p.produto, codigo: '' })).join('')
+  $('op-itens').innerHTML = produtos.map((p) => linhaItem({ qtd: fmtQtd(p.quantidade), unidade: 'Caixa', descricao: p.produto, codigo: '' })).join('')
   const pi = pis.find((x) => x.id == piId)
   if (pi && pi.cliente && !$('op-cliente_curto').value) $('op-cliente_curto').value = pi.cliente
 }
@@ -204,7 +206,7 @@ function exportarPDF(d) {
     ${secao('ITENS DO PEDIDO')}
     <table style="width:100%;border-collapse:collapse">
       <thead><tr><th style="${th}">Quantidade</th><th style="${th}">Item</th><th style="${th};text-align:left">Descrição do Produto</th><th style="${th}">Código</th></tr></thead>
-      <tbody>${itens.map((it) => `<tr><td style="${td('center')}">${esc(it.qtd || '')}</td><td style="${td('center')}">${esc(it.unidade || '')}</td><td style="${td('left')}">${esc(it.descricao || '')}</td><td style="${td('center')}">${esc(it.codigo || '')}</td></tr>`).join('')}</tbody>
+      <tbody>${itens.map((it) => `<tr><td style="${td('center')}">${esc(fmtQtd(it.qtd))}</td><td style="${td('center')}">${esc(it.unidade || '')}</td><td style="${td('left')}">${esc(it.descricao || '')}</td><td style="${td('center')}">${esc(it.codigo || '')}</td></tr>`).join('')}</tbody>
     </table>
     <div style="font-weight:bold;font-size:10.5px;padding:6px 2px">Total: ${esc(d.total_caixas || itens.reduce((s, it) => s + (parseFloat(String(it.qtd || '').replace(/\./g, '').replace(',', '.')) || 0), 0).toLocaleString('pt-BR'))}</div>
 
@@ -220,7 +222,7 @@ function exportarPDF(d) {
     <table style="width:100%;border-collapse:collapse">
       <thead><tr><th style="${th};text-align:left">Produto</th><th style="${th}">QTD (CX)</th><th style="${th}">Lote</th><th style="${th}">Elaboração</th><th style="${th}">Vence</th></tr></thead>
       <tbody>
-        ${itens.map((it) => `<tr><td style="${td('left')};height:34px">${esc(it.descricao || '')}</td><td style="${td('center')}">${esc(it.qtd || '')}</td><td style="${td('center')}"></td><td style="${td('center')}"></td><td style="${td('center')}"></td></tr>`).join('')}
+        ${itens.map((it) => `<tr><td style="${td('left')};height:34px">${esc(it.descricao || '')}</td><td style="${td('center')}">${esc(fmtQtd(it.qtd))}</td><td style="${td('center')}"></td><td style="${td('center')}"></td><td style="${td('center')}"></td></tr>`).join('')}
         <tr style="font-weight:bold;background:${LBL}"><td style="${td('left')}">TOTAL</td><td style="${td('center')}">${esc(d.total_caixas || '')}</td><td style="${td('center')}"></td><td style="${td('center')}"></td><td style="${td('center')}"></td></tr>
       </tbody>
     </table>
@@ -323,13 +325,13 @@ async function exportarExcel(d) {
   secao('ITENS DO PEDIDO')
   ;['Quantidade', 'Item', 'Descrição do Produto', 'Código'].forEach((h, i) => { const c = ws.getCell(r, i + 1); c.value = h; c.font = { bold: true }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CAB } } })
   r++
-  ;(d.itens || []).forEach((it) => { ws.getCell(r, 1).value = it.qtd; ws.getCell(r, 2).value = it.unidade; ws.getCell(r, 3).value = it.descricao; ws.getCell(r, 4).value = it.codigo; r++ })
+  ;(d.itens || []).forEach((it) => { ws.getCell(r, 1).value = fmtQtd(it.qtd); ws.getCell(r, 2).value = it.unidade; ws.getCell(r, 3).value = it.descricao; ws.getCell(r, 4).value = it.codigo; r++ })
   bloco('Produto - Fórmula', d.formula, true); bloco('MIX DE PRODUTOS', d.mix_produtos); bloco('RÓTULOS', d.rotulos)
   bloco('EMBALAGEM', d.embalagem); bloco('RÓTULOS / EMBALAGEM', d.rotulos_embalagem); bloco('CAIXA', d.caixa_info); bloco('OBSERVAÇÕES DA PRODUÇÃO', d.observacoes)
   secao('CONTROLE DE LOTE')
   ;['Produto', 'QTD (CX)', 'Lote', 'Elaboração', 'Vence'].forEach((h, i) => { const c = ws.getCell(r, i + 1); c.value = h; c.font = { bold: true }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CAB } } })
   r++
-  ;(d.itens || []).forEach((it) => { ws.getCell(r, 1).value = it.descricao; ws.getCell(r, 2).value = it.qtd; r++ })
+  ;(d.itens || []).forEach((it) => { ws.getCell(r, 1).value = it.descricao; ws.getCell(r, 2).value = fmtQtd(it.qtd); r++ })
   r += 2
   secao('RESPONSÁVEL PELA EXPEDIÇÃO')
   ws.getCell(r, 1).value = 'Assinatura:'; ws.getCell(r, 1).font = { bold: true }; ws.getCell(r, 2).value = '____________________________________'; r++
