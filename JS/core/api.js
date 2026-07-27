@@ -124,9 +124,11 @@ export const api = {
  excluirImportacao: (id) => requisitar('DELETE', `/api/fin/importacoes/${id}`),
  pagamentos: (importacaoId) => requisitar('GET', `/api/fin/pagamentos?importacaoId=${importacaoId}`),
  criarPagamento: (dados) => requisitar('POST', '/api/fin/pagamentos', dados),
+ editarPagamento: (id, dados) => requisitar('PATCH', `/api/fin/pagamentos/${id}`, dados),
  excluirPagamento: (id) => requisitar('DELETE', `/api/fin/pagamentos/${id}`),
  contratos: (importacaoId) => requisitar('GET', `/api/fin/contratos${importacaoId ? '?importacaoId=' + importacaoId : ''}`),
  criarContrato: (dados) => requisitar('POST', '/api/fin/contratos', dados),
+ editarContrato: (id, dados) => requisitar('PATCH', `/api/fin/contratos/${id}`, dados),
  excluirContrato: (id) => requisitar('DELETE', `/api/fin/contratos/${id}`)
  },
 

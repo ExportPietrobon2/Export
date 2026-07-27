@@ -1402,6 +1402,15 @@ app.post('/api/fin/pagamentos', autenticarContabil(), async (req, res) => {
     [b.importacao_id, b.data_pgto || null, parseFloat(b.valor_reais) || 0, parseFloat(b.valor_moeda) || 0, b.forma || null, b.obs || null])
   res.json({ ok: true })
 })
+app.patch('/api/fin/pagamentos/:id', autenticarContabil(), async (req, res) => {
+  const campos = ['data_pgto', 'valor_reais', 'valor_moeda', 'forma', 'obs']
+  const sets = [], vals = []
+  for (const c of campos) { if (c in req.body) { let v = req.body[c]; if (v === '') v = null; if (c === 'valor_reais' || c === 'valor_moeda') v = parseFloat(v) || 0; sets.push(`${c} = ?`); vals.push(v) } }
+  if (!sets.length) return res.json({ ok: true })
+  vals.push(req.params.id)
+  await pool.query(`UPDATE fin_pagamentos SET ${sets.join(', ')} WHERE id = ?`, vals)
+  res.json({ ok: true })
+})
 app.delete('/api/fin/pagamentos/:id', autenticarContabil(), async (req, res) => {
   await pool.query('DELETE FROM fin_pagamentos WHERE id = ?', [req.params.id])
   res.json({ ok: true })
@@ -1425,6 +1434,25 @@ app.post('/api/fin/contratos', autenticarContabil(), async (req, res) => {
     [b.num_contrato, b.banco || null, b.data_fechamento || null, b.moeda || 'USD', parseFloat(b.valor_moeda) || 0,
      parseFloat(b.taxa) || 0, (parseFloat(b.valor_moeda) || 0) * (parseFloat(b.taxa) || 0), b.importacao_id || null,
      b.liquidado ? 1 : 0, b.data_liquidacao || null, b.obs || null])
+  res.json({ ok: true })
+})
+app.patch('/api/fin/contratos/:id', autenticarContabil(), async (req, res) => {
+  const b = req.body
+  const campos = ['num_contrato', 'banco', 'data_fechamento', 'moeda', 'valor_moeda', 'taxa', 'importacao_id', 'liquidado', 'data_liquidacao', 'obs']
+  const sets = [], vals = []
+  for (const c of campos) {
+    if (c in b) {
+      let v = b[c]
+      if (v === '') v = null
+      if (c === 'valor_moeda' || c === 'taxa') v = parseFloat(v) || 0
+      if (c === 'liquidado') v = b[c] ? 1 : 0
+      sets.push(`${c} = ?`); vals.push(v)
+    }
+  }
+  if ('valor_moeda' in b || 'taxa' in b) { sets.push('valor_reais = ?'); vals.push((parseFloat(b.valor_moeda) || 0) * (parseFloat(b.taxa) || 0)) }
+  if (!sets.length) return res.json({ ok: true })
+  vals.push(req.params.id)
+  await pool.query(`UPDATE fin_contratos SET ${sets.join(', ')} WHERE id = ?`, vals)
   res.json({ ok: true })
 })
 app.delete('/api/fin/contratos/:id', autenticarContabil(), async (req, res) => {
