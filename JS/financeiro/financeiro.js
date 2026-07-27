@@ -437,11 +437,11 @@ async function carregarCusto(impId) {
   const imp = resumo.importacoes.find((x) => String(x.id) === String(impId))
   const d = await api.fin.custo(impId)
   if (d && !d.erro) {
-    custoCab = { nfe: d.nfe || '', materia_prima: d.materia_prima ?? '', imposto_importacao: d.imposto_importacao ?? '', ipi: d.ipi ?? '', pis: d.pis ?? '', cofins: d.cofins ?? '', icms: d.icms ?? '', quantidade_kg: d.quantidade_kg ?? '', unidade: d.unidade || 'KG', obs: d.obs || '' }
+    custoCab = { nfe: d.nfe || '', produto: d.produto || '', materia_prima: d.materia_prima ?? '', imposto_importacao: d.imposto_importacao ?? '', ipi: d.ipi ?? '', pis: d.pis ?? '', cofins: d.cofins ?? '', icms: d.icms ?? '', quantidade_kg: d.quantidade_kg ?? '', unidade: d.unidade || 'KG', obs: d.obs || '' }
     custoDespesas = (d.despesas || []).map((x) => ({ nome: x.nome || '', valor: x.valor ?? '' }))
     custoSt = (d.st || []).map((x) => ({ produto: x.produto || '', ncm: x.ncm || '', base_icms: x.base_icms ?? '', icms_proprio: x.icms_proprio ?? '', aliquota: x.aliquota ?? '', ipi_destacado: x.ipi_destacado ?? '', mva: x.mva ?? '' }))
   } else {
-    custoCab = { nfe: imp?.invoice || '', materia_prima: imp?.valor_reais ?? '', imposto_importacao: '', ipi: '', pis: '', cofins: '', icms: '', quantidade_kg: '', unidade: 'KG', obs: '' }
+    custoCab = { nfe: imp?.invoice || '', produto: imp?.mercadoria || '', materia_prima: imp?.valor_reais ?? '', imposto_importacao: '', ipi: '', pis: '', cofins: '', icms: '', quantidade_kg: '', unidade: 'KG', obs: '' }
     custoDespesas = []
     custoSt = []
   }
@@ -480,9 +480,10 @@ function renderCustos() {
       <div class="row g-2 align-items-end mb-2">
         <div class="col-12 col-md-6"><label class="form-label small mb-0">Importação</label>
           <select class="form-select form-select-sm" onchange="custoSelImp(this.value)"><option value="">— selecione —</option>${optImp}</select></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">NF-e</label><input class="form-control form-control-sm" value="${esc(custoCab.nfe || '')}" oninput="custoCabInput('nfe',this.value)"></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">Quantidade</label><input type="number" step="any" class="form-control form-control-sm" value="${custoCab.quantidade_kg ?? ''}" oninput="custoCabInput('quantidade_kg',this.value)"></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">Unidade</label><select class="form-select form-select-sm" onchange="custoCabInput('unidade',this.value)"><option value="KG" ${(custoCab.unidade || 'KG') === 'KG' ? 'selected' : ''}>KG</option><option value="UN" ${custoCab.unidade === 'UN' ? 'selected' : ''}>UN</option></select></div>
+        <div class="col-12 col-md-6"><label class="form-label small mb-0">Produto</label><input class="form-control form-control-sm" value="${esc(custoCab.produto || '')}" oninput="custoCabInput('produto',this.value)" placeholder="Nome do produto importado"></div>
+        <div class="col-6 col-md-4"><label class="form-label small mb-0">NF-e</label><input class="form-control form-control-sm" value="${esc(custoCab.nfe || '')}" oninput="custoCabInput('nfe',this.value)"></div>
+        <div class="col-6 col-md-4"><label class="form-label small mb-0">Quantidade</label><input type="number" step="any" class="form-control form-control-sm" value="${custoCab.quantidade_kg ?? ''}" oninput="custoCabInput('quantidade_kg',this.value)"></div>
+        <div class="col-6 col-md-4"><label class="form-label small mb-0">Unidade</label><select class="form-select form-select-sm" onchange="custoCabInput('unidade',this.value)"><option value="KG" ${(custoCab.unidade || 'KG') === 'KG' ? 'selected' : ''}>KG</option><option value="UN" ${custoCab.unidade === 'UN' ? 'selected' : ''}>UN</option></select></div>
       </div>
       <h6 class="secao-titulo-card mt-2 mb-2">Custos e impostos (R$)</h6>
       <div class="row g-2">
@@ -524,9 +525,9 @@ async function carregarCustosSalvos() {
   const lista = await api.fin.custos()
   if (!Array.isArray(lista) || !lista.length) { el.innerHTML = '<p class="text-muted fst-italic mb-0">Nenhum custo salvo ainda.</p>'; return }
   el.innerHTML = `<div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:.85rem">
-    <thead><tr><th>Invoice</th><th>Fornecedor</th><th class="text-end">Custo/un.</th><th class="text-end">Total pago</th><th></th></tr></thead>
+    <thead><tr><th>Invoice</th><th>Produto</th><th>Fornecedor</th><th class="text-end">Custo/un.</th><th class="text-end">Total pago</th><th></th></tr></thead>
     <tbody>${lista.map((c) => `<tr class="${String(c.importacao_id) === String(custoImpSel) ? 'table-primary' : ''}">
-      <td class="fw-semibold">${esc(c.invoice || '-')}</td><td>${esc(c.fornecedor_nome || '-')}</td>
+      <td class="fw-semibold">${esc(c.invoice || '-')}</td><td>${esc(c.produto || '-')}</td><td>${esc(c.fornecedor_nome || '-')}</td>
       <td class="text-end">${brl(c.calc ? c.calc.custoKg : 0)} <span class="text-muted">/${esc(c.unidade || 'KG')}</span></td>
       <td class="text-end">${brl(c.calc ? c.calc.total : 0)}</td>
       <td class="text-end" style="white-space:nowrap"><button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="custoSelImp('${c.importacao_id}')">Abrir</button>
@@ -627,6 +628,7 @@ window.exportarCustoPDF = async () => {
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#1a1a1a">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid ${NAVY};padding-bottom:8px;margin-bottom:12px">
       <div><div style="font-weight:bold;font-size:14px">CUSTO DE IMPORTAÇÃO</div>
+        ${custoCab.produto ? `<div style="font-size:12px;font-weight:bold;color:#1a1a1a">${esc(custoCab.produto)}</div>` : ''}
         <div style="font-size:11px;color:#333">Invoice ${esc(imp?.invoice || '')} · ${esc(imp?.fornecedor_nome || '')}</div>
         <div style="font-size:11px;color:#333">NF-e: ${esc(custoCab.nfe || '-')} · Qtd: ${esc(custoCab.quantidade_kg || '-')} ${esc(un)}</div>
       </div>

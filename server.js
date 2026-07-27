@@ -1360,6 +1360,8 @@ async function migrarFinanceiro() {
     try {
       const [uc] = await pool.query("SHOW COLUMNS FROM fin_custos LIKE 'unidade'")
       if (!uc.length) await pool.query("ALTER TABLE fin_custos ADD COLUMN unidade VARCHAR(4) DEFAULT 'KG'")
+      const [pc] = await pool.query("SHOW COLUMNS FROM fin_custos LIKE 'produto'")
+      if (!pc.length) await pool.query("ALTER TABLE fin_custos ADD COLUMN produto VARCHAR(200)")
     } catch (e) { /* tabela ainda não existe */ }
   } catch (e) { console.error('Erro migração financeiro:', e.message) }
 }
@@ -1639,7 +1641,7 @@ app.delete('/api/fin/contratos/:id', autenticarContabil(), async (req, res) => {
 async function inicializarCustos() {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS fin_custos (
-      id INT AUTO_INCREMENT PRIMARY KEY, importacao_id INT NULL UNIQUE, nfe VARCHAR(60),
+      id INT AUTO_INCREMENT PRIMARY KEY, importacao_id INT NULL UNIQUE, nfe VARCHAR(60), produto VARCHAR(200),
       materia_prima DECIMAL(14,2) DEFAULT 0, imposto_importacao DECIMAL(14,2) DEFAULT 0,
       ipi DECIMAL(14,2) DEFAULT 0, pis DECIMAL(14,2) DEFAULT 0, cofins DECIMAL(14,2) DEFAULT 0, icms DECIMAL(14,2) DEFAULT 0,
       quantidade_kg DECIMAL(14,3) DEFAULT 0, unidade VARCHAR(4) DEFAULT 'KG', obs VARCHAR(500),
@@ -1694,7 +1696,7 @@ app.get('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, res) 
   res.json({ ...c, despesas, st, calc: computarCusto(c, despesas, st) })
 })
 
-const CAMPOS_CUSTO = ['nfe', 'materia_prima', 'imposto_importacao', 'ipi', 'pis', 'cofins', 'icms', 'quantidade_kg', 'unidade', 'obs']
+const CAMPOS_CUSTO = ['nfe', 'produto', 'materia_prima', 'imposto_importacao', 'ipi', 'pis', 'cofins', 'icms', 'quantidade_kg', 'unidade', 'obs']
 app.put('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, res) => {
   const impId = parseInt(req.params.importacaoId) || 0
   if (!impId) return res.status(400).json({ erro: 'Selecione uma importação.' })
@@ -1704,13 +1706,13 @@ app.put('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, res) 
   if (existe) {
     custoId = existe.id
     const sets = [], vals = []
-    for (const c of CAMPOS_CUSTO) { let v = b[c]; if (v === '' || v === undefined) v = (c === 'nfe' || c === 'obs') ? null : (c === 'unidade' ? 'KG' : 0); sets.push(`${c} = ?`); vals.push(v) }
+    for (const c of CAMPOS_CUSTO) { let v = b[c]; if (v === '' || v === undefined) v = (c === 'nfe' || c === 'obs' || c === 'produto') ? null : (c === 'unidade' ? 'KG' : 0); sets.push(`${c} = ?`); vals.push(v) }
     vals.push(custoId)
     await pool.query(`UPDATE fin_custos SET ${sets.join(', ')} WHERE id = ?`, vals)
   } else {
     const [r] = await pool.query(
-      'INSERT INTO fin_custos (importacao_id, nfe, materia_prima, imposto_importacao, ipi, pis, cofins, icms, quantidade_kg, unidade, obs) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-      [impId, b.nfe || null, Number(b.materia_prima) || 0, Number(b.imposto_importacao) || 0, Number(b.ipi) || 0, Number(b.pis) || 0, Number(b.cofins) || 0, Number(b.icms) || 0, Number(b.quantidade_kg) || 0, b.unidade || 'KG', b.obs || null])
+      'INSERT INTO fin_custos (importacao_id, nfe, produto, materia_prima, imposto_importacao, ipi, pis, cofins, icms, quantidade_kg, unidade, obs) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+      [impId, b.nfe || null, b.produto || null, Number(b.materia_prima) || 0, Number(b.imposto_importacao) || 0, Number(b.ipi) || 0, Number(b.pis) || 0, Number(b.cofins) || 0, Number(b.icms) || 0, Number(b.quantidade_kg) || 0, b.unidade || 'KG', b.obs || null])
     custoId = r.insertId
   }
   await pool.query('DELETE FROM fin_custo_despesas WHERE custo_id = ?', [custoId])
