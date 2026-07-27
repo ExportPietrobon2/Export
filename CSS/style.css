@@ -889,6 +889,8 @@ body {
   box-shadow: 0 0 0 3px rgba(237,50,55,.12) !important;
 }
 .form-label { color: var(--slate); font-weight: 500; }
+/* Reserva espaço para a seta do select (o padding acima apaga o do Bootstrap) */
+.form-select { padding-right: 2.4rem !important; background-position: right .75rem center !important; }
 
 /* Tabelas corporativas: cabeçalho claro, texto escuro, linhas com hover */
 .table { --bs-table-bg: transparent; }

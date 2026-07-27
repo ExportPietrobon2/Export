@@ -451,11 +451,13 @@ async function carregarCusto(impId) {
 function renderCustos() {
   const optImp = resumo.importacoes.map((i) => `<option value="${i.id}" ${String(i.id) === String(custoImpSel) ? 'selected' : ''}>${esc(i.invoice)} — ${esc(i.fornecedor_nome || '')}</option>`).join('')
   if (!custoImpSel) {
-    $('area-fin').innerHTML = `<div class="card"><div class="card-body">
+    $('area-fin').innerHTML = `<div class="card mb-3"><div class="card-body">
       <label class="form-label small mb-1">Importação</label>
       <select class="form-select form-select-sm" style="max-width:520px" onchange="custoSelImp(this.value)"><option value="">— selecione uma importação —</option>${optImp}</select>
-      <p class="text-muted mt-3 mb-0">Escolha uma importação para calcular os custos de nacionalização (matéria-prima, impostos, despesas, ICMS-ST e custo por kg).</p>
-    </div></div>`
+      <p class="text-muted mt-3 mb-0">Escolha uma importação para calcular os custos de nacionalização (matéria-prima, impostos, despesas, ICMS-ST e custo por unidade).</p>
+    </div></div>
+    <div class="card"><div class="card-body"><h6 class="secao-titulo-card mb-2">Custos já salvos</h6><div id="custos-salvos"><p class="text-muted mb-0">Carregando...</p></div></div></div>`
+    carregarCustosSalvos()
     return
   }
   const num = (k, label, prefill) => `<div class="col-6 col-md-3"><label class="form-label small mb-0">${label}</label><input type="number" step="any" class="form-control form-control-sm" value="${custoCab[k] ?? ''}" oninput="custoCabInput('${k}',this.value)" ${prefill || ''}></div>`
@@ -509,8 +511,33 @@ function renderCustos() {
       <div id="c-resumo"></div>
       <button class="btn btn-ok-grande mt-3" onclick="salvarCusto()">Salvar custos</button>
       <button class="btn btn-outline-danger mt-3 ms-2" onclick="exportarCustoPDF()">Exportar PDF</button>
-    </div></div>`
+    </div></div>
+
+    <div class="card mt-3"><div class="card-body"><h6 class="secao-titulo-card mb-2">Custos já salvos</h6><div id="custos-salvos"><p class="text-muted mb-0">Carregando...</p></div></div></div>`
   atualizarResumoCusto()
+  carregarCustosSalvos()
+}
+
+async function carregarCustosSalvos() {
+  const el = $('custos-salvos')
+  if (!el) return
+  const lista = await api.fin.custos()
+  if (!Array.isArray(lista) || !lista.length) { el.innerHTML = '<p class="text-muted fst-italic mb-0">Nenhum custo salvo ainda.</p>'; return }
+  el.innerHTML = `<div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:.85rem">
+    <thead><tr><th>Invoice</th><th>Fornecedor</th><th class="text-end">Custo/un.</th><th class="text-end">Total pago</th><th></th></tr></thead>
+    <tbody>${lista.map((c) => `<tr class="${String(c.importacao_id) === String(custoImpSel) ? 'table-primary' : ''}">
+      <td class="fw-semibold">${esc(c.invoice || '-')}</td><td>${esc(c.fornecedor_nome || '-')}</td>
+      <td class="text-end">${brl(c.calc ? c.calc.custoKg : 0)} <span class="text-muted">/${esc(c.unidade || 'KG')}</span></td>
+      <td class="text-end">${brl(c.calc ? c.calc.total : 0)}</td>
+      <td class="text-end" style="white-space:nowrap"><button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="custoSelImp('${c.importacao_id}')">Abrir</button>
+        <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="excluirCustoSalvo('${c.importacao_id}')">🗑</button></td></tr>`).join('')}</tbody></table></div>`
+}
+
+window.excluirCustoSalvo = async (impId) => {
+  if (!confirm('Excluir este custo salvo?')) return
+  await api.fin.excluirCusto(impId)
+  if (String(custoImpSel) === String(impId)) { custoImpSel = ''; custoCab = {}; custoDespesas = []; custoSt = [] }
+  renderCustos()
 }
 
 function atualizarResumoCusto() {
