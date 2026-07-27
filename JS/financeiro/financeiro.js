@@ -612,55 +612,52 @@ window.exportarCustoPDF = async () => {
   const imp = resumo.importacoes.find((x) => String(x.id) === String(custoImpSel))
   const c = calcCusto()
   const un = custoCab.unidade || 'KG'
-  const NAVY = '#1f2d50', BORD = '#d5dae2', LBL = '#eef1f5'
+  const CAB = '#404040', ZEBRA = '#f2f2f2', TOTAL = '#c9c9c9', BORDA = '1px solid #000'
   const pct = (v) => c.total > 0 ? (v / c.total * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%' : '-'
-  const th = `background:${NAVY};color:#fff;font-weight:bold;font-size:11px;padding:6px 10px`
-  const tdL = `border:1px solid ${BORD};padding:5px 10px;font-size:11px`
-  const tdR = `border:1px solid ${BORD};padding:5px 10px;font-size:11px;text-align:right`
+  const th = `background:${CAB};color:#fff;font-weight:bold;border:${BORDA};padding:5px 6px;font-size:10px;text-align:center`
+  const tdL = (bg) => `background:${bg};color:#000;border:${BORDA};padding:4px 6px;font-size:10px;text-align:left`
+  const tdR = (bg) => `background:${bg};color:#000;border:${BORDA};padding:4px 6px;font-size:10px;text-align:right`
   const g = (k) => parseFloat(custoCab[k]) || 0
-  const linImp = (l, v) => `<tr><td style="${tdL}">${esc(l)}</td><td style="${tdR}">${brl(v)}</td><td style="${tdR}">${pct(v)}</td></tr>`
-  const despRows = custoDespesas.filter((d) => (d.nome || '') || (parseFloat(d.valor) || 0)).map((d) => `<tr><td style="${tdL}">${esc(d.nome || '-')}</td><td style="${tdR}">${brl(d.valor)}</td></tr>`).join('') || `<tr><td style="${tdL}" colspan="2">—</td></tr>`
-  const stRows = custoSt.filter((s) => (s.produto || '') || (parseFloat(s.base_icms) || 0)).map((s) => `<tr>
-    <td style="${tdL}">${esc(s.produto || '-')}</td><td style="${tdL}">${esc(s.ncm || '-')}</td>
-    <td style="${tdR}">${brl(s.base_icms)}</td><td style="${tdR}">${brl(s.icms_proprio)}</td>
-    <td style="${tdR}">${numf(s.aliquota, 4)}</td><td style="${tdR}">${brl(s.ipi_destacado)}</td><td style="${tdR}">${numf(s.mva, 4)}</td>
-    <td style="${tdR};font-weight:bold">${brl(stRecolher(s))}</td></tr>`).join('')
-  const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#1a1a1a">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid ${NAVY};padding-bottom:8px;margin-bottom:12px">
-      <div><div style="font-weight:bold;font-size:14px">CUSTO DE IMPORTAÇÃO</div>
-        ${custoCab.produto ? `<div style="font-size:12px;font-weight:bold;color:#1a1a1a">${esc(custoCab.produto)}</div>` : ''}
-        <div style="font-size:11px;color:#333">Invoice ${esc(imp?.invoice || '')} · ${esc(imp?.fornecedor_nome || '')}</div>
-        <div style="font-size:11px;color:#333">NF-e: ${esc(custoCab.nfe || '-')} · Qtd: ${esc(custoCab.quantidade_kg || '-')} ${esc(un)}</div>
-      </div>
-      <div style="font-weight:bold;font-size:15px;color:#c0392b">Pietrobon</div>
-    </div>
+  const zeb = (i) => i % 2 ? ZEBRA : '#fff'
+  const impLinhas = [['Matéria-prima', g('materia_prima')], ['Imposto Importação', g('imposto_importacao')], ['ST Custo', c.stCusto], ['IPI', g('ipi')], ['PIS', g('pis')], ['COFINS', g('cofins')], ['ICMS', g('icms')], ['Despesas', c.despTotal]]
+  const impRows = impLinhas.map(([l, v], i) => `<tr><td style="${tdL(zeb(i))}">${esc(l)}</td><td style="${tdR(zeb(i))}">${brl(v)}</td><td style="${tdR(zeb(i))}">${pct(v)}</td></tr>`).join('')
+  const despLista = custoDespesas.filter((d) => (d.nome || '') || (parseFloat(d.valor) || 0))
+  const despRows = despLista.length ? despLista.map((d, i) => `<tr><td style="${tdL(zeb(i))}">${esc(d.nome || '-')}</td><td style="${tdR(zeb(i))}">${brl(d.valor)}</td></tr>`).join('') : `<tr><td style="${tdL('#fff')}" colspan="2">—</td></tr>`
+  const stLista = custoSt.filter((s) => (s.produto || '') || (parseFloat(s.base_icms) || 0))
+  const stRows = stLista.map((s, i) => `<tr>
+    <td style="${tdL(zeb(i))}">${esc(s.produto || '-')}</td><td style="${tdL(zeb(i))}">${esc(s.ncm || '-')}</td>
+    <td style="${tdR(zeb(i))}">${brl(s.base_icms)}</td><td style="${tdR(zeb(i))}">${brl(s.icms_proprio)}</td>
+    <td style="${tdR(zeb(i))}">${numf(s.aliquota, 4)}</td><td style="${tdR(zeb(i))}">${brl(s.ipi_destacado)}</td><td style="${tdR(zeb(i))}">${numf(s.mva, 4)}</td>
+    <td style="${tdR(zeb(i))};font-weight:bold">${brl(stRecolher(s))}</td></tr>`).join('')
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#000">
+    <h2 style="text-align:center;margin:0 0 2px;font-size:16px">CUSTO DE IMPORTAÇÃO</h2>
+    ${custoCab.produto ? `<div style="text-align:center;font-weight:bold;font-size:12px;margin-bottom:2px">${esc(custoCab.produto)}</div>` : ''}
+    <div style="text-align:center;font-size:10px;color:#333;margin-bottom:12px">Invoice ${esc(imp?.invoice || '')} · ${esc(imp?.fornecedor_nome || '')} · NF-e: ${esc(custoCab.nfe || '-')} · Qtd: ${esc(custoCab.quantidade_kg || '-')} ${esc(un)}</div>
 
     <table style="width:100%;border-collapse:collapse;margin-bottom:14px">
-      <thead><tr><th style="${th};text-align:left">Custos e impostos</th><th style="${th};text-align:right">Valor R$</th><th style="${th};text-align:right">%</th></tr></thead>
-      <tbody>
-        ${linImp('Matéria-prima', g('materia_prima'))}${linImp('Imposto Importação', g('imposto_importacao'))}${linImp('ST Custo', c.stCusto)}
-        ${linImp('IPI', g('ipi'))}${linImp('PIS', g('pis'))}${linImp('COFINS', g('cofins'))}${linImp('ICMS', g('icms'))}${linImp('Despesas', c.despTotal)}
-        <tr style="background:${LBL};font-weight:bold"><td style="${tdL}">TOTAL PAGO</td><td style="${tdR}">${brl(c.total)}</td><td style="${tdR}">100%</td></tr>
+      <thead><tr><th style="${th};text-align:left">Custos e impostos</th><th style="${th}">Valor R$</th><th style="${th}">%</th></tr></thead>
+      <tbody>${impRows}
+        <tr><td style="${tdL(TOTAL)};font-weight:bold">TOTAL PAGO</td><td style="${tdR(TOTAL)};font-weight:bold">${brl(c.total)}</td><td style="${tdR(TOTAL)};font-weight:bold">100%</td></tr>
       </tbody>
     </table>
 
     <table style="width:100%;border-collapse:collapse;margin-bottom:14px">
-      <thead><tr><th style="${th};text-align:left">Despesas</th><th style="${th};text-align:right">Valor R$</th></tr></thead>
-      <tbody>${despRows}<tr style="background:${LBL};font-weight:bold"><td style="${tdL}">Total despesas</td><td style="${tdR}">${brl(c.despTotal)}</td></tr></tbody>
+      <thead><tr><th style="${th};text-align:left">Despesas</th><th style="${th}">Valor R$</th></tr></thead>
+      <tbody>${despRows}<tr><td style="${tdL(TOTAL)};font-weight:bold">Total despesas</td><td style="${tdR(TOTAL)};font-weight:bold">${brl(c.despTotal)}</td></tr></tbody>
     </table>
 
     ${stRows ? `<table style="width:100%;border-collapse:collapse;margin-bottom:14px">
-      <thead><tr><th style="${th};text-align:left">ICMS-ST — Produto</th><th style="${th}">NCM</th><th style="${th};text-align:right">Base ICMS</th><th style="${th};text-align:right">ICMS Próprio</th><th style="${th};text-align:right">Alíquota</th><th style="${th};text-align:right">IPI Dest.</th><th style="${th};text-align:right">MVA</th><th style="${th};text-align:right">ST a recolher</th></tr></thead>
-      <tbody>${stRows}<tr style="background:${LBL};font-weight:bold"><td style="${tdL}" colspan="7">ST Custo (total)</td><td style="${tdR}">${brl(c.stCusto)}</td></tr></tbody>
+      <thead><tr><th style="${th};text-align:left">ICMS-ST — Produto</th><th style="${th}">NCM</th><th style="${th}">Base ICMS</th><th style="${th}">ICMS Próprio</th><th style="${th}">Alíquota</th><th style="${th}">IPI Dest.</th><th style="${th}">MVA</th><th style="${th}">ST a recolher</th></tr></thead>
+      <tbody>${stRows}<tr><td style="${tdL(TOTAL)};font-weight:bold" colspan="7">ST Custo (total)</td><td style="${tdR(TOTAL)};font-weight:bold">${brl(c.stCusto)}</td></tr></tbody>
     </table>` : ''}
 
-    <table style="width:60%;border-collapse:collapse;margin-left:auto">
-      <tr><td style="${tdL}">TOTAL PAGO</td><td style="${tdR}">${brl(c.total)}</td></tr>
-      <tr><td style="${tdL};color:#1a7f37">(−) Créditos ICMS/IPI/PIS/COFINS</td><td style="${tdR};color:#1a7f37">${brl(c.credito)}</td></tr>
-      <tr style="font-weight:bold"><td style="${tdL}">CUSTO COM CRÉDITO</td><td style="${tdR}">${brl(c.custoCredito)}</td></tr>
-      <tr style="background:${NAVY};color:#fff;font-weight:bold"><td style="border:1px solid ${NAVY};padding:7px 10px;font-size:12px">CUSTO POR ${esc(un)}</td><td style="border:1px solid ${NAVY};padding:7px 10px;font-size:12px;text-align:right">${brl(c.custoKg)}</td></tr>
+    <table style="width:55%;border-collapse:collapse;margin-left:auto">
+      <tr><td style="${tdL('#fff')}">TOTAL PAGO</td><td style="${tdR('#fff')}">${brl(c.total)}</td></tr>
+      <tr><td style="${tdL('#fff')}">(−) Créditos ICMS/IPI/PIS/COFINS</td><td style="${tdR('#fff')}">${brl(c.credito)}</td></tr>
+      <tr><td style="${tdL(ZEBRA)};font-weight:bold">CUSTO COM CRÉDITO</td><td style="${tdR(ZEBRA)};font-weight:bold">${brl(c.custoCredito)}</td></tr>
+      <tr><td style="${tdL(TOTAL)};font-weight:bold;font-size:12px">CUSTO POR ${esc(un)}</td><td style="${tdR(TOTAL)};font-weight:bold;font-size:12px">${brl(c.custoKg)}</td></tr>
     </table>
-    <div style="font-size:9.5px;color:#666;margin-top:14px">Emitido em ${new Date().toLocaleDateString('pt-BR')} · Pietrobon &amp; Cia Ltda</div>
+    <div style="font-size:9px;color:#555;margin-top:14px;text-align:center">Emitido em ${new Date().toLocaleDateString('pt-BR')} · Pietrobon &amp; Cia Ltda</div>
   </div>`
   gerarPdfDeHtml(html, `Custo_${(imp?.invoice || 'importacao').replace(/\W+/g, '_')}.pdf`)
 }
