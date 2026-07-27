@@ -184,8 +184,9 @@ async function abrirPagamentosInner(id) {
     <div class="small text-muted mb-3">Valor: <strong>${brl(imp.valor_reais)}</strong> · Pago: <strong>${brl(imp.pago)}</strong> · Saldo: <strong class="${imp.saldo > 0.01 ? 'text-danger' : 'text-success'}">${brl(imp.saldo)}</strong></div>
     <div class="row g-2 align-items-end mb-3 ${ep ? 'p-2 rounded border border-primary' : ''}">
       ${ep ? '<div class="col-12"><span class="badge bg-primary">Editando pagamento</span></div>' : ''}
-      <div class="col-6 col-md-3"><label class="form-label small mb-0">Data</label><input type="date" id="p-data" class="form-control form-control-sm"></div>
-      <div class="col-6 col-md-3"><label class="form-label small mb-0">Valor pago (R$)</label><input type="number" step="any" id="p-valor" class="form-control form-control-sm"></div>
+      <div class="col-6 col-md-2"><label class="form-label small mb-0">Data</label><input type="date" id="p-data" class="form-control form-control-sm"></div>
+      <div class="col-6 col-md-2"><label class="form-label small mb-0">Valor pago (USD)</label><input type="number" step="any" id="p-valor-usd" class="form-control form-control-sm"></div>
+      <div class="col-6 col-md-2"><label class="form-label small mb-0">Valor pago (R$)</label><input type="number" step="any" id="p-valor" class="form-control form-control-sm"></div>
       <div class="col-6 col-md-3"><label class="form-label small mb-0">Contrato de câmbio</label><select id="p-contrato_id" class="form-select form-select-sm"><option value="">— nenhum —</option>${optCt}</select><div id="p-ct-nota" class="small text-muted mt-1"></div></div>
       <div class="col-6 col-md-3"><label class="form-label small mb-0">Forma</label><input id="p-forma" class="form-control form-control-sm" value="Câmbio Antecipado"></div>
       <div class="col-12"><label class="form-label small mb-0">Observação</label><input id="p-obs" class="form-control form-control-sm"></div>
@@ -197,6 +198,7 @@ async function abrirPagamentosInner(id) {
   if (ep) {
     $('p-data').value = dISO(ep.data_pgto)
     $('p-valor').value = ep.valor_reais ?? ''
+    $('p-valor-usd').value = ep.valor_moeda ?? ''
     $('p-forma').value = ep.forma || ''
     $('p-obs').value = ep.obs || ''
     $('p-contrato_id').value = ep.contrato_id || ''
@@ -204,13 +206,30 @@ async function abrirPagamentosInner(id) {
   } else {
     $('p-data').value = new Date().toISOString().slice(0, 10)
   }
-  // Sugere o contrato de câmbio cujo valor bate com o valor pago
+  // Taxa usada na conversão: a do contrato selecionado, senão a da invoice
+  const taxaPag = () => {
+    const cid = $('p-contrato_id').value
+    if (cid) { const c = window._contratosImp.find((x) => String(x.id) === String(cid)); if (c && Number(c.taxa) > 0) return Number(c.taxa) }
+    return Number(imp.taxa_cambio) || 0
+  }
+  // USD digitado -> calcula R$
+  $('p-valor-usd').addEventListener('input', () => {
+    const t = taxaPag(); const u = parseFloat($('p-valor-usd').value)
+    if (t > 0 && u >= 0) $('p-valor').value = (u * t).toFixed(2)
+  })
+  // R$ digitado -> calcula USD e sugere contrato cujo valor bate
   $('p-valor').addEventListener('input', () => {
-    if ($('p-contrato_id').value) return
-    const v = parseFloat($('p-valor').value)
-    if (!(v > 0)) { $('p-ct-nota').textContent = ''; return }
-    const match = window._contratosImp.find((c) => Math.abs((Number(c.valor_reais) || 0) - v) < 0.01)
-    if (match) { $('p-contrato_id').value = match.id; $('p-ct-nota').textContent = `Vinculado ao contrato Nº ${match.num_contrato} (valor bate).` }
+    const t = taxaPag(); const v = parseFloat($('p-valor').value)
+    if (t > 0 && v >= 0) $('p-valor-usd').value = (v / t).toFixed(2)
+    if (!$('p-contrato_id').value && v > 0) {
+      const match = window._contratosImp.find((c) => Math.abs((Number(c.valor_reais) || 0) - v) < 0.01)
+      if (match) { $('p-contrato_id').value = match.id; $('p-ct-nota').textContent = `Vinculado ao contrato Nº ${match.num_contrato} (valor bate).` }
+    }
+  })
+  // Trocar de contrato recalcula o R$ a partir do USD (nova taxa)
+  $('p-contrato_id').addEventListener('change', () => {
+    const t = taxaPag(); const u = parseFloat($('p-valor-usd').value)
+    if (t > 0 && u >= 0) $('p-valor').value = (u * t).toFixed(2)
   })
   renderListaPag(lista, mapaCt)
   $('p-salvar').addEventListener('click', salvarPagamento)
@@ -221,8 +240,8 @@ function renderListaPag(lista, mapaCt) {
   const el = $('p-lista')
   if (!lista.length) { el.innerHTML = '<p class="text-muted fst-italic mb-0">Nenhum pagamento registrado.</p>'; return }
   const ct = mapaCt || {}
-  el.innerHTML = `<table class="table table-sm mb-0" style="font-size:.85rem"><thead><tr><th>Data</th><th class="text-end">Valor R$</th><th>Contrato</th><th>Forma</th><th>Obs.</th><th></th></tr></thead>
-    <tbody>${lista.map((p) => `<tr class="${p.id === editPag ? 'table-primary' : ''}"><td>${dBR(p.data_pgto)}</td><td class="text-end">${brl(p.valor_reais)}</td><td>${p.contrato_id && ct[p.contrato_id] ? 'Nº ' + esc(ct[p.contrato_id].num_contrato) : '-'}</td><td>${esc(p.forma || '-')}</td><td>${esc(p.obs || '-')}</td>
+  el.innerHTML = `<table class="table table-sm mb-0" style="font-size:.85rem"><thead><tr><th>Data</th><th class="text-end">Valor USD</th><th class="text-end">Valor R$</th><th>Contrato</th><th>Forma</th><th>Obs.</th><th></th></tr></thead>
+    <tbody>${lista.map((p) => `<tr class="${p.id === editPag ? 'table-primary' : ''}"><td>${dBR(p.data_pgto)}</td><td class="text-end">${numf(p.valor_moeda)}</td><td class="text-end">${brl(p.valor_reais)}</td><td>${p.contrato_id && ct[p.contrato_id] ? 'Nº ' + esc(ct[p.contrato_id].num_contrato) : '-'}</td><td>${esc(p.forma || '-')}</td><td>${esc(p.obs || '-')}</td>
       <td class="text-end" style="white-space:nowrap"><button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="editarPag(${p.id})">Editar</button>
         <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="excluirPag(${p.id})">Excluir</button></td></tr>`).join('')}</tbody></table>`
 }
@@ -230,7 +249,7 @@ function renderListaPag(lista, mapaCt) {
 window.editarPag = function (id) { editPag = id; abrirPagamentosInner(window._impAtual) }
 
 async function salvarPagamento() {
-  const dados = { importacao_id: window._impAtual, data_pgto: $('p-data').value, valor_reais: $('p-valor').value, forma: $('p-forma').value, obs: $('p-obs').value, contrato_id: $('p-contrato_id').value || null }
+  const dados = { importacao_id: window._impAtual, data_pgto: $('p-data').value, valor_reais: $('p-valor').value, valor_moeda: $('p-valor-usd').value, forma: $('p-forma').value, obs: $('p-obs').value, contrato_id: $('p-contrato_id').value || null }
   if (!(parseFloat(dados.valor_reais) >= 0)) { alert('Informe o valor.'); return }
   const r = editPag ? await api.fin.editarPagamento(editPag, dados) : await api.fin.criarPagamento(dados)
   if (r?.erro) { alert(r.erro); return }

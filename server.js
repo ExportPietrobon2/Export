@@ -1344,6 +1344,18 @@ async function migrarFinanceiro() {
       await pool.query('ALTER TABLE fin_pagamentos ADD COLUMN contrato_id INT NULL')
       console.log('fin_pagamentos.contrato_id adicionado.')
     }
+    // Backfill (1x): estima o valor em USD dos pagamentos antigos lançados só em R$,
+    // dividindo o R$ pago pela taxa da invoice. Guardado por flag para não repetir.
+    const [[flag]] = await pool.query("SELECT chave FROM notif_log WHERE chave = 'backfill_pag_usd'")
+    if (!flag) {
+      await pool.query('CREATE TABLE IF NOT EXISTS notif_log (chave VARCHAR(60) PRIMARY KEY, ultima_data DATE)')
+      const [r] = await pool.query(`
+        UPDATE fin_pagamentos p JOIN fin_importacoes i ON i.id = p.importacao_id
+        SET p.valor_moeda = ROUND(p.valor_reais / i.taxa_cambio, 2)
+        WHERE (p.valor_moeda IS NULL OR p.valor_moeda = 0) AND i.taxa_cambio > 0 AND p.valor_reais > 0`)
+      await pool.query("INSERT INTO notif_log (chave, ultima_data) VALUES ('backfill_pag_usd', CURDATE()) ON DUPLICATE KEY UPDATE ultima_data = CURDATE()")
+      console.log('Backfill USD dos pagamentos:', r.affectedRows, 'linhas.')
+    }
   } catch (e) { console.error('Erro migração financeiro:', e.message) }
 }
 setTimeout(migrarFinanceiro, 7000)
@@ -1356,11 +1368,16 @@ function _escEmail(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;')
 
 async function montarCorpoResumoImport() {
   const imps = await importacoesComputadas()
-  // valores em moeda (USD): pago = valor - saldo_moeda
+  // valores em moeda (USD). Se o pagamento não foi lançado em USD, estima
+  // o pago em USD pelo R$ pago dividido pela taxa da invoice.
   imps.forEach((i) => {
     i._vm = Number(i.valor_moeda) || 0
-    i._sm = Number(i.saldo_moeda) || 0
-    i._pm = i._vm - i._sm
+    const smRegistrado = Number(i.saldo_moeda) || 0
+    const pmRegistrado = i._vm - smRegistrado
+    const taxa = Number(i.taxa_cambio) || 0
+    i._pm = pmRegistrado > 0.01 ? pmRegistrado : (taxa > 0 ? (i.pago / taxa) : 0)
+    if (i._pm > i._vm) i._pm = i._vm
+    i._sm = i._vm - i._pm
   })
   const totImp = imps.reduce((s, i) => s + (Number(i.valor_reais) || 0), 0)
   const totPago = imps.reduce((s, i) => s + i.pago, 0)
@@ -1414,7 +1431,8 @@ async function montarCorpoResumoImport() {
       <td style="padding:7px 8px;text-align:right">${_num2(totImpM)}</td><td style="padding:7px 8px;text-align:right">${_num2(totPagoM)}</td><td style="padding:7px 8px;text-align:right">${_num2(totImpM - totPagoM)}</td>
       <td style="padding:7px 8px;text-align:right">${_brl(totImp)}</td><td style="padding:7px 8px;text-align:right">${_brl(totPago)}</td><td style="padding:7px 8px;text-align:right">${_brl(totImp - totPago)}</td>
     </tr></tfoot>
-  </table>`
+  </table>
+  <p style="color:#8a6a6a;font-size:.72rem;margin:10px 0 0">Pago/Saldo em USD estimado pela taxa da invoice quando o pagamento foi lançado em R$.</p>`
 }
 
 async function enviarResumoSemanalImportacao(forcar = false) {
