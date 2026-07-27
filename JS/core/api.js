@@ -116,6 +116,7 @@ export const api = {
  fin: {
  resumo: () => requisitar('GET', '/api/fin/resumo'),
  ptax: (data) => requisitar('GET', `/api/fin/ptax?data=${data}`),
+ enviarResumoSemanal: () => requisitar('POST', '/api/fin/resumo-semanal/enviar'),
  fornecedores: () => requisitar('GET', '/api/fin/fornecedores'),
  criarFornecedor: (dados) => requisitar('POST', '/api/fin/fornecedores', dados),
  editarFornecedor: (id, dados) => requisitar('PATCH', `/api/fin/fornecedores/${id}`, dados),

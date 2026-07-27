@@ -56,6 +56,7 @@ function render() {
 function renderPainel() {
   const c = resumo.contagem
   $('area-fin').innerHTML = `
+    <div class="d-flex justify-content-end mb-2"><button class="btn btn-sm btn-outline-primary" id="btn-resumo-semanal">Enviar Resumo Semanal agora</button></div>
     <div class="row g-3 mb-3">
       <div class="col-6 col-md-3"><div class="card"><div class="card-body text-center py-3"><div class="small text-muted">Total Importado</div><div class="fw-bold fs-5">${brl(resumo.totalImportado)}</div></div></div></div>
       <div class="col-6 col-md-3"><div class="card"><div class="card-body text-center py-3"><div class="small text-muted">Total Pago</div><div class="fw-bold fs-5 text-success">${brl(resumo.totalPago)}</div></div></div></div>
@@ -71,6 +72,12 @@ function renderPainel() {
           <tr class="fw-bold" style="background:#f8fafc"><td>TOTAL</td><td class="text-end">${brl(resumo.totalImportado)}</td><td class="text-end">${brl(resumo.totalPago)}</td><td class="text-end">${brl(resumo.saldoDevedor)}</td></tr>
         </tbody></table></div>
     </div></div>`
+  $('btn-resumo-semanal').addEventListener('click', async (e) => {
+    e.target.disabled = true; e.target.textContent = 'Enviando...'
+    const r = await api.fin.enviarResumoSemanal()
+    e.target.disabled = false; e.target.textContent = 'Enviar Resumo Semanal agora'
+    alert(r?.erro ? r.erro : 'Resumo enviado por e-mail.')
+  })
 }
 
 // ---------- IMPORTAÇÕES ----------
@@ -166,6 +173,11 @@ async function abrirPagamentosInner(id) {
   window._impAtual = id
   const pags = await api.fin.pagamentos(id)
   const lista = Array.isArray(pags) ? pags : []
+  const cts = await api.fin.contratos(id)
+  window._contratosImp = Array.isArray(cts) ? cts : []
+  const mapaCt = {}
+  window._contratosImp.forEach((c) => { mapaCt[c.id] = c })
+  const optCt = window._contratosImp.map((c) => `<option value="${c.id}">Nº ${esc(c.num_contrato)} · ${brl(c.valor_reais)}${c.liquidado ? '' : ' (não liq.)'}</option>`).join('')
   const ep = editPag ? lista.find((p) => p.id === editPag) : null
   $('modal-fin-body').innerHTML = `
     <h5 class="mb-1">${esc(imp.invoice)} — ${esc(imp.fornecedor_nome || '')}</h5>
@@ -174,8 +186,9 @@ async function abrirPagamentosInner(id) {
       ${ep ? '<div class="col-12"><span class="badge bg-primary">Editando pagamento</span></div>' : ''}
       <div class="col-6 col-md-3"><label class="form-label small mb-0">Data</label><input type="date" id="p-data" class="form-control form-control-sm"></div>
       <div class="col-6 col-md-3"><label class="form-label small mb-0">Valor pago (R$)</label><input type="number" step="any" id="p-valor" class="form-control form-control-sm"></div>
+      <div class="col-6 col-md-3"><label class="form-label small mb-0">Contrato de câmbio</label><select id="p-contrato_id" class="form-select form-select-sm"><option value="">— nenhum —</option>${optCt}</select><div id="p-ct-nota" class="small text-muted mt-1"></div></div>
       <div class="col-6 col-md-3"><label class="form-label small mb-0">Forma</label><input id="p-forma" class="form-control form-control-sm" value="Câmbio Antecipado"></div>
-      <div class="col-6 col-md-3"><label class="form-label small mb-0">Observação</label><input id="p-obs" class="form-control form-control-sm"></div>
+      <div class="col-12"><label class="form-label small mb-0">Observação</label><input id="p-obs" class="form-control form-control-sm"></div>
     </div>
     <button class="btn btn-ok-grande" id="p-salvar">${ep ? 'Salvar alterações' : 'Registrar pagamento'}</button>
     ${ep ? '<button class="btn btn-outline-secondary ms-2" id="p-cancel">Cancelar</button>' : ''}
@@ -186,20 +199,30 @@ async function abrirPagamentosInner(id) {
     $('p-valor').value = ep.valor_reais ?? ''
     $('p-forma').value = ep.forma || ''
     $('p-obs').value = ep.obs || ''
+    $('p-contrato_id').value = ep.contrato_id || ''
     $('p-cancel').addEventListener('click', () => { editPag = null; abrirPagamentosInner(id) })
   } else {
     $('p-data').value = new Date().toISOString().slice(0, 10)
   }
-  renderListaPag(lista)
+  // Sugere o contrato de câmbio cujo valor bate com o valor pago
+  $('p-valor').addEventListener('input', () => {
+    if ($('p-contrato_id').value) return
+    const v = parseFloat($('p-valor').value)
+    if (!(v > 0)) { $('p-ct-nota').textContent = ''; return }
+    const match = window._contratosImp.find((c) => Math.abs((Number(c.valor_reais) || 0) - v) < 0.01)
+    if (match) { $('p-contrato_id').value = match.id; $('p-ct-nota').textContent = `Vinculado ao contrato Nº ${match.num_contrato} (valor bate).` }
+  })
+  renderListaPag(lista, mapaCt)
   $('p-salvar').addEventListener('click', salvarPagamento)
   window._modalFin.show()
 }
 
-function renderListaPag(lista) {
+function renderListaPag(lista, mapaCt) {
   const el = $('p-lista')
   if (!lista.length) { el.innerHTML = '<p class="text-muted fst-italic mb-0">Nenhum pagamento registrado.</p>'; return }
-  el.innerHTML = `<table class="table table-sm mb-0" style="font-size:.85rem"><thead><tr><th>Data</th><th class="text-end">Valor R$</th><th>Forma</th><th>Obs.</th><th></th></tr></thead>
-    <tbody>${lista.map((p) => `<tr class="${p.id === editPag ? 'table-primary' : ''}"><td>${dBR(p.data_pgto)}</td><td class="text-end">${brl(p.valor_reais)}</td><td>${esc(p.forma || '-')}</td><td>${esc(p.obs || '-')}</td>
+  const ct = mapaCt || {}
+  el.innerHTML = `<table class="table table-sm mb-0" style="font-size:.85rem"><thead><tr><th>Data</th><th class="text-end">Valor R$</th><th>Contrato</th><th>Forma</th><th>Obs.</th><th></th></tr></thead>
+    <tbody>${lista.map((p) => `<tr class="${p.id === editPag ? 'table-primary' : ''}"><td>${dBR(p.data_pgto)}</td><td class="text-end">${brl(p.valor_reais)}</td><td>${p.contrato_id && ct[p.contrato_id] ? 'Nº ' + esc(ct[p.contrato_id].num_contrato) : '-'}</td><td>${esc(p.forma || '-')}</td><td>${esc(p.obs || '-')}</td>
       <td class="text-end" style="white-space:nowrap"><button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="editarPag(${p.id})">Editar</button>
         <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="excluirPag(${p.id})">Excluir</button></td></tr>`).join('')}</tbody></table>`
 }
@@ -207,7 +230,7 @@ function renderListaPag(lista) {
 window.editarPag = function (id) { editPag = id; abrirPagamentosInner(window._impAtual) }
 
 async function salvarPagamento() {
-  const dados = { importacao_id: window._impAtual, data_pgto: $('p-data').value, valor_reais: $('p-valor').value, forma: $('p-forma').value, obs: $('p-obs').value }
+  const dados = { importacao_id: window._impAtual, data_pgto: $('p-data').value, valor_reais: $('p-valor').value, forma: $('p-forma').value, obs: $('p-obs').value, contrato_id: $('p-contrato_id').value || null }
   if (!(parseFloat(dados.valor_reais) >= 0)) { alert('Informe o valor.'); return }
   const r = editPag ? await api.fin.editarPagamento(editPag, dados) : await api.fin.criarPagamento(dados)
   if (r?.erro) { alert(r.erro); return }

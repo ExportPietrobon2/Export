@@ -82,6 +82,31 @@ async function enviarEmail(assunto, corpo, papeis) {
  }
 }
 
+// Envia para uma lista específica de e-mails (respeitando o modo teste).
+async function enviarEmailPara(assunto, corpo, emails) {
+ try {
+ if (!BREVO_API_KEY) return
+ const destinatarios = MODO_TESTE ? [EMAIL_TESTE] : (emails || []).filter(Boolean)
+ if (!destinatarios.length) return
+ const html = `
+ <div style="font-family:'Segoe UI',sans-serif;max-width:640px;margin:0 auto;"><div style="background:linear-gradient(120deg,#ED3237,#C6242A);padding:24px 28px;border-radius:12px 12px 0 0;"><p style="color:#fff;font-size:1.2rem;font-weight:800;margin:0;">Pietrobon · Insumos</p></div><div style="background:#fff;padding:28px;border:1px solid #f0d0d0;border-top:none;border-radius:0 0 12px 12px;">
+ ${corpo}
+ <hr style="border:none;border-top:1px solid #f0d0d0;margin:24px 0;"><p style="font-size:0.78rem;color:#8a6a6a;margin:0;">Pietrobon & Cia Ltda · Controle de Insumos Exportação<br>
+ ${MODO_TESTE ? '<strong style="color:#ED3237">Modo teste — enviado apenas para ' + EMAIL_TESTE + '</strong>' : ''}</p></div></div>`
+ const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+ method: 'POST',
+ headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', 'accept': 'application/json' },
+ body: JSON.stringify({
+ sender: { email: EMAIL_REMETENTE, name: 'Pietrobon · Insumos' },
+ to: destinatarios.map((email) => ({ email })),
+ subject: assunto,
+ htmlContent: html
+ })
+ })
+ if (!resp.ok) { const txt = await resp.text(); console.error('Erro Brevo:', resp.status, txt) } else { console.log('Email enviado:', assunto) }
+ } catch (e) { console.error('Erro ao enviar email:', e.message) }
+}
+
 const pool = mysql.createPool({
  host: process.env.MYSQLHOST,
  port: process.env.MYSQLPORT,
@@ -1311,6 +1336,89 @@ async function importacoesComputadas() {
   })
 }
 
+// Migração: garante a coluna contrato_id em fin_pagamentos (vínculo com câmbio)
+async function migrarFinanceiro() {
+  try {
+    const [cols] = await pool.query("SHOW COLUMNS FROM fin_pagamentos LIKE 'contrato_id'")
+    if (!cols.length) {
+      await pool.query('ALTER TABLE fin_pagamentos ADD COLUMN contrato_id INT NULL')
+      console.log('fin_pagamentos.contrato_id adicionado.')
+    }
+  } catch (e) { console.error('Erro migração financeiro:', e.message) }
+}
+setTimeout(migrarFinanceiro, 7000)
+
+// ---- Resumo Semanal de Importação (e-mail) ----
+const EMAILS_RESUMO_IMPORT = ['joaoantonio@pietrobon.com.br', 'export2@pietrobon.com.br']
+function _brl(n) { return 'R$ ' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+function _escEmail(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
+
+async function montarCorpoResumoImport() {
+  const imps = await importacoesComputadas()
+  const totImp = imps.reduce((s, i) => s + (Number(i.valor_reais) || 0), 0)
+  const totPago = imps.reduce((s, i) => s + i.pago, 0)
+  const grupos = {}
+  imps.forEach((i) => {
+    const k = i.fornecedor_nome || '—'
+    if (!grupos[k]) grupos[k] = []
+    grupos[k].push(i)
+  })
+  const corStatus = { PAGO: '#1a7f37', PARCIAL: '#b7791f', DEVENDO: '#c0392b' }
+  const nomes = Object.keys(grupos).sort((a, b) => a.localeCompare(b))
+  let linhas = ''
+  for (const forn of nomes) {
+    const lista = grupos[forn]
+    const sImp = lista.reduce((s, i) => s + (Number(i.valor_reais) || 0), 0)
+    const sPago = lista.reduce((s, i) => s + i.pago, 0)
+    const sSaldo = sImp - sPago
+    linhas += `<tr style="background:#1f2d50;color:#fff"><td colspan="5" style="padding:6px 8px;font-weight:bold">${_escEmail(forn)}</td></tr>`
+    lista.forEach((i) => {
+      linhas += `<tr style="border-bottom:1px solid #e5e7eb">
+        <td style="padding:5px 8px">${_escEmail(i.invoice || '-')}</td>
+        <td style="padding:5px 8px">${_escEmail(i.mercadoria || '-')}</td>
+        <td style="padding:5px 8px;text-align:right">${_brl(i.valor_reais)}</td>
+        <td style="padding:5px 8px;text-align:right">${_brl(i.pago)}</td>
+        <td style="padding:5px 8px;text-align:right;color:${i.saldo > 0.01 ? '#c0392b' : '#1a7f37'}">${_brl(i.saldo)} <span style="color:${corStatus[i.status] || '#555'};font-size:.72rem">(${i.status})</span></td>
+      </tr>`
+    })
+    linhas += `<tr style="background:#eef1f5;font-weight:bold"><td colspan="2" style="padding:5px 8px;text-align:right">Subtotal ${_escEmail(forn)}</td>
+      <td style="padding:5px 8px;text-align:right">${_brl(sImp)}</td><td style="padding:5px 8px;text-align:right">${_brl(sPago)}</td><td style="padding:5px 8px;text-align:right">${_brl(sSaldo)}</td></tr>`
+  }
+  return `
+  <h2 style="color:#1f2d50;margin:0 0 4px">Resumo Semanal de Importação</h2>
+  <p style="color:#555;margin:0 0 16px">${new Date().toLocaleDateString('pt-BR')} · ${imps.length} importações</p>
+  <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+    <thead><tr style="background:#c0392b;color:#fff">
+      <th style="padding:6px 8px;text-align:left">Invoice</th><th style="padding:6px 8px;text-align:left">Mercadoria</th>
+      <th style="padding:6px 8px;text-align:right">Valor R$</th><th style="padding:6px 8px;text-align:right">Pago R$</th><th style="padding:6px 8px;text-align:right">Saldo R$</th>
+    </tr></thead>
+    <tbody>${linhas}</tbody>
+    <tfoot><tr style="background:#1f2d50;color:#fff;font-weight:bold">
+      <td colspan="2" style="padding:7px 8px;text-align:right">TOTAL GERAL</td>
+      <td style="padding:7px 8px;text-align:right">${_brl(totImp)}</td><td style="padding:7px 8px;text-align:right">${_brl(totPago)}</td><td style="padding:7px 8px;text-align:right">${_brl(totImp - totPago)}</td>
+    </tr></tfoot>
+  </table>`
+}
+
+async function enviarResumoSemanalImportacao(forcar = false) {
+  try {
+    if (!forcar) {
+      if (new Date().getDay() !== 1) return // envia às segundas-feiras
+      if (!(await podeEnviarHoje('resumo_semanal_import'))) return
+    }
+    const corpo = await montarCorpoResumoImport()
+    await enviarEmailPara('Resumo Semanal de Importação', corpo, EMAILS_RESUMO_IMPORT)
+  } catch (e) { console.error('Erro resumo semanal import:', e.message) }
+}
+setTimeout(() => enviarResumoSemanalImportacao(false), 200 * 1000)
+setInterval(() => enviarResumoSemanalImportacao(false), 24 * 60 * 60 * 1000)
+
+// Envio manual (para testar): dispara o resumo na hora
+app.post('/api/fin/resumo-semanal/enviar', autenticarContabil(), async (req, res) => {
+  await enviarResumoSemanalImportacao(true)
+  res.json({ ok: true })
+})
+
 // Painel + lista
 app.get('/api/fin/resumo', autenticarContabil(), async (req, res) => {
   const imps = await importacoesComputadas()
@@ -1425,12 +1533,12 @@ app.get('/api/fin/pagamentos', autenticarContabil(), async (req, res) => {
 app.post('/api/fin/pagamentos', autenticarContabil(), async (req, res) => {
   const b = req.body
   if (!b.importacao_id || !(parseFloat(b.valor_reais) >= 0)) return res.status(400).json({ erro: 'Dados inválidos.' })
-  await pool.query('INSERT INTO fin_pagamentos (importacao_id, data_pgto, valor_reais, valor_moeda, forma, obs) VALUES (?,?,?,?,?,?)',
-    [b.importacao_id, b.data_pgto || null, parseFloat(b.valor_reais) || 0, parseFloat(b.valor_moeda) || 0, b.forma || null, b.obs || null])
+  await pool.query('INSERT INTO fin_pagamentos (importacao_id, data_pgto, valor_reais, valor_moeda, forma, obs, contrato_id) VALUES (?,?,?,?,?,?,?)',
+    [b.importacao_id, b.data_pgto || null, parseFloat(b.valor_reais) || 0, parseFloat(b.valor_moeda) || 0, b.forma || null, b.obs || null, b.contrato_id || null])
   res.json({ ok: true })
 })
 app.patch('/api/fin/pagamentos/:id', autenticarContabil(), async (req, res) => {
-  const campos = ['data_pgto', 'valor_reais', 'valor_moeda', 'forma', 'obs']
+  const campos = ['data_pgto', 'valor_reais', 'valor_moeda', 'forma', 'obs', 'contrato_id']
   const sets = [], vals = []
   for (const c of campos) { if (c in req.body) { let v = req.body[c]; if (v === '') v = null; if (c === 'valor_reais' || c === 'valor_moeda') v = parseFloat(v) || 0; sets.push(`${c} = ?`); vals.push(v) } }
   if (!sets.length) return res.json({ ok: true })
