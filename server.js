@@ -1351,12 +1351,21 @@ setTimeout(migrarFinanceiro, 7000)
 // ---- Resumo Semanal de Importação (e-mail) ----
 const EMAILS_RESUMO_IMPORT = ['joaoantonio@pietrobon.com.br', 'export2@pietrobon.com.br']
 function _brl(n) { return 'R$ ' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+function _num2(n) { return (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function _escEmail(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
 
 async function montarCorpoResumoImport() {
   const imps = await importacoesComputadas()
+  // valores em moeda (USD): pago = valor - saldo_moeda
+  imps.forEach((i) => {
+    i._vm = Number(i.valor_moeda) || 0
+    i._sm = Number(i.saldo_moeda) || 0
+    i._pm = i._vm - i._sm
+  })
   const totImp = imps.reduce((s, i) => s + (Number(i.valor_reais) || 0), 0)
   const totPago = imps.reduce((s, i) => s + i.pago, 0)
+  const totImpM = imps.reduce((s, i) => s + i._vm, 0)
+  const totPagoM = imps.reduce((s, i) => s + i._pm, 0)
   const grupos = {}
   imps.forEach((i) => {
     const k = i.fornecedor_nome || '—'
@@ -1370,31 +1379,39 @@ async function montarCorpoResumoImport() {
     const lista = grupos[forn]
     const sImp = lista.reduce((s, i) => s + (Number(i.valor_reais) || 0), 0)
     const sPago = lista.reduce((s, i) => s + i.pago, 0)
-    const sSaldo = sImp - sPago
-    linhas += `<tr style="background:#1f2d50;color:#fff"><td colspan="5" style="padding:6px 8px;font-weight:bold">${_escEmail(forn)}</td></tr>`
+    const sImpM = lista.reduce((s, i) => s + i._vm, 0)
+    const sPagoM = lista.reduce((s, i) => s + i._pm, 0)
+    linhas += `<tr style="background:#1f2d50;color:#fff"><td colspan="8" style="padding:6px 8px;font-weight:bold">${_escEmail(forn)}</td></tr>`
     lista.forEach((i) => {
+      const moeda = _escEmail(i.moeda || 'USD')
       linhas += `<tr style="border-bottom:1px solid #e5e7eb">
         <td style="padding:5px 8px">${_escEmail(i.invoice || '-')}</td>
         <td style="padding:5px 8px">${_escEmail(i.mercadoria || '-')}</td>
+        <td style="padding:5px 8px;text-align:right">${moeda} ${_num2(i._vm)}</td>
+        <td style="padding:5px 8px;text-align:right">${moeda} ${_num2(i._pm)}</td>
+        <td style="padding:5px 8px;text-align:right;color:${i._sm > 0.01 ? '#c0392b' : '#1a7f37'}">${moeda} ${_num2(i._sm)}</td>
         <td style="padding:5px 8px;text-align:right">${_brl(i.valor_reais)}</td>
         <td style="padding:5px 8px;text-align:right">${_brl(i.pago)}</td>
         <td style="padding:5px 8px;text-align:right;color:${i.saldo > 0.01 ? '#c0392b' : '#1a7f37'}">${_brl(i.saldo)} <span style="color:${corStatus[i.status] || '#555'};font-size:.72rem">(${i.status})</span></td>
       </tr>`
     })
     linhas += `<tr style="background:#eef1f5;font-weight:bold"><td colspan="2" style="padding:5px 8px;text-align:right">Subtotal ${_escEmail(forn)}</td>
-      <td style="padding:5px 8px;text-align:right">${_brl(sImp)}</td><td style="padding:5px 8px;text-align:right">${_brl(sPago)}</td><td style="padding:5px 8px;text-align:right">${_brl(sSaldo)}</td></tr>`
+      <td style="padding:5px 8px;text-align:right">${_num2(sImpM)}</td><td style="padding:5px 8px;text-align:right">${_num2(sPagoM)}</td><td style="padding:5px 8px;text-align:right">${_num2(sImpM - sPagoM)}</td>
+      <td style="padding:5px 8px;text-align:right">${_brl(sImp)}</td><td style="padding:5px 8px;text-align:right">${_brl(sPago)}</td><td style="padding:5px 8px;text-align:right">${_brl(sImp - sPago)}</td></tr>`
   }
   return `
   <h2 style="color:#1f2d50;margin:0 0 4px">Resumo Semanal de Importação</h2>
   <p style="color:#555;margin:0 0 16px">${new Date().toLocaleDateString('pt-BR')} · ${imps.length} importações</p>
-  <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+  <table style="width:100%;border-collapse:collapse;font-size:.8rem">
     <thead><tr style="background:#c0392b;color:#fff">
       <th style="padding:6px 8px;text-align:left">Invoice</th><th style="padding:6px 8px;text-align:left">Mercadoria</th>
+      <th style="padding:6px 8px;text-align:right">Valor USD</th><th style="padding:6px 8px;text-align:right">Pago USD</th><th style="padding:6px 8px;text-align:right">Saldo USD</th>
       <th style="padding:6px 8px;text-align:right">Valor R$</th><th style="padding:6px 8px;text-align:right">Pago R$</th><th style="padding:6px 8px;text-align:right">Saldo R$</th>
     </tr></thead>
     <tbody>${linhas}</tbody>
     <tfoot><tr style="background:#1f2d50;color:#fff;font-weight:bold">
       <td colspan="2" style="padding:7px 8px;text-align:right">TOTAL GERAL</td>
+      <td style="padding:7px 8px;text-align:right">${_num2(totImpM)}</td><td style="padding:7px 8px;text-align:right">${_num2(totPagoM)}</td><td style="padding:7px 8px;text-align:right">${_num2(totImpM - totPagoM)}</td>
       <td style="padding:7px 8px;text-align:right">${_brl(totImp)}</td><td style="padding:7px 8px;text-align:right">${_brl(totPago)}</td><td style="padding:7px 8px;text-align:right">${_brl(totImp - totPago)}</td>
     </tr></tfoot>
   </table>`
