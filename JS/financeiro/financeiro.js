@@ -437,11 +437,11 @@ async function carregarCusto(impId) {
   const imp = resumo.importacoes.find((x) => String(x.id) === String(impId))
   const d = await api.fin.custo(impId)
   if (d && !d.erro) {
-    custoCab = { nfe: d.nfe || '', materia_prima: d.materia_prima ?? '', imposto_importacao: d.imposto_importacao ?? '', ipi: d.ipi ?? '', pis: d.pis ?? '', cofins: d.cofins ?? '', icms: d.icms ?? '', quantidade_kg: d.quantidade_kg ?? '', obs: d.obs || '' }
+    custoCab = { nfe: d.nfe || '', materia_prima: d.materia_prima ?? '', imposto_importacao: d.imposto_importacao ?? '', ipi: d.ipi ?? '', pis: d.pis ?? '', cofins: d.cofins ?? '', icms: d.icms ?? '', quantidade_kg: d.quantidade_kg ?? '', unidade: d.unidade || 'KG', obs: d.obs || '' }
     custoDespesas = (d.despesas || []).map((x) => ({ nome: x.nome || '', valor: x.valor ?? '' }))
     custoSt = (d.st || []).map((x) => ({ produto: x.produto || '', ncm: x.ncm || '', base_icms: x.base_icms ?? '', icms_proprio: x.icms_proprio ?? '', aliquota: x.aliquota ?? '', ipi_destacado: x.ipi_destacado ?? '', mva: x.mva ?? '' }))
   } else {
-    custoCab = { nfe: imp?.invoice || '', materia_prima: imp?.valor_reais ?? '', imposto_importacao: '', ipi: '', pis: '', cofins: '', icms: '', quantidade_kg: '', obs: '' }
+    custoCab = { nfe: imp?.invoice || '', materia_prima: imp?.valor_reais ?? '', imposto_importacao: '', ipi: '', pis: '', cofins: '', icms: '', quantidade_kg: '', unidade: 'KG', obs: '' }
     custoDespesas = []
     custoSt = []
   }
@@ -478,8 +478,9 @@ function renderCustos() {
       <div class="row g-2 align-items-end mb-2">
         <div class="col-12 col-md-6"><label class="form-label small mb-0">Importação</label>
           <select class="form-select form-select-sm" onchange="custoSelImp(this.value)"><option value="">— selecione —</option>${optImp}</select></div>
-        <div class="col-6 col-md-3"><label class="form-label small mb-0">NF-e</label><input class="form-control form-control-sm" value="${esc(custoCab.nfe || '')}" oninput="custoCabInput('nfe',this.value)"></div>
-        <div class="col-6 col-md-3"><label class="form-label small mb-0">Quantidade (kg)</label><input type="number" step="any" class="form-control form-control-sm" value="${custoCab.quantidade_kg ?? ''}" oninput="custoCabInput('quantidade_kg',this.value)"></div>
+        <div class="col-6 col-md-2"><label class="form-label small mb-0">NF-e</label><input class="form-control form-control-sm" value="${esc(custoCab.nfe || '')}" oninput="custoCabInput('nfe',this.value)"></div>
+        <div class="col-6 col-md-2"><label class="form-label small mb-0">Quantidade</label><input type="number" step="any" class="form-control form-control-sm" value="${custoCab.quantidade_kg ?? ''}" oninput="custoCabInput('quantidade_kg',this.value)"></div>
+        <div class="col-6 col-md-2"><label class="form-label small mb-0">Unidade</label><select class="form-select form-select-sm" onchange="custoCabInput('unidade',this.value)"><option value="KG" ${(custoCab.unidade || 'KG') === 'KG' ? 'selected' : ''}>KG</option><option value="UN" ${custoCab.unidade === 'UN' ? 'selected' : ''}>UN</option></select></div>
       </div>
       <h6 class="secao-titulo-card mt-2 mb-2">Custos e impostos (R$)</h6>
       <div class="row g-2">
@@ -507,6 +508,7 @@ function renderCustos() {
     <div class="card"><div class="card-body">
       <div id="c-resumo"></div>
       <button class="btn btn-ok-grande mt-3" onclick="salvarCusto()">Salvar custos</button>
+      <button class="btn btn-outline-danger mt-3 ms-2" onclick="exportarCustoPDF()">Exportar PDF</button>
     </div></div>`
   atualizarResumoCusto()
 }
@@ -525,7 +527,7 @@ function atualizarResumoCusto() {
     ${linha('(−) Créditos ICMS/IPI/PIS/COFINS', brl(c.credito), 'text-success')}
     ${linha('CUSTO COM CRÉDITO', brl(c.custoCredito), 'fs-6 fw-bold')}
     <hr class="my-2">
-    ${linha('CUSTO POR KG', brl(c.custoKg), 'fs-5 fw-bold text-primary')}`
+    ${linha('CUSTO POR ' + (custoCab.unidade || 'KG'), brl(c.custoKg), 'fs-5 fw-bold text-primary')}`
 }
 
 window.custoSelImp = (v) => carregarCusto(v)
@@ -542,6 +544,96 @@ window.salvarCusto = async () => {
   const r = await api.fin.salvarCusto(custoImpSel, dados)
   if (r?.erro) { alert(r.erro); return }
   alert('Custos salvos.')
+}
+
+// ---- PDF do custo de importação ----
+function carregarScriptFin(src) {
+  return new Promise((resolve, reject) => {
+    if ([...document.scripts].some((s) => s.src === src)) return resolve()
+    const s = document.createElement('script'); s.src = src
+    s.onload = () => resolve(); s.onerror = () => reject(new Error('Falha ao carregar ' + src))
+    document.head.appendChild(s)
+  })
+}
+async function garantirLibsPdf() {
+  if (!window.html2canvas) await carregarScriptFin('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js')
+  if (!window.jspdf) await carregarScriptFin('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+}
+async function gerarPdfDeHtml(html, nomeArquivo) {
+  await garantirLibsPdf()
+  const cont = document.createElement('div')
+  cont.style.cssText = 'position:fixed;left:-10000px;top:0;width:780px;background:#fff;padding:24px'
+  cont.innerHTML = html
+  document.body.appendChild(cont)
+  try {
+    const canvas = await html2canvas(cont, { scale: 2, backgroundColor: '#ffffff', useCORS: true })
+    const { jsPDF } = window.jspdf
+    const pdf = new jsPDF('p', 'mm', 'a4')
+    const pageW = 210, pageH = 297
+    const imgW = pageW, imgH = canvas.height * imgW / canvas.width
+    let heightLeft = imgH, position = 0
+    const img = canvas.toDataURL('image/jpeg', 0.92)
+    pdf.addImage(img, 'JPEG', 0, position, imgW, imgH); heightLeft -= pageH
+    while (heightLeft > 0) { position -= pageH; pdf.addPage(); pdf.addImage(img, 'JPEG', 0, position, imgW, imgH); heightLeft -= pageH }
+    pdf.save(nomeArquivo)
+  } catch (e) { alert('Erro ao gerar PDF: ' + e.message) } finally { document.body.removeChild(cont) }
+}
+
+window.exportarCustoPDF = async () => {
+  if (!custoImpSel) { alert('Selecione uma importação.'); return }
+  const imp = resumo.importacoes.find((x) => String(x.id) === String(custoImpSel))
+  const c = calcCusto()
+  const un = custoCab.unidade || 'KG'
+  const NAVY = '#1f2d50', BORD = '#d5dae2', LBL = '#eef1f5'
+  const pct = (v) => c.total > 0 ? (v / c.total * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%' : '-'
+  const th = `background:${NAVY};color:#fff;font-weight:bold;font-size:11px;padding:6px 10px`
+  const tdL = `border:1px solid ${BORD};padding:5px 10px;font-size:11px`
+  const tdR = `border:1px solid ${BORD};padding:5px 10px;font-size:11px;text-align:right`
+  const g = (k) => parseFloat(custoCab[k]) || 0
+  const linImp = (l, v) => `<tr><td style="${tdL}">${esc(l)}</td><td style="${tdR}">${brl(v)}</td><td style="${tdR}">${pct(v)}</td></tr>`
+  const despRows = custoDespesas.filter((d) => (d.nome || '') || (parseFloat(d.valor) || 0)).map((d) => `<tr><td style="${tdL}">${esc(d.nome || '-')}</td><td style="${tdR}">${brl(d.valor)}</td></tr>`).join('') || `<tr><td style="${tdL}" colspan="2">—</td></tr>`
+  const stRows = custoSt.filter((s) => (s.produto || '') || (parseFloat(s.base_icms) || 0)).map((s) => `<tr>
+    <td style="${tdL}">${esc(s.produto || '-')}</td><td style="${tdL}">${esc(s.ncm || '-')}</td>
+    <td style="${tdR}">${brl(s.base_icms)}</td><td style="${tdR}">${brl(s.icms_proprio)}</td>
+    <td style="${tdR}">${numf(s.aliquota, 4)}</td><td style="${tdR}">${brl(s.ipi_destacado)}</td><td style="${tdR}">${numf(s.mva, 4)}</td>
+    <td style="${tdR};font-weight:bold">${brl(stRecolher(s))}</td></tr>`).join('')
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#1a1a1a">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid ${NAVY};padding-bottom:8px;margin-bottom:12px">
+      <div><div style="font-weight:bold;font-size:14px">CUSTO DE IMPORTAÇÃO</div>
+        <div style="font-size:11px;color:#333">Invoice ${esc(imp?.invoice || '')} · ${esc(imp?.fornecedor_nome || '')}</div>
+        <div style="font-size:11px;color:#333">NF-e: ${esc(custoCab.nfe || '-')} · Qtd: ${esc(custoCab.quantidade_kg || '-')} ${esc(un)}</div>
+      </div>
+      <div style="font-weight:bold;font-size:15px;color:#c0392b">Pietrobon</div>
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;margin-bottom:14px">
+      <thead><tr><th style="${th};text-align:left">Custos e impostos</th><th style="${th};text-align:right">Valor R$</th><th style="${th};text-align:right">%</th></tr></thead>
+      <tbody>
+        ${linImp('Matéria-prima', g('materia_prima'))}${linImp('Imposto Importação', g('imposto_importacao'))}${linImp('ST Custo', c.stCusto)}
+        ${linImp('IPI', g('ipi'))}${linImp('PIS', g('pis'))}${linImp('COFINS', g('cofins'))}${linImp('ICMS', g('icms'))}${linImp('Despesas', c.despTotal)}
+        <tr style="background:${LBL};font-weight:bold"><td style="${tdL}">TOTAL PAGO</td><td style="${tdR}">${brl(c.total)}</td><td style="${tdR}">100%</td></tr>
+      </tbody>
+    </table>
+
+    <table style="width:100%;border-collapse:collapse;margin-bottom:14px">
+      <thead><tr><th style="${th};text-align:left">Despesas</th><th style="${th};text-align:right">Valor R$</th></tr></thead>
+      <tbody>${despRows}<tr style="background:${LBL};font-weight:bold"><td style="${tdL}">Total despesas</td><td style="${tdR}">${brl(c.despTotal)}</td></tr></tbody>
+    </table>
+
+    ${stRows ? `<table style="width:100%;border-collapse:collapse;margin-bottom:14px">
+      <thead><tr><th style="${th};text-align:left">ICMS-ST — Produto</th><th style="${th}">NCM</th><th style="${th};text-align:right">Base ICMS</th><th style="${th};text-align:right">ICMS Próprio</th><th style="${th};text-align:right">Alíquota</th><th style="${th};text-align:right">IPI Dest.</th><th style="${th};text-align:right">MVA</th><th style="${th};text-align:right">ST a recolher</th></tr></thead>
+      <tbody>${stRows}<tr style="background:${LBL};font-weight:bold"><td style="${tdL}" colspan="7">ST Custo (total)</td><td style="${tdR}">${brl(c.stCusto)}</td></tr></tbody>
+    </table>` : ''}
+
+    <table style="width:60%;border-collapse:collapse;margin-left:auto">
+      <tr><td style="${tdL}">TOTAL PAGO</td><td style="${tdR}">${brl(c.total)}</td></tr>
+      <tr><td style="${tdL};color:#1a7f37">(−) Créditos ICMS/IPI/PIS/COFINS</td><td style="${tdR};color:#1a7f37">${brl(c.credito)}</td></tr>
+      <tr style="font-weight:bold"><td style="${tdL}">CUSTO COM CRÉDITO</td><td style="${tdR}">${brl(c.custoCredito)}</td></tr>
+      <tr style="background:${NAVY};color:#fff;font-weight:bold"><td style="border:1px solid ${NAVY};padding:7px 10px;font-size:12px">CUSTO POR ${esc(un)}</td><td style="border:1px solid ${NAVY};padding:7px 10px;font-size:12px;text-align:right">${brl(c.custoKg)}</td></tr>
+    </table>
+    <div style="font-size:9.5px;color:#666;margin-top:14px">Emitido em ${new Date().toLocaleDateString('pt-BR')} · Pietrobon &amp; Cia Ltda</div>
+  </div>`
+  gerarPdfDeHtml(html, `Custo_${(imp?.invoice || 'importacao').replace(/\W+/g, '_')}.pdf`)
 }
 
 // ---------- Interface ----------
