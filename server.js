@@ -1334,6 +1334,33 @@ app.get('/api/fin/resumo', autenticarContabil(), async (req, res) => {
   })
 })
 
+// Cotação PTAX do dólar (Banco Central). Se não houver cotação na data
+// (fim de semana/feriado/ainda não publicada), retorna a última disponível.
+const _ptaxCache = {}
+function _fmtBCB(d) { const [y, m, dd] = d.split('-'); return `${m}-${dd}-${y}` }
+app.get('/api/fin/ptax', autenticarContabil(), async (req, res) => {
+  const data = String(req.query.data || '').slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return res.status(400).json({ erro: 'Data inválida.' })
+  if (_ptaxCache[data]) return res.json(_ptaxCache[data])
+  try {
+    const ini = new Date(data + 'T00:00:00'); ini.setDate(ini.getDate() - 12)
+    const iniStr = ini.toISOString().slice(0, 10)
+    const url = `https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)?@dataInicial='${_fmtBCB(iniStr)}'&@dataFinalCotacao='${_fmtBCB(data)}'&$top=100&$orderby=dataHoraCotacao%20desc&$format=json`
+    const resp = await fetch(url)
+    if (!resp.ok) return res.status(502).json({ erro: 'Banco Central indisponível.' })
+    const j = await resp.json()
+    const arr = (j && j.value) || []
+    if (!arr.length) return res.json({ taxa: null, dataCotacao: null, aviso: 'Sem cotação no período.' })
+    const c = arr[0]
+    const out = { taxa: c.cotacaoVenda, dataCotacao: String(c.dataHoraCotacao || '').slice(0, 10) }
+    _ptaxCache[data] = out
+    res.json(out)
+  } catch (e) {
+    console.error('Erro PTAX:', e.message)
+    res.status(502).json({ erro: 'Falha ao consultar PTAX.' })
+  }
+})
+
 // Fornecedores
 app.get('/api/fin/fornecedores', autenticarContabil(), async (req, res) => {
   const [rows] = await pool.query('SELECT * FROM fin_fornecedores ORDER BY nome')

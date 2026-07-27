@@ -20,6 +20,22 @@ const dBR = (v) => { const s = dISO(v); return s ? s.split('-').reverse().join('
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const STATUS_COR = { PAGO: 'bg-success', PARCIAL: 'bg-warning text-dark', DEVENDO: 'bg-danger' }
 
+// Preenche a taxa de câmbio pela PTAX do Banco Central conforme a data informada.
+async function autoPtax(dataId, taxaId, notaId) {
+  const data = $(dataId).value
+  const nota = $(notaId)
+  if (!data) { if (nota) nota.textContent = ''; return }
+  if (nota) { nota.textContent = 'Buscando PTAX...'; nota.className = 'small text-muted mt-1' }
+  const r = await api.fin.ptax(data)
+  if (r && !r.erro && r.taxa != null) {
+    $(taxaId).value = r.taxa
+    if (nota) { nota.textContent = `PTAX ${numf(r.taxa, 4)} (${dBR(r.dataCotacao)})`; nota.className = 'small text-success mt-1' }
+  } else if (nota) {
+    nota.textContent = 'PTAX indisponível — informe a taxa manualmente.'
+    nota.className = 'small text-danger mt-1'
+  }
+}
+
 async function carregar() {
   const r = await api.fin.resumo()
   if (!r || r.erro) { $('area-fin').innerHTML = `<p class="text-danger">${esc(r?.erro || 'Erro ao carregar.')}</p>`; return }
@@ -72,7 +88,7 @@ function renderImportacoes() {
         <div class="col-6 col-md-4"><label class="form-label small mb-0">Mercadoria</label><input id="i-mercadoria" class="form-control form-control-sm"></div>
         <div class="col-6 col-md-2"><label class="form-label small mb-0">Moeda</label><input id="i-moeda" class="form-control form-control-sm" value="USD"></div>
         <div class="col-6 col-md-2"><label class="form-label small mb-0">Valor (moeda)</label><input type="number" step="any" id="i-valor_moeda" class="form-control form-control-sm"></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">Taxa câmbio</label><input type="number" step="any" id="i-taxa_cambio" class="form-control form-control-sm"></div>
+        <div class="col-6 col-md-2"><label class="form-label small mb-0">Taxa câmbio</label><input type="number" step="any" id="i-taxa_cambio" class="form-control form-control-sm"><div id="i-taxa-nota" class="small text-muted mt-1"></div></div>
         <div class="col-6 col-md-2"><label class="form-label small mb-0">Banco</label><input id="i-banco" class="form-control form-control-sm" value="Santander"></div>
       </div>
       <button class="btn btn-ok-grande mt-3" id="btn-nova-imp">${ed ? 'Salvar alterações' : 'Lançar importação'}</button>
@@ -106,6 +122,7 @@ function renderImportacoes() {
     $('i-banco').value = ed.banco || ''
     $('btn-cancel-imp').addEventListener('click', () => { editImp = null; render() })
   }
+  $('i-data_invoice').addEventListener('change', () => autoPtax('i-data_invoice', 'i-taxa_cambio', 'i-taxa-nota'))
   $('btn-nova-imp').addEventListener('click', ed ? salvarEdicaoImp : novaImportacao)
 }
 
@@ -284,7 +301,7 @@ async function renderContratos() {
         <div class="col-6 col-md-2"><label class="form-label small mb-0">Data fechamento</label><input type="date" id="ct-data_fechamento" class="form-control form-control-sm"></div>
         <div class="col-6 col-md-1"><label class="form-label small mb-0">Moeda</label><input id="ct-moeda" class="form-control form-control-sm" value="USD"></div>
         <div class="col-6 col-md-2"><label class="form-label small mb-0">Valor (moeda)</label><input type="number" step="any" id="ct-valor_moeda" class="form-control form-control-sm"></div>
-        <div class="col-6 col-md-1"><label class="form-label small mb-0">Taxa</label><input type="number" step="any" id="ct-taxa" class="form-control form-control-sm"></div>
+        <div class="col-6 col-md-2"><label class="form-label small mb-0">Taxa</label><input type="number" step="any" id="ct-taxa" class="form-control form-control-sm"><div id="ct-taxa-nota" class="small text-muted mt-1"></div></div>
         <div class="col-12 col-md-4"><label class="form-label small mb-0">Importação vinculada</label><select id="ct-importacao_id" class="form-select form-select-sm"><option value="">—</option>${optImp}</select></div>
         <div class="col-6 col-md-2"><label class="form-label small mb-0">Data liquidação</label><input type="date" id="ct-data_liquidacao" class="form-control form-control-sm"></div>
         <div class="col-6 col-md-2 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" id="ct-liquidado" checked><label class="form-check-label small" for="ct-liquidado">Liquidado</label></div></div>
@@ -314,6 +331,7 @@ async function renderContratos() {
     $('ct-obs').value = ed.obs || ''
     $('btn-cancel-ct').addEventListener('click', () => { editCt = null; renderContratos() })
   }
+  $('ct-data_fechamento').addEventListener('change', () => autoPtax('ct-data_fechamento', 'ct-taxa', 'ct-taxa-nota'))
   $('btn-novo-ct').addEventListener('click', ed ? salvarEdicaoCt : novoContrato)
 }
 
