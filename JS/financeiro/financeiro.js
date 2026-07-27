@@ -11,6 +11,10 @@ let editImp = null
 let editForn = null
 let editCt = null
 let editPag = null
+let custoImpSel = ''
+let custoCab = {}
+let custoDespesas = []
+let custoSt = []
 
 const $ = (id) => document.getElementById(id)
 const brl = (n) => 'R$ ' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -50,6 +54,7 @@ function render() {
   else if (aba === 'importacoes') renderImportacoes()
   else if (aba === 'fornecedores') renderFornecedores()
   else if (aba === 'contratos') renderContratos()
+  else if (aba === 'custos') renderCustos()
 }
 
 // ---------- PAINEL ----------
@@ -410,6 +415,135 @@ window.excluirCt = async function (id) {
   renderContratos()
 }
 
+// ---------- CUSTOS DE IMPORTAÇÃO ----------
+function stRecolher(it) {
+  const bc = ((parseFloat(it.base_icms) || 0) + (parseFloat(it.ipi_destacado) || 0)) * (parseFloat(it.mva) || 0)
+  return bc * (parseFloat(it.aliquota) || 0) - (parseFloat(it.icms_proprio) || 0)
+}
+function calcCusto() {
+  const despTotal = custoDespesas.reduce((s, d) => s + (parseFloat(d.valor) || 0), 0)
+  const stCusto = custoSt.reduce((s, i) => s + stRecolher(i), 0)
+  const g = (k) => parseFloat(custoCab[k]) || 0
+  const total = g('materia_prima') + g('imposto_importacao') + stCusto + g('ipi') + g('pis') + g('cofins') + g('icms') + despTotal
+  const credito = g('icms') + g('ipi') + g('pis') + g('cofins')
+  const custoCredito = total - credito
+  const kg = g('quantidade_kg')
+  return { despTotal, stCusto, total, credito, custoCredito, custoKg: kg > 0 ? custoCredito / kg : 0 }
+}
+
+async function carregarCusto(impId) {
+  custoImpSel = impId
+  if (!impId) { custoCab = {}; custoDespesas = []; custoSt = []; renderCustos(); return }
+  const imp = resumo.importacoes.find((x) => String(x.id) === String(impId))
+  const d = await api.fin.custo(impId)
+  if (d && !d.erro) {
+    custoCab = { nfe: d.nfe || '', materia_prima: d.materia_prima ?? '', imposto_importacao: d.imposto_importacao ?? '', ipi: d.ipi ?? '', pis: d.pis ?? '', cofins: d.cofins ?? '', icms: d.icms ?? '', quantidade_kg: d.quantidade_kg ?? '', obs: d.obs || '' }
+    custoDespesas = (d.despesas || []).map((x) => ({ nome: x.nome || '', valor: x.valor ?? '' }))
+    custoSt = (d.st || []).map((x) => ({ produto: x.produto || '', ncm: x.ncm || '', base_icms: x.base_icms ?? '', icms_proprio: x.icms_proprio ?? '', aliquota: x.aliquota ?? '', ipi_destacado: x.ipi_destacado ?? '', mva: x.mva ?? '' }))
+  } else {
+    custoCab = { nfe: imp?.invoice || '', materia_prima: imp?.valor_reais ?? '', imposto_importacao: '', ipi: '', pis: '', cofins: '', icms: '', quantidade_kg: '', obs: '' }
+    custoDespesas = []
+    custoSt = []
+  }
+  renderCustos()
+}
+
+function renderCustos() {
+  const optImp = resumo.importacoes.map((i) => `<option value="${i.id}" ${String(i.id) === String(custoImpSel) ? 'selected' : ''}>${esc(i.invoice)} — ${esc(i.fornecedor_nome || '')}</option>`).join('')
+  if (!custoImpSel) {
+    $('area-fin').innerHTML = `<div class="card"><div class="card-body">
+      <label class="form-label small mb-1">Importação</label>
+      <select class="form-select form-select-sm" style="max-width:520px" onchange="custoSelImp(this.value)"><option value="">— selecione uma importação —</option>${optImp}</select>
+      <p class="text-muted mt-3 mb-0">Escolha uma importação para calcular os custos de nacionalização (matéria-prima, impostos, despesas, ICMS-ST e custo por kg).</p>
+    </div></div>`
+    return
+  }
+  const num = (k, label, prefill) => `<div class="col-6 col-md-3"><label class="form-label small mb-0">${label}</label><input type="number" step="any" class="form-control form-control-sm" value="${custoCab[k] ?? ''}" oninput="custoCabInput('${k}',this.value)" ${prefill || ''}></div>`
+  const despRows = custoDespesas.map((d, i) => `<tr>
+    <td><input class="form-control form-control-sm" value="${esc(d.nome)}" oninput="custoDespInput(${i},'nome',this.value)" placeholder="Ex: Frete marítimo"></td>
+    <td style="width:160px"><input type="number" step="any" class="form-control form-control-sm text-end" value="${d.valor ?? ''}" oninput="custoDespInput(${i},'valor',this.value)"></td>
+    <td style="width:40px"><button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="custoDelDesp(${i})">×</button></td></tr>`).join('')
+  const stRows = custoSt.map((s, i) => `<tr>
+    <td><input class="form-control form-control-sm" value="${esc(s.produto)}" oninput="custoStInput(${i},'produto',this.value)" placeholder="Produto"></td>
+    <td style="width:110px"><input class="form-control form-control-sm" value="${esc(s.ncm)}" oninput="custoStInput(${i},'ncm',this.value)" placeholder="NCM"></td>
+    <td style="width:120px"><input type="number" step="any" class="form-control form-control-sm text-end" value="${s.base_icms ?? ''}" oninput="custoStInput(${i},'base_icms',this.value)"></td>
+    <td style="width:120px"><input type="number" step="any" class="form-control form-control-sm text-end" value="${s.icms_proprio ?? ''}" oninput="custoStInput(${i},'icms_proprio',this.value)"></td>
+    <td style="width:90px"><input type="number" step="any" class="form-control form-control-sm text-end" value="${s.aliquota ?? ''}" oninput="custoStInput(${i},'aliquota',this.value)" placeholder="0.17"></td>
+    <td style="width:110px"><input type="number" step="any" class="form-control form-control-sm text-end" value="${s.ipi_destacado ?? ''}" oninput="custoStInput(${i},'ipi_destacado',this.value)"></td>
+    <td style="width:90px"><input type="number" step="any" class="form-control form-control-sm text-end" value="${s.mva ?? ''}" oninput="custoStInput(${i},'mva',this.value)" placeholder="1.66"></td>
+    <td style="width:120px;text-align:right;font-weight:600" id="st-res-${i}">-</td>
+    <td style="width:40px"><button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="custoDelSt(${i})">×</button></td></tr>`).join('')
+  $('area-fin').innerHTML = `
+    <div class="card mb-3"><div class="card-body">
+      <div class="row g-2 align-items-end mb-2">
+        <div class="col-12 col-md-6"><label class="form-label small mb-0">Importação</label>
+          <select class="form-select form-select-sm" onchange="custoSelImp(this.value)"><option value="">— selecione —</option>${optImp}</select></div>
+        <div class="col-6 col-md-3"><label class="form-label small mb-0">NF-e</label><input class="form-control form-control-sm" value="${esc(custoCab.nfe || '')}" oninput="custoCabInput('nfe',this.value)"></div>
+        <div class="col-6 col-md-3"><label class="form-label small mb-0">Quantidade (kg)</label><input type="number" step="any" class="form-control form-control-sm" value="${custoCab.quantidade_kg ?? ''}" oninput="custoCabInput('quantidade_kg',this.value)"></div>
+      </div>
+      <h6 class="secao-titulo-card mt-2 mb-2">Custos e impostos (R$)</h6>
+      <div class="row g-2">
+        ${num('materia_prima', 'Matéria-prima')}${num('imposto_importacao', 'Imposto Importação')}${num('ipi', 'IPI')}${num('pis', 'PIS')}
+        ${num('cofins', 'COFINS')}${num('icms', 'ICMS')}
+      </div>
+    </div></div>
+
+    <div class="card mb-3"><div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-2"><h6 class="secao-titulo-card mb-0">Despesas</h6>
+        <button class="btn btn-sm btn-outline-primary" onclick="custoAddDesp()">+ Despesa</button></div>
+      <table class="table table-sm mb-0"><thead><tr><th>Descrição</th><th class="text-end">Valor R$</th><th></th></tr></thead>
+        <tbody>${despRows || '<tr><td colspan="3" class="text-muted fst-italic">Nenhuma despesa. Clique em “+ Despesa”.</td></tr>'}</tbody></table>
+    </div></div>
+
+    <div class="card mb-3"><div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-2"><h6 class="secao-titulo-card mb-0">ICMS-ST por item</h6>
+        <button class="btn btn-sm btn-outline-primary" onclick="custoAddSt()">+ Item</button></div>
+      <div class="table-responsive"><table class="table table-sm mb-0" style="font-size:.8rem"><thead><tr>
+        <th>Produto</th><th>NCM</th><th class="text-end">Base ICMS</th><th class="text-end">ICMS Próprio</th><th class="text-end">Alíquota</th><th class="text-end">IPI Dest.</th><th class="text-end">MVA</th><th class="text-end">ST a recolher</th><th></th></tr></thead>
+        <tbody>${stRows || '<tr><td colspan="9" class="text-muted fst-italic">Nenhum item de ST. O “ST Custo” fica zero.</td></tr>'}</tbody></table></div>
+      <div class="small text-muted mt-1">ST a recolher = (Base ICMS + IPI) × MVA × Alíquota − ICMS Próprio. Alíquota e MVA em decimal (ex.: 0.17 e 1.66).</div>
+    </div></div>
+
+    <div class="card"><div class="card-body">
+      <div id="c-resumo"></div>
+      <button class="btn btn-ok-grande mt-3" onclick="salvarCusto()">Salvar custos</button>
+    </div></div>`
+  atualizarResumoCusto()
+}
+
+function atualizarResumoCusto() {
+  custoSt.forEach((s, i) => { const el = $('st-res-' + i); if (el) el.textContent = brl(stRecolher(s)) })
+  const c = calcCusto()
+  const el = $('c-resumo')
+  if (!el) return
+  const linha = (l, v, cls) => `<div class="d-flex justify-content-between py-1 ${cls || ''}"><span>${l}</span><strong>${v}</strong></div>`
+  el.innerHTML = `
+    ${linha('Total despesas', brl(c.despTotal))}
+    ${linha('ST Custo (soma ICMS-ST)', brl(c.stCusto))}
+    <hr class="my-2">
+    ${linha('TOTAL PAGO', brl(c.total), 'fs-6')}
+    ${linha('(−) Créditos ICMS/IPI/PIS/COFINS', brl(c.credito), 'text-success')}
+    ${linha('CUSTO COM CRÉDITO', brl(c.custoCredito), 'fs-6 fw-bold')}
+    <hr class="my-2">
+    ${linha('CUSTO POR KG', brl(c.custoKg), 'fs-5 fw-bold text-primary')}`
+}
+
+window.custoSelImp = (v) => carregarCusto(v)
+window.custoCabInput = (k, v) => { custoCab[k] = v; atualizarResumoCusto() }
+window.custoDespInput = (i, k, v) => { custoDespesas[i][k] = v; atualizarResumoCusto() }
+window.custoStInput = (i, k, v) => { custoSt[i][k] = v; atualizarResumoCusto() }
+window.custoAddDesp = () => { custoDespesas.push({ nome: '', valor: '' }); renderCustos() }
+window.custoDelDesp = (i) => { custoDespesas.splice(i, 1); renderCustos() }
+window.custoAddSt = () => { custoSt.push({ produto: '', ncm: '', base_icms: '', icms_proprio: '', aliquota: '0.17', ipi_destacado: '', mva: '' }); renderCustos() }
+window.custoDelSt = (i) => { custoSt.splice(i, 1); renderCustos() }
+window.salvarCusto = async () => {
+  if (!custoImpSel) { alert('Selecione uma importação.'); return }
+  const dados = { ...custoCab, despesas: custoDespesas, st: custoSt }
+  const r = await api.fin.salvarCusto(custoImpSel, dados)
+  if (r?.erro) { alert(r.erro); return }
+  alert('Custos salvos.')
+}
+
 // ---------- Interface ----------
 function montarInterface() {
   $('conteudo-fin').innerHTML = `
@@ -417,6 +551,7 @@ function montarInterface() {
       <li class="nav-item"><a class="nav-link active" href="#" data-aba="painel">Painel</a></li>
       <li class="nav-item"><a class="nav-link" href="#" data-aba="importacoes">Importações</a></li>
       <li class="nav-item"><a class="nav-link" href="#" data-aba="contratos">Contratos de Câmbio</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" data-aba="custos">Custos de Importação</a></li>
       <li class="nav-item"><a class="nav-link" href="#" data-aba="fornecedores">Fornecedores</a></li>
     </ul>
     <div id="area-fin"><p class="text-muted">Carregando...</p></div>

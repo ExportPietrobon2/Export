@@ -131,7 +131,11 @@ export const api = {
  contratos: (importacaoId) => requisitar('GET', `/api/fin/contratos${importacaoId ? '?importacaoId=' + importacaoId : ''}`),
  criarContrato: (dados) => requisitar('POST', '/api/fin/contratos', dados),
  editarContrato: (id, dados) => requisitar('PATCH', `/api/fin/contratos/${id}`, dados),
- excluirContrato: (id) => requisitar('DELETE', `/api/fin/contratos/${id}`)
+ excluirContrato: (id) => requisitar('DELETE', `/api/fin/contratos/${id}`),
+ custos: () => requisitar('GET', '/api/fin/custos'),
+ custo: (impId) => requisitar('GET', `/api/fin/custos/${impId}`),
+ salvarCusto: (impId, dados) => requisitar('PUT', `/api/fin/custos/${impId}`, dados),
+ excluirCusto: (impId) => requisitar('DELETE', `/api/fin/custos/${impId}`)
  },
 
  ordemProducao: {
