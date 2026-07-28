@@ -28,7 +28,9 @@ async function requisitar(metodo, rota, corpo, formData) {
  }
  if (!resposta.ok && resposta.status !== 400) {
  console.error(`Erro ${resposta.status} em ${metodo} ${rota}`)
- return { erro: `Erro de servidor (${resposta.status}). Tente novamente.` }
+ let msg = `Erro de servidor (${resposta.status}). Tente novamente.`
+ try { const j = await resposta.clone().json(); if (j && j.erro) msg = j.erro } catch (e) { /* corpo não-JSON */ }
+ return { erro: msg }
  }
  return resposta.json()
  } catch (e) {
