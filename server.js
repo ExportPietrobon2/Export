@@ -1882,22 +1882,33 @@ app.delete('/api/fin/com/lanc/:id', autenticarContabil(), async (req, res) => {
 app.post('/api/fin/com/importar', autenticarContabil(), async (req, res) => {
   const { representante_id, faturas, substituir } = req.body
   if (!representante_id || !Array.isArray(faturas)) return res.status(400).json({ erro: 'Dados inválidos.' })
+  const cut = (v, n) => v == null ? null : String(v).slice(0, n)
+  const numOk = (v) => { const x = Number(v); return isFinite(x) ? x : 0 }
+  const dataOk = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? v : null
+  const pctOk = (v) => { let x = Number(v); if (!isFinite(x) || x < 0 || x > 9.9999) x = 0.05; return x }
   let nFat = 0, nLanc = 0
-  for (const f of faturas) {
-    if (substituir) {
-      const [ex] = await pool.query('SELECT id FROM fin_com_faturas WHERE representante_id = ? AND ano <=> ? AND fatura <=> ?', [representante_id, f.ano || null, f.fatura || null])
-      for (const e of ex) { await pool.query('DELETE FROM fin_com_lanc WHERE fatura_id = ?', [e.id]); await pool.query('DELETE FROM fin_com_faturas WHERE id = ?', [e.id]) }
+  try {
+    for (const f of faturas) {
+      const ano = parseInt(f.ano) || null
+      const fatura = cut(f.fatura, 40)
+      if (substituir) {
+        const [ex] = await pool.query('SELECT id FROM fin_com_faturas WHERE representante_id = ? AND ano <=> ? AND fatura <=> ?', [representante_id, ano, fatura])
+        for (const e of ex) { await pool.query('DELETE FROM fin_com_lanc WHERE fatura_id = ?', [e.id]); await pool.query('DELETE FROM fin_com_faturas WHERE id = ?', [e.id]) }
+      }
+      const [r] = await pool.query('INSERT INTO fin_com_faturas (representante_id, ano, fatura, pais, cliente, valor_invoice) VALUES (?,?,?,?,?,?)',
+        [representante_id, ano, fatura, cut(f.pais, 80), cut(f.cliente, 200), numOk(f.valor_invoice)])
+      nFat++
+      for (const l of (f.lancamentos || [])) {
+        await pool.query('INSERT INTO fin_com_lanc (fatura_id, data_contrato, valor_usd, taxa, frete, pct, situacao, nf_numero, nf_valor, obs) VALUES (?,?,?,?,?,?,?,?,?,?)',
+          [r.insertId, dataOk(l.data_contrato), numOk(l.valor_usd), numOk(l.taxa), numOk(l.frete), pctOk(l.pct), cut(l.situacao, 20) || 'AGUARDANDO NF', cut(l.nf_numero, 40), (l.nf_valor === '' || l.nf_valor == null) ? null : numOk(l.nf_valor), cut(l.obs, 300)])
+        nLanc++
+      }
     }
-    const [r] = await pool.query('INSERT INTO fin_com_faturas (representante_id, ano, fatura, pais, cliente, valor_invoice) VALUES (?,?,?,?,?,?)',
-      [representante_id, f.ano || null, f.fatura || null, f.pais || null, f.cliente || null, Number(f.valor_invoice) || 0])
-    nFat++
-    for (const l of (f.lancamentos || [])) {
-      await pool.query('INSERT INTO fin_com_lanc (fatura_id, data_contrato, valor_usd, taxa, frete, pct, situacao, nf_numero, nf_valor, obs) VALUES (?,?,?,?,?,?,?,?,?,?)',
-        [r.insertId, l.data_contrato || null, Number(l.valor_usd) || 0, Number(l.taxa) || 0, Number(l.frete) || 0, Number(l.pct) || 0.05, l.situacao || 'AGUARDANDO NF', l.nf_numero || null, (l.nf_valor === '' || l.nf_valor == null) ? null : Number(l.nf_valor), l.obs || null])
-      nLanc++
-    }
+    res.json({ ok: true, faturas: nFat, lancamentos: nLanc })
+  } catch (e) {
+    console.error('Erro import comissoes:', e.message)
+    res.status(500).json({ erro: 'Falha ao importar: ' + e.message + ` (${nFat} faturas gravadas antes do erro)` })
   }
-  res.json({ ok: true, faturas: nFat, lancamentos: nLanc })
 })
 
 // =============================================
