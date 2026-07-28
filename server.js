@@ -1740,6 +1740,144 @@ app.delete('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, re
   res.json({ ok: true })
 })
 
+// ---- Comissões de Representantes (exportação) ----
+const PIETROBON_CNPJ = '97580260000115'
+async function inicializarComissoes() {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS fin_representantes (
+      id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(160) NOT NULL, ativo TINYINT DEFAULT 1)`)
+    await pool.query(`CREATE TABLE IF NOT EXISTS fin_com_faturas (
+      id INT AUTO_INCREMENT PRIMARY KEY, representante_id INT NOT NULL, ano INT, fatura VARCHAR(40),
+      pais VARCHAR(80), cliente VARCHAR(200), valor_invoice DECIMAL(14,2) DEFAULT 0, INDEX(representante_id))`)
+    await pool.query(`CREATE TABLE IF NOT EXISTS fin_com_lanc (
+      id INT AUTO_INCREMENT PRIMARY KEY, fatura_id INT NOT NULL, data_contrato DATE,
+      valor_usd DECIMAL(14,2) DEFAULT 0, taxa DECIMAL(12,6) DEFAULT 0, frete DECIMAL(14,2) DEFAULT 0,
+      pct DECIMAL(6,4) DEFAULT 0.0500, situacao VARCHAR(20) DEFAULT 'AGUARDANDO NF',
+      nf_numero VARCHAR(40), nf_valor DECIMAL(14,2) NULL, obs VARCHAR(300), INDEX(fatura_id))`)
+  } catch (e) { console.error('Erro init comissoes:', e.message) }
+}
+setTimeout(inicializarComissoes, 6500)
+
+// Cálculo de um lançamento de comissão
+function computarLanc(l) {
+  const usd = Number(l.valor_usd) || 0, taxa = Number(l.taxa) || 0, frete = Number(l.frete) || 0
+  const pct = Number(l.pct) || 0
+  const valorReais = usd * taxa
+  const dctFrete = frete * taxa * pct
+  const comissao = valorReais * pct - dctFrete
+  const umDozeAvos = comissao / 12
+  const totalNfEsperado = comissao + umDozeAvos
+  const nfValor = l.nf_valor == null || l.nf_valor === '' ? null : Number(l.nf_valor)
+  const semNf = !(l.nf_numero && String(l.nf_numero).trim())
+  const divergente = nfValor != null && Math.abs(nfValor - totalNfEsperado) > 0.02
+  return { valorReais, dctFrete, comissao, umDozeAvos, totalNfEsperado, semNf, divergente, nfValor, divergencia: nfValor != null ? nfValor - totalNfEsperado : 0 }
+}
+async function faturasComputadas(representanteId, ano) {
+  const cond = ['representante_id = ?'], args = [representanteId]
+  if (ano) { cond.push('ano = ?'); args.push(ano) }
+  const [fats] = await pool.query(`SELECT * FROM fin_com_faturas WHERE ${cond.join(' AND ')} ORDER BY fatura`, args)
+  if (!fats.length) return []
+  const ids = fats.map((f) => f.id)
+  const [lancs] = await pool.query(`SELECT * FROM fin_com_lanc WHERE fatura_id IN (${ids.map(() => '?').join(',')}) ORDER BY data_contrato, id`, ids)
+  const porFat = {}
+  lancs.forEach((l) => { (porFat[l.fatura_id] = porFat[l.fatura_id] || []).push({ ...l, calc: computarLanc(l) }) })
+  return fats.map((f) => {
+    const ls = porFat[f.id] || []
+    const somaUsd = ls.reduce((s, l) => s + (Number(l.valor_usd) || 0), 0)
+    const totalComissao = ls.reduce((s, l) => s + l.calc.comissao, 0)
+    const totalNf = ls.reduce((s, l) => s + l.calc.totalNfEsperado, 0)
+    return {
+      ...f, lancamentos: ls,
+      saldoUsd: (Number(f.valor_invoice) || 0) - somaUsd,
+      totalComissao, totalNf,
+      qtdSemNf: ls.filter((l) => l.calc.semNf).length,
+      qtdDivergente: ls.filter((l) => l.calc.divergente).length
+    }
+  })
+}
+
+// Representantes
+app.get('/api/fin/com/representantes', autenticarContabil(), async (req, res) => {
+  const [rows] = await pool.query('SELECT * FROM fin_representantes ORDER BY nome')
+  res.json(rows)
+})
+app.post('/api/fin/com/representantes', autenticarContabil(), async (req, res) => {
+  if (!(req.body.nome || '').trim()) return res.status(400).json({ erro: 'Informe o nome.' })
+  const [r] = await pool.query('INSERT INTO fin_representantes (nome) VALUES (?)', [req.body.nome.trim()])
+  res.json({ ok: true, id: r.insertId })
+})
+app.patch('/api/fin/com/representantes/:id', autenticarContabil(), async (req, res) => {
+  const sets = [], vals = []
+  for (const c of ['nome', 'ativo']) { if (c in req.body) { sets.push(`${c} = ?`); vals.push(req.body[c]) } }
+  if (!sets.length) return res.json({ ok: true })
+  vals.push(req.params.id)
+  await pool.query(`UPDATE fin_representantes SET ${sets.join(', ')} WHERE id = ?`, vals)
+  res.json({ ok: true })
+})
+app.delete('/api/fin/com/representantes/:id', autenticarContabil(), async (req, res) => {
+  const [fs] = await pool.query('SELECT id FROM fin_com_faturas WHERE representante_id = ?', [req.params.id])
+  for (const f of fs) await pool.query('DELETE FROM fin_com_lanc WHERE fatura_id = ?', [f.id])
+  await pool.query('DELETE FROM fin_com_faturas WHERE representante_id = ?', [req.params.id])
+  await pool.query('DELETE FROM fin_representantes WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
+})
+
+// Faturas (com lançamentos computados)
+app.get('/api/fin/com/faturas', autenticarContabil(), async (req, res) => {
+  const repId = parseInt(req.query.representanteId) || 0
+  if (!repId) return res.json([])
+  res.json(await faturasComputadas(repId, parseInt(req.query.ano) || 0))
+})
+app.post('/api/fin/com/faturas', autenticarContabil(), async (req, res) => {
+  const b = req.body
+  if (!b.representante_id) return res.status(400).json({ erro: 'Representante obrigatório.' })
+  const [r] = await pool.query('INSERT INTO fin_com_faturas (representante_id, ano, fatura, pais, cliente, valor_invoice) VALUES (?,?,?,?,?,?)',
+    [b.representante_id, parseInt(b.ano) || null, b.fatura || null, b.pais || null, b.cliente || null, Number(b.valor_invoice) || 0])
+  res.json({ ok: true, id: r.insertId })
+})
+app.patch('/api/fin/com/faturas/:id', autenticarContabil(), async (req, res) => {
+  const sets = [], vals = []
+  for (const c of ['ano', 'fatura', 'pais', 'cliente', 'valor_invoice']) { if (c in req.body) { let v = req.body[c]; if (v === '') v = null; if (c === 'valor_invoice') v = Number(v) || 0; if (c === 'ano') v = parseInt(v) || null; sets.push(`${c} = ?`); vals.push(v) } }
+  if (!sets.length) return res.json({ ok: true })
+  vals.push(req.params.id)
+  await pool.query(`UPDATE fin_com_faturas SET ${sets.join(', ')} WHERE id = ?`, vals)
+  res.json({ ok: true })
+})
+app.delete('/api/fin/com/faturas/:id', autenticarContabil(), async (req, res) => {
+  await pool.query('DELETE FROM fin_com_lanc WHERE fatura_id = ?', [req.params.id])
+  await pool.query('DELETE FROM fin_com_faturas WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
+})
+
+// Lançamentos (contratos/comissões)
+const CAMPOS_LANC = ['data_contrato', 'valor_usd', 'taxa', 'frete', 'pct', 'situacao', 'nf_numero', 'nf_valor', 'obs']
+app.post('/api/fin/com/lanc', autenticarContabil(), async (req, res) => {
+  const b = req.body
+  if (!b.fatura_id) return res.status(400).json({ erro: 'Fatura obrigatória.' })
+  await pool.query('INSERT INTO fin_com_lanc (fatura_id, data_contrato, valor_usd, taxa, frete, pct, situacao, nf_numero, nf_valor, obs) VALUES (?,?,?,?,?,?,?,?,?,?)',
+    [b.fatura_id, b.data_contrato || null, Number(b.valor_usd) || 0, Number(b.taxa) || 0, Number(b.frete) || 0, Number(b.pct) || 0.05, b.situacao || 'AGUARDANDO NF', b.nf_numero || null, b.nf_valor === '' || b.nf_valor == null ? null : Number(b.nf_valor), b.obs || null])
+  res.json({ ok: true })
+})
+app.patch('/api/fin/com/lanc/:id', autenticarContabil(), async (req, res) => {
+  const sets = [], vals = []
+  for (const c of CAMPOS_LANC) {
+    if (c in req.body) {
+      let v = req.body[c]
+      if (v === '') v = (c === 'nf_valor') ? null : (['data_contrato', 'nf_numero', 'obs', 'situacao'].includes(c) ? null : 0)
+      else if (['valor_usd', 'taxa', 'frete', 'pct', 'nf_valor'].includes(c)) v = Number(v)
+      sets.push(`${c} = ?`); vals.push(v)
+    }
+  }
+  if (!sets.length) return res.json({ ok: true })
+  vals.push(req.params.id)
+  await pool.query(`UPDATE fin_com_lanc SET ${sets.join(', ')} WHERE id = ?`, vals)
+  res.json({ ok: true })
+})
+app.delete('/api/fin/com/lanc/:id', autenticarContabil(), async (req, res) => {
+  await pool.query('DELETE FROM fin_com_lanc WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
+})
+
 // =============================================
 // CHECK-LIST DE EXPEDIÇÃO (exportação) — restrito ao export2 e export
 // =============================================

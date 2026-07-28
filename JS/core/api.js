@@ -135,7 +135,18 @@ export const api = {
  custos: () => requisitar('GET', '/api/fin/custos'),
  custo: (impId) => requisitar('GET', `/api/fin/custos/${impId}`),
  salvarCusto: (impId, dados) => requisitar('PUT', `/api/fin/custos/${impId}`, dados),
- excluirCusto: (impId) => requisitar('DELETE', `/api/fin/custos/${impId}`)
+ excluirCusto: (impId) => requisitar('DELETE', `/api/fin/custos/${impId}`),
+ representantes: () => requisitar('GET', '/api/fin/com/representantes'),
+ criarRepresentante: (nome) => requisitar('POST', '/api/fin/com/representantes', { nome }),
+ editarRepresentante: (id, dados) => requisitar('PATCH', `/api/fin/com/representantes/${id}`, dados),
+ excluirRepresentante: (id) => requisitar('DELETE', `/api/fin/com/representantes/${id}`),
+ comFaturas: (repId, ano) => requisitar('GET', `/api/fin/com/faturas?representanteId=${repId}${ano ? '&ano=' + ano : ''}`),
+ criarComFatura: (dados) => requisitar('POST', '/api/fin/com/faturas', dados),
+ editarComFatura: (id, dados) => requisitar('PATCH', `/api/fin/com/faturas/${id}`, dados),
+ excluirComFatura: (id) => requisitar('DELETE', `/api/fin/com/faturas/${id}`),
+ criarComLanc: (dados) => requisitar('POST', '/api/fin/com/lanc', dados),
+ editarComLanc: (id, dados) => requisitar('PATCH', `/api/fin/com/lanc/${id}`, dados),
+ excluirComLanc: (id) => requisitar('DELETE', `/api/fin/com/lanc/${id}`)
  },
 
  ordemProducao: {
