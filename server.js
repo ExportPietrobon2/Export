@@ -1879,6 +1879,7 @@ app.delete('/api/fin/com/lanc/:id', autenticarContabil(), async (req, res) => {
 })
 
 // Importação em massa a partir das planilhas (parseadas no navegador)
+// v2 - blindada: clamp de %, truncamento de textos e erro detalhado
 app.post('/api/fin/com/importar', autenticarContabil(), async (req, res) => {
   const { representante_id, faturas, substituir } = req.body
   if (!representante_id || !Array.isArray(faturas)) return res.status(400).json({ erro: 'Dados inválidos.' })
