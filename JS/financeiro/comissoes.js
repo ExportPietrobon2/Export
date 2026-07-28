@@ -302,9 +302,11 @@ async function onArquivo(ev) {
   const wb = new ExcelJS.Workbook()
   await wb.xlsx.load(buf)
   const faturas = []
+  const anoFiltro = comAno ? parseInt(comAno) : null
   wb.eachSheet((ws) => {
     const anoM = String(ws.name).match(/(20\d{2})/)
     const ano = anoM ? parseInt(anoM[1]) : null
+    if (anoFiltro && ano !== anoFiltro) return // importa só o ano informado
     const headers = []
     ws.getRow(1).eachCell({ includeEmpty: true }, (c, n) => { headers[n - 1] = c.value })
     const cFat = acharCol(headers, 'fatura'), cPais = acharCol(headers, 'pais'), cInv = acharCol(headers, 'valor da invoice', 'invoice')
@@ -341,8 +343,8 @@ async function onArquivo(ev) {
   })
   ev.target.value = ''
   const nLanc = faturas.reduce((s, f) => s + f.lancamentos.length, 0)
-  if (!faturas.length) { alert('Não encontrei faturas nesta planilha. Verifique se é o relatório de comissões.'); return }
-  if (!confirm(`Importar ${faturas.length} faturas e ${nLanc} lançamentos para "${comRepNome()}"?\nFaturas já existentes (mesmo ano/número) serão substituídas.`)) return
+  if (!faturas.length) { alert(anoFiltro ? `Não encontrei a aba do ano ${anoFiltro} nesta planilha (ou está vazia).` : 'Não encontrei faturas nesta planilha. Verifique se é o relatório de comissões.'); return }
+  if (!confirm(`Importar ${faturas.length} faturas e ${nLanc} lançamentos${anoFiltro ? ' do ano ' + anoFiltro : ' (todos os anos)'} para "${comRepNome()}"?\nFaturas já existentes (mesmo ano/número) serão substituídas.`)) return
   const r = await api.fin.importarComissoes({ representante_id: comRepSel, substituir: true, faturas })
   if (r?.erro) { alert(r.erro); return }
   alert(`Importado: ${r.faturas} faturas e ${r.lancamentos} lançamentos.`)
