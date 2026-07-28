@@ -1878,6 +1878,28 @@ app.delete('/api/fin/com/lanc/:id', autenticarContabil(), async (req, res) => {
   res.json({ ok: true })
 })
 
+// Importação em massa a partir das planilhas (parseadas no navegador)
+app.post('/api/fin/com/importar', autenticarContabil(), async (req, res) => {
+  const { representante_id, faturas, substituir } = req.body
+  if (!representante_id || !Array.isArray(faturas)) return res.status(400).json({ erro: 'Dados inválidos.' })
+  let nFat = 0, nLanc = 0
+  for (const f of faturas) {
+    if (substituir) {
+      const [ex] = await pool.query('SELECT id FROM fin_com_faturas WHERE representante_id = ? AND ano <=> ? AND fatura <=> ?', [representante_id, f.ano || null, f.fatura || null])
+      for (const e of ex) { await pool.query('DELETE FROM fin_com_lanc WHERE fatura_id = ?', [e.id]); await pool.query('DELETE FROM fin_com_faturas WHERE id = ?', [e.id]) }
+    }
+    const [r] = await pool.query('INSERT INTO fin_com_faturas (representante_id, ano, fatura, pais, cliente, valor_invoice) VALUES (?,?,?,?,?,?)',
+      [representante_id, f.ano || null, f.fatura || null, f.pais || null, f.cliente || null, Number(f.valor_invoice) || 0])
+    nFat++
+    for (const l of (f.lancamentos || [])) {
+      await pool.query('INSERT INTO fin_com_lanc (fatura_id, data_contrato, valor_usd, taxa, frete, pct, situacao, nf_numero, nf_valor, obs) VALUES (?,?,?,?,?,?,?,?,?,?)',
+        [r.insertId, l.data_contrato || null, Number(l.valor_usd) || 0, Number(l.taxa) || 0, Number(l.frete) || 0, Number(l.pct) || 0.05, l.situacao || 'AGUARDANDO NF', l.nf_numero || null, (l.nf_valor === '' || l.nf_valor == null) ? null : Number(l.nf_valor), l.obs || null])
+      nLanc++
+    }
+  }
+  res.json({ ok: true, faturas: nFat, lancamentos: nLanc })
+})
+
 // =============================================
 // CHECK-LIST DE EXPEDIÇÃO (exportação) — restrito ao export2 e export
 // =============================================

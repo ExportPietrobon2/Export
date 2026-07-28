@@ -51,7 +51,8 @@ export function montarCabecalho(papel) {
  { titulo: 'Financeiro', quando: ehContabil, itens: [
  { href: '/HTML/financeiro/contabil.html', texto: 'Contábil / Faturamento' },
  { href: '/HTML/financeiro/exp-contabil.html', texto: 'Contab. de Exportação' },
- { href: '/HTML/financeiro/financeiro.html', texto: 'Financeiro (Importações)' }
+ { href: '/HTML/financeiro/financeiro.html', texto: 'Financeiro (Importações)' },
+ { href: '/HTML/financeiro/comissoes.html', texto: 'Comissões (Exportação)' }
  ] }
  ]
 

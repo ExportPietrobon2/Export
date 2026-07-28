@@ -146,7 +146,8 @@ export const api = {
  excluirComFatura: (id) => requisitar('DELETE', `/api/fin/com/faturas/${id}`),
  criarComLanc: (dados) => requisitar('POST', '/api/fin/com/lanc', dados),
  editarComLanc: (id, dados) => requisitar('PATCH', `/api/fin/com/lanc/${id}`, dados),
- excluirComLanc: (id) => requisitar('DELETE', `/api/fin/com/lanc/${id}`)
+ excluirComLanc: (id) => requisitar('DELETE', `/api/fin/com/lanc/${id}`),
+ importarComissoes: (dados) => requisitar('POST', '/api/fin/com/importar', dados)
  },
 
  ordemProducao: {
