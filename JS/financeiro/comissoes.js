@@ -41,12 +41,10 @@ async function render() {
       <div class="col-6 col-md-2"><label class="form-label small mb-0">Ano</label><input class="form-control form-control-sm" value="${esc(comAno)}" placeholder="Todos" oninput="comSetAno(this.value)"></div>
       <div class="col-12 col-md-5 text-end">
         <button class="btn btn-sm btn-outline-primary" onclick="comNovoRep()">+ Representante</button>
-        <button class="btn btn-sm btn-outline-success ms-1" onclick="comImportar()">Importar planilha</button>
         ${comRepSel ? '<button class="btn btn-sm btn-outline-danger ms-1" onclick="comDelRep()">Excluir repres.</button>' : ''}</div>
     </div>
-    <input type="file" id="com-file" accept=".xlsx" style="display:none">
   </div></div>`
-  if (!comRepSel) { $('conteudo-com').innerHTML = cab + '<p class="text-muted">Selecione um representante para ver as faturas e comissões, ou importe uma planilha.</p>'; ligarFile(); return }
+  if (!comRepSel) { $('conteudo-com').innerHTML = cab + '<p class="text-muted">Selecione um representante para ver as faturas e comissões.</p>'; return }
   comFats = await api.fin.comFaturas(comRepSel, comAno) || []
   if (!Array.isArray(comFats)) comFats = []
   const tot = comFats.reduce((a, f) => ({ com: a.com + f.totalComissao, nf: a.nf + f.totalNf, sem: a.sem + f.qtdSemNf, div: a.div + f.qtdDivergente }), { com: 0, nf: 0, sem: 0, div: 0 })
@@ -56,13 +54,12 @@ async function render() {
     <div class="col-6 col-md-3"><div class="card"><div class="card-body py-2 text-center"><div class="small text-muted">Sem NF</div><div class="fw-bold ${tot.sem ? 'text-warning' : ''}">${tot.sem}</div></div></div></div>
     <div class="col-6 col-md-3"><div class="card"><div class="card-body py-2 text-center"><div class="small text-muted">Divergências</div><div class="fw-bold ${tot.div ? 'text-danger' : ''}">${tot.div}</div></div></div></div>
   </div>`
-  const faturasHtml = comFats.map((f) => cardFatura(f)).join('') || '<p class="text-muted">Nenhuma fatura. Adicione a primeira ou importe uma planilha.</p>'
+  const faturasHtml = comFats.map((f) => cardFatura(f)).join('') || '<p class="text-muted">Nenhuma fatura. Adicione a primeira.</p>'
   $('conteudo-com').innerHTML = cab + resumo +
     `<div class="d-flex justify-content-end gap-2 mb-2">
       <button class="btn btn-outline-success" onclick="comExportarExcel()">Excel</button>
       <button class="btn btn-outline-danger" onclick="comExportarPDF()">PDF</button>
       <button class="btn btn-ok-grande" onclick="comAddFatura()">+ Fatura</button></div>` + faturasHtml
-  ligarFile()
 }
 
 function cardFatura(f) {
@@ -280,120 +277,6 @@ window.comExportarPDF = async () => {
   gerarPdfDeHtml(html, `Comissoes_${comRepNome().replace(/\W+/g, '_')}${comAno ? '_' + comAno : ''}.pdf`)
 }
 
-// ---- Importar planilha ----
-function ligarFile() {
-  const inp = $('com-file')
-  if (inp) inp.onchange = onArquivo
-}
-window.comImportar = () => {
-  if (!comRepSel) { alert('Selecione (ou crie) o representante antes de importar.'); return }
-  $('com-file').click()
-}
-const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
-function acharCol(headers, ...alvos) {
-  for (let i = 0; i < headers.length; i++) { const h = norm(headers[i]); if (alvos.some((a) => h.includes(a))) return i }
-  return -1
-}
-function toISO(v) {
-  if (!v) return null
-  if (v instanceof Date) return v.toISOString().slice(0, 10)
-  const s = String(v).trim()
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`
-  m = s.match(/^(\d{1,2})[/](\d{1,2})[/](\d{2,4})/); if (m) { const y = m[3].length === 2 ? '20' + m[3] : m[3]; return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` }
-  return null
-}
-const num = (v) => { if (v == null || v === '') return 0; const n = parseFloat(String(v).replace(/\./g, '').replace(',', '.')); return isNaN(parseFloat(v)) ? (isNaN(n) ? 0 : n) : parseFloat(v) }
-
-// Extrai o valor de uma célula do ExcelJS, tratando todos os formatos de fórmula.
-// ExcelJS pode retornar:
-//   { formula, result }        — fórmula normal com resultado cacheado
-//   { sharedFormula, result }  — shared formula (t="shared" no XML)
-//   { formula }                — fórmula sem cache (nunca calculado)
-//   string com '='             — fórmula lida como string bruta
-//   Date, number, string       — valor direto
-function celVal(cell) {
-  if (!cell) return null
-  const v = cell.value
-  if (v == null) return null
-  if (typeof v === 'object' && !(v instanceof Date)) {
-    // Tem resultado cacheado (fórmula normal ou shared formula)
-    if ('result' in v) return v.result
-    // Objeto de fórmula sem resultado — arquivo nunca foi calculado
-    if ('sharedFormula' in v || 'formula' in v) return null
-  }
-  // String de fórmula bruta — descarta
-  if (typeof v === 'string' && v.startsWith('=')) return null
-  return v
-}
-
-async function onArquivo(ev) {
-  const file = ev.target.files[0]
-  if (!file) return
-  await garantirExcel()
-  const buf = await file.arrayBuffer()
-  const wb = new ExcelJS.Workbook()
-  await wb.xlsx.load(buf)
-  const faturas = []
-  const anoFiltro = comAno ? parseInt(comAno) : null
-  wb.eachSheet((ws) => {
-    const anoM = String(ws.name).match(/(20\d{2})/)
-    const ano = anoM ? parseInt(anoM[1]) : null
-    if (anoFiltro && ano !== anoFiltro) return // importa só o ano informado
-    const headers = []
-    ws.getRow(1).eachCell({ includeEmpty: true }, (c, n) => { headers[n - 1] = celVal(c) })
-    const cFat = acharCol(headers, 'fatura'), cPais = acharCol(headers, 'pais'), cInv = acharCol(headers, 'valor da invoice', 'invoice')
-    const cData = acharCol(headers, 'data contrato', 'data'), cUsd = acharCol(headers, 'valor u$ contrato', 'u$ contrato', 'u$', 'us$', 'valor u')
-    const cTaxa = acharCol(headers, 'tx contrato', 'taxa'), cFrete = acharCol(headers, 'frete na invoice', 'frete na', 'frete')
-    const cRs = acharCol(headers, 'valor r$ contrato', 'valor r$', 'valor r')
-    const cCom = acharCol(headers, 'valor comissao nf', 'valor comiss', 'comiss')
-    const cSit = acharCol(headers, 'situacao nf', 'situacao'), cNf = acharCol(headers, 'nº nf', 'n nf', 'no nf')
-    const cObs = acharCol(headers, 'observ')
-    if (cFat < 0) return
-    let atual = null
-    const val = (row, i) => i >= 0 ? celVal(row.getCell(i + 1)) : null
-    for (let r = 2; r <= ws.rowCount; r++) {
-      const row = ws.getRow(r)
-      const aRaw = val(row, cFat)
-      const a = aRaw == null ? '' : String(aRaw).trim()
-      if (norm(a).startsWith('situacao')) continue
-      const usd = num(val(row, cUsd)), data = toISO(val(row, cData))
-      const taxa = num(val(row, cTaxa)), frete = num(val(row, cFrete))
-      const rs = (cRs >= 0 && val(row, cRs) != null) ? num(val(row, cRs)) : usd * taxa
-      const com = (cCom >= 0 && val(row, cCom) != null) ? num(val(row, cCom)) : 0
-      const denom = rs - frete * taxa
-      const pct = com && denom ? com / denom : 0.05
-      // Tem lançamento se há data, USD, R$ ou comissão (cobre faturas em reais sem câmbio)
-      const temLanc = !!(data || usd || rs || com)
-      if (a) {
-        atual = { fatura: a, pais: cPais >= 0 ? (val(row, cPais) || '') : '', cliente: '', valor_invoice: num(val(row, cInv)), ano, lancamentos: [] }
-        if (temLanc) {
-          atual.lancamentos.push({
-            data_contrato: data, valor_usd: usd, taxa, frete, pct,
-            situacao: cSit >= 0 ? String(val(row, cSit) || '').trim() : '',
-            nf_numero: cNf >= 0 ? String(val(row, cNf) || '').trim() : '',
-            obs: cObs >= 0 ? String(val(row, cObs) || '').trim() : ''
-          })
-        }
-        faturas.push(atual)
-      } else if (atual && temLanc) {
-        atual.lancamentos.push({
-          data_contrato: data, valor_usd: usd, taxa, frete, pct,
-          situacao: cSit >= 0 ? String(val(row, cSit) || '').trim() : '',
-          nf_numero: cNf >= 0 ? String(val(row, cNf) || '').trim() : '',
-          obs: cObs >= 0 ? String(val(row, cObs) || '').trim() : ''
-        })
-      }
-    }
-  })
-  ev.target.value = ''
-  const nLanc = faturas.reduce((s, f) => s + f.lancamentos.length, 0)
-  if (!faturas.length) { alert(anoFiltro ? `Não encontrei a aba do ano ${anoFiltro} nesta planilha (ou está vazia).` : 'Não encontrei faturas nesta planilha. Verifique se é o relatório de comissões.'); return }
-  if (!confirm(`Importar ${faturas.length} faturas e ${nLanc} lançamentos${anoFiltro ? ' do ano ' + anoFiltro : ' (todos os anos)'} para "${comRepNome()}"?\nFaturas já existentes (mesmo ano/número) serão substituídas.`)) return
-  const r = await api.fin.importarComissoes({ representante_id: comRepSel, substituir: true, faturas })
-  if (r?.erro) { alert(r.erro); return }
-  alert(`Importado: ${r.faturas} faturas e ${r.lancamentos} lançamentos.`)
-  render()
-}
 
 async function iniciar() {
   const perfil = exigirPapel(['admin'])
