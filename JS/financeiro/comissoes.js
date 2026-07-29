@@ -70,9 +70,9 @@ function cardFatura(f) {
     && Math.abs(saldo) < 0.01
     && f.qtdSemNf === 0
     && f.qtdDivergente === 0
-  // Card liquidado: fundo verde-água suave, borda esquerda destacada, sem borda padrão
+  // Card liquidado: fundo verde bem suave cobrindo tudo, borda esquerda e sombra verde
   const cardStyle = liquidada
-    ? 'background:linear-gradient(135deg,#e8f8f0 0%,#f0fdf6 100%);border:none;border-left:4px solid #198754;box-shadow:0 1px 6px rgba(25,135,84,.15)'
+    ? 'background:#e9f7ef !important;border:1px solid #a8d5b5 !important;box-shadow:0 2px 8px rgba(25,135,84,.12) !important'
     : ''
   const linhas = (f.lancamentos || []).map((l) => {
     const c = l.calc
