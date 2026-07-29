@@ -67,6 +67,14 @@ async function render() {
 
 function cardFatura(f) {
   const th = 'padding:4px 6px;font-size:.75rem'
+  const saldo = f.saldoUsd
+  // Fatura liquidada = saldo zerado, todos lançamentos OK (sem divergência, sem NF faltando)
+  const liquidada = f.lancamentos && f.lancamentos.length > 0
+    && Math.abs(saldo) < 0.01
+    && f.qtdSemNf === 0
+    && f.qtdDivergente === 0
+  const cardBorder = liquidada ? 'border-color:#198754;border-width:2px' : ''
+  const cardBg = liquidada ? 'background:#f0fdf4' : ''
   const linhas = (f.lancamentos || []).map((l) => {
     const c = l.calc
     const alerta = c.divergente ? `<span class="badge bg-danger">Difere ${brl(c.dif)}</span>` : (c.semNf ? '<span class="badge bg-warning text-dark">Sem NF</span>' : '<span class="badge bg-success">OK</span>')
@@ -85,11 +93,13 @@ function cardFatura(f) {
         <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="comDelLanc(${l.id})">×</button></td>
     </tr>`
   }).join('')
-  const saldo = f.saldoUsd
-  return `<div class="card mb-2"><div class="card-body">
+  const badgeLiquidada = liquidada
+    ? '<span class="badge ms-2" style="background:#198754;font-size:.7rem;vertical-align:middle">✔ Liquidada</span>'
+    : ''
+  return `<div class="card mb-2" style="${cardBorder};${cardBg}"><div class="card-body">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
-      <div><span class="fw-bold">Fatura ${esc(f.fatura || '-')}</span> · ${esc(f.pais || '-')} · ${esc(f.cliente || '-')}
-        <div class="small text-muted">Invoice US$ ${numf(f.valor_invoice)} · Saldo US$ <span class="${saldo > 0.01 ? 'text-danger fw-semibold' : 'text-success'}">${numf(saldo)}</span>
+      <div><span class="fw-bold">Fatura ${esc(f.fatura || '-')}</span>${badgeLiquidada} · ${esc(f.pais || '-')} · ${esc(f.cliente || '-')}
+        <div class="small text-muted">Invoice US$ ${numf(f.valor_invoice)} · Saldo US$ <span class="${saldo > 0.01 ? 'text-danger fw-semibold' : 'text-success fw-semibold'}">${numf(saldo)}</span>
           ${f.qtdSemNf ? ` · <span class="text-warning">${f.qtdSemNf} sem NF</span>` : ''}${f.qtdDivergente ? ` · <span class="text-danger">${f.qtdDivergente} divergência(s)</span>` : ''}</div></div>
       <div class="text-nowrap"><button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="comAddLanc(${f.id})">+ Lançamento</button>
         <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="comEditFatura(${f.id})">Editar</button>
@@ -294,15 +304,24 @@ function toISO(v) {
 }
 const num = (v) => { if (v == null || v === '') return 0; const n = parseFloat(String(v).replace(/\./g, '').replace(',', '.')); return isNaN(parseFloat(v)) ? (isNaN(n) ? 0 : n) : parseFloat(v) }
 
-// Extrai o valor numérico de uma célula do ExcelJS, tratando fórmulas corretamente.
-// ExcelJS retorna { formula, result } para células com fórmula — precisamos do result.
+// Extrai o valor de uma célula do ExcelJS, tratando todos os formatos de fórmula.
+// ExcelJS pode retornar:
+//   { formula, result }        — fórmula normal com resultado cacheado
+//   { sharedFormula, result }  — shared formula (t="shared" no XML)
+//   { formula }                — fórmula sem cache (nunca calculado)
+//   string com '='             — fórmula lida como string bruta
+//   Date, number, string       — valor direto
 function celVal(cell) {
   if (!cell) return null
   const v = cell.value
   if (v == null) return null
-  // Fórmula com resultado calculado: { formula: '=E3*F3', result: 1234.56 }
-  if (typeof v === 'object' && 'result' in v) return v.result
-  // Fórmula sem resultado (arquivo nunca foi calculado): retorna null para não usar 0 errado
+  if (typeof v === 'object' && !(v instanceof Date)) {
+    // Tem resultado cacheado (fórmula normal ou shared formula)
+    if ('result' in v) return v.result
+    // Objeto de fórmula sem resultado — arquivo nunca foi calculado
+    if ('sharedFormula' in v || 'formula' in v) return null
+  }
+  // String de fórmula bruta — descarta
   if (typeof v === 'string' && v.startsWith('=')) return null
   return v
 }
