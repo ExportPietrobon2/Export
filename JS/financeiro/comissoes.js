@@ -338,15 +338,16 @@ async function onArquivo(ev) {
       const a = aRaw == null ? '' : String(aRaw).trim()
       if (norm(a).startsWith('situacao')) continue
       const usd = num(val(row, cUsd)), data = toISO(val(row, cData))
+      const taxa = num(val(row, cTaxa)), frete = num(val(row, cFrete))
+      const rs = (cRs >= 0 && val(row, cRs) != null) ? num(val(row, cRs)) : usd * taxa
+      const com = (cCom >= 0 && val(row, cCom) != null) ? num(val(row, cCom)) : 0
+      const denom = rs - frete * taxa
+      const pct = com && denom ? com / denom : 0.05
+      // Tem lançamento se há data, USD, R$ ou comissão (cobre faturas em reais sem câmbio)
+      const temLanc = !!(data || usd || rs || com)
       if (a) {
         atual = { fatura: a, pais: cPais >= 0 ? (val(row, cPais) || '') : '', cliente: '', valor_invoice: num(val(row, cInv)), ano, lancamentos: [] }
-        // Linha da fatura pode também ter um lançamento (1ª parcela na mesma linha)
-        if (usd || data) {
-          const taxa = num(val(row, cTaxa)), frete = num(val(row, cFrete))
-          const rs = (cRs >= 0 && val(row, cRs) != null) ? num(val(row, cRs)) : usd * taxa
-          const com = (cCom >= 0 && val(row, cCom) != null) ? num(val(row, cCom)) : 0
-          const denom = rs - frete * taxa
-          const pct = com && denom ? com / denom : 0.05
+        if (temLanc) {
           atual.lancamentos.push({
             data_contrato: data, valor_usd: usd, taxa, frete, pct,
             situacao: cSit >= 0 ? String(val(row, cSit) || '').trim() : '',
@@ -355,12 +356,7 @@ async function onArquivo(ev) {
           })
         }
         faturas.push(atual)
-      } else if (atual && (usd || data)) {
-        const taxa = num(val(row, cTaxa)), frete = num(val(row, cFrete))
-        const rs = (cRs >= 0 && val(row, cRs) != null) ? num(val(row, cRs)) : usd * taxa
-        const com = (cCom >= 0 && val(row, cCom) != null) ? num(val(row, cCom)) : 0
-        const denom = rs - frete * taxa
-        const pct = com && denom ? com / denom : 0.05
+      } else if (atual && temLanc) {
         atual.lancamentos.push({
           data_contrato: data, valor_usd: usd, taxa, frete, pct,
           situacao: cSit >= 0 ? String(val(row, cSit) || '').trim() : '',
