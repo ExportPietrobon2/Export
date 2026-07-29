@@ -294,6 +294,19 @@ function toISO(v) {
 }
 const num = (v) => { if (v == null || v === '') return 0; const n = parseFloat(String(v).replace(/\./g, '').replace(',', '.')); return isNaN(parseFloat(v)) ? (isNaN(n) ? 0 : n) : parseFloat(v) }
 
+// Extrai o valor numérico de uma célula do ExcelJS, tratando fórmulas corretamente.
+// ExcelJS retorna { formula, result } para células com fórmula — precisamos do result.
+function celVal(cell) {
+  if (!cell) return null
+  const v = cell.value
+  if (v == null) return null
+  // Fórmula com resultado calculado: { formula: '=E3*F3', result: 1234.56 }
+  if (typeof v === 'object' && 'result' in v) return v.result
+  // Fórmula sem resultado (arquivo nunca foi calculado): retorna null para não usar 0 errado
+  if (typeof v === 'string' && v.startsWith('=')) return null
+  return v
+}
+
 async function onArquivo(ev) {
   const file = ev.target.files[0]
   if (!file) return
@@ -308,28 +321,44 @@ async function onArquivo(ev) {
     const ano = anoM ? parseInt(anoM[1]) : null
     if (anoFiltro && ano !== anoFiltro) return // importa só o ano informado
     const headers = []
-    ws.getRow(1).eachCell({ includeEmpty: true }, (c, n) => { headers[n - 1] = c.value })
+    ws.getRow(1).eachCell({ includeEmpty: true }, (c, n) => { headers[n - 1] = celVal(c) })
     const cFat = acharCol(headers, 'fatura'), cPais = acharCol(headers, 'pais'), cInv = acharCol(headers, 'valor da invoice', 'invoice')
-    const cData = acharCol(headers, 'data'), cUsd = acharCol(headers, 'u$', 'us$', 'valor u'), cTaxa = acharCol(headers, 'tx', 'taxa')
-    const cFrete = acharCol(headers, 'frete'), cRs = acharCol(headers, 'valor r$', 'valor r'), cCom = acharCol(headers, 'comiss')
-    const cSit = acharCol(headers, 'situacao nf', 'situacao'), cNf = acharCol(headers, 'n nf', 'nº nf', 'no nf', 'nf'), cObs = acharCol(headers, 'observ')
+    const cData = acharCol(headers, 'data contrato', 'data'), cUsd = acharCol(headers, 'valor u$ contrato', 'u$ contrato', 'u$', 'us$', 'valor u')
+    const cTaxa = acharCol(headers, 'tx contrato', 'taxa'), cFrete = acharCol(headers, 'frete na invoice', 'frete na', 'frete')
+    const cRs = acharCol(headers, 'valor r$ contrato', 'valor r$', 'valor r')
+    const cCom = acharCol(headers, 'valor comissao nf', 'valor comiss', 'comiss')
+    const cSit = acharCol(headers, 'situacao nf', 'situacao'), cNf = acharCol(headers, 'nº nf', 'n nf', 'no nf')
+    const cObs = acharCol(headers, 'observ')
     if (cFat < 0) return
     let atual = null
-    const val = (row, i) => i >= 0 ? row.getCell(i + 1).value : null
+    const val = (row, i) => i >= 0 ? celVal(row.getCell(i + 1)) : null
     for (let r = 2; r <= ws.rowCount; r++) {
       const row = ws.getRow(r)
       const aRaw = val(row, cFat)
       const a = aRaw == null ? '' : String(aRaw).trim()
-      if (norm(a).startsWith('situacao fatura')) continue
+      if (norm(a).startsWith('situacao')) continue
       const usd = num(val(row, cUsd)), data = toISO(val(row, cData))
-      if (a && !norm(a).startsWith('situacao')) {
+      if (a) {
         atual = { fatura: a, pais: cPais >= 0 ? (val(row, cPais) || '') : '', cliente: '', valor_invoice: num(val(row, cInv)), ano, lancamentos: [] }
+        // Linha da fatura pode também ter um lançamento (1ª parcela na mesma linha)
+        if (usd || data) {
+          const taxa = num(val(row, cTaxa)), frete = num(val(row, cFrete))
+          const rs = (cRs >= 0 && val(row, cRs) != null) ? num(val(row, cRs)) : usd * taxa
+          const com = (cCom >= 0 && val(row, cCom) != null) ? num(val(row, cCom)) : 0
+          const denom = rs - frete * taxa
+          const pct = com && denom ? com / denom : 0.05
+          atual.lancamentos.push({
+            data_contrato: data, valor_usd: usd, taxa, frete, pct,
+            situacao: cSit >= 0 ? String(val(row, cSit) || '').trim() : '',
+            nf_numero: cNf >= 0 ? String(val(row, cNf) || '').trim() : '',
+            obs: cObs >= 0 ? String(val(row, cObs) || '').trim() : ''
+          })
+        }
         faturas.push(atual)
-      }
-      if (atual && (usd || data)) {
+      } else if (atual && (usd || data)) {
         const taxa = num(val(row, cTaxa)), frete = num(val(row, cFrete))
-        const rs = cRs >= 0 ? num(val(row, cRs)) : usd * taxa
-        const com = cCom >= 0 ? num(val(row, cCom)) : 0
+        const rs = (cRs >= 0 && val(row, cRs) != null) ? num(val(row, cRs)) : usd * taxa
+        const com = (cCom >= 0 && val(row, cCom) != null) ? num(val(row, cCom)) : 0
         const denom = rs - frete * taxa
         const pct = com && denom ? com / denom : 0.05
         atual.lancamentos.push({
