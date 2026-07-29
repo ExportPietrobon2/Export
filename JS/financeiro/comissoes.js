@@ -70,8 +70,10 @@ function cardFatura(f) {
     && Math.abs(saldo) < 0.01
     && f.qtdSemNf === 0
     && f.qtdDivergente === 0
-  const cardBorder = liquidada ? 'border-color:#198754;border-width:2px' : ''
-  const cardBg = liquidada ? 'background:#f0fdf4' : ''
+  // Card liquidado: fundo verde-água suave, borda esquerda destacada, sem borda padrão
+  const cardStyle = liquidada
+    ? 'background:linear-gradient(135deg,#e8f8f0 0%,#f0fdf6 100%);border:none;border-left:4px solid #198754;box-shadow:0 1px 6px rgba(25,135,84,.15)'
+    : ''
   const linhas = (f.lancamentos || []).map((l) => {
     const c = l.calc
     const alerta = c.divergente ? `<span class="badge bg-danger">Difere ${brl(c.dif)}</span>` : (c.semNf ? '<span class="badge bg-warning text-dark">Sem NF</span>' : '<span class="badge bg-success">OK</span>')
@@ -93,7 +95,7 @@ function cardFatura(f) {
   const badgeLiquidada = liquidada
     ? '<span class="badge ms-2" style="background:#198754;font-size:.7rem;vertical-align:middle">✔ Liquidada</span>'
     : ''
-  return `<div class="card mb-2" style="${cardBorder};${cardBg}"><div class="card-body">
+  return `<div class="card mb-2" style="${cardStyle}"><div class="card-body">
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
       <div><span class="fw-bold">Fatura ${esc(f.fatura || '-')}</span>${badgeLiquidada} · ${esc(f.pais || '-')} · ${esc(f.cliente || '-')}
         <div class="small text-muted">Invoice US$ ${numf(f.valor_invoice)} · Saldo US$ <span class="${saldo > 0.01 ? 'text-danger fw-semibold' : 'text-success fw-semibold'}">${numf(saldo)}</span>
