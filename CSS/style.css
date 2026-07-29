@@ -1096,3 +1096,12 @@ body[data-pagina="checklist.html"] .page-header-icon::before { content: "📋"; 
 /* Ícone da aba Ordem de Produção */
 body[data-pagina="ordem-producao.html"] .page-header-icon::before { content: "🏭"; }
 #menu-principal a[href$="ordem-producao.html"]::before { content: "🏭"; margin-right: 8px; }
+/* ============================================================
+   PÁGINA DE COMISSÕES — fundo âmbar suave
+   ============================================================ */
+body[data-pagina="comissoes.html"] {
+  background:
+    radial-gradient(1000px 400px at 100% -5%, #fef9ec 0%, rgba(254,249,236,0) 60%),
+    radial-gradient(800px 350px at -5% 10%, #fdf3dc 0%, rgba(253,243,220,0) 55%),
+    #faf7f0;
+}
