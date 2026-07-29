@@ -651,6 +651,7 @@ async function verificarAlertasEmbarque() {
  }
 
  if (!alertas.length) return
+ if (!(await podeEnviarHoje('alertas_embarque'))) return
 
  const hoje = new Date()
  hoje.setHours(0, 0, 0, 0)
@@ -843,6 +844,7 @@ async function verificarComprasAtrasadas() {
  WHERE c.status <> 'recebido' AND c.data_prevista IS NOT NULL AND c.data_prevista < CURDATE()
  ORDER BY c.data_prevista ASC`)
  if (!rows.length) return
+ if (!(await podeEnviarHoje('compras_atrasadas'))) return
 
  const linhas = rows.map((c) => {
  const prev = new Date(String(c.data_prevista).slice(0, 10) + 'T00:00:00')
