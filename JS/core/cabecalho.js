@@ -27,12 +27,11 @@ async function carregarBadgesPendencias() {
 
 async function registrarPushNotification() {
   try {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false
     const sw = await navigator.serviceWorker.ready
     const permissao = await Notification.requestPermission()
-    if (permissao !== 'granted') return
+    if (permissao !== 'granted') return false
     const { key } = await fetch('/api/push/vapid-public').then((r) => r.json())
-    // Converter VAPID public key de base64url para Uint8Array
     const raw = atob(key.replace(/-/g, '+').replace(/_/g, '/'))
     const vapidKey = new Uint8Array([...raw].map((c) => c.charCodeAt(0)))
     const sub = await sw.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKey })
@@ -42,7 +41,21 @@ async function registrarPushNotification() {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(sub.toJSON())
     })
-  } catch (e) { /* silencioso — push não é crítico */ }
+    return true
+  } catch (e) { return false }
+}
+
+async function atualizarBotaoSino(btn) {
+  if (!('Notification' in window) || !('PushManager' in window)) { btn.style.display = 'none'; return }
+  if (Notification.permission === 'granted') {
+    btn.title = 'Notificações ativadas'
+    btn.innerHTML = '🔔'
+    btn.style.opacity = '1'
+  } else {
+    btn.title = 'Ativar notificações push'
+    btn.innerHTML = '🔕'
+    btn.style.opacity = '0.7'
+  }
 }
 
 export function montarCabecalho(papel) {
@@ -92,7 +105,7 @@ export function montarCabecalho(papel) {
  const nav = document.createElement('nav')
  nav.className = 'navbar navbar-pietrobon sticky-top'
  nav.innerHTML = `
- <div class="container-fluid px-3"><a class="navbar-brand d-flex align-items-center gap-2" href="${brandHref}"><img src="/logo.png" alt="Pietrobon" style="height:36px;object-fit:contain;"></a><div class="d-flex align-items-center gap-2 ms-auto"><button id="btn-instalar-topo" title="Instalar app" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);border-radius:8px;color:#fff;padding:6px 12px;font-size:0.82rem;font-weight:600;cursor:pointer;">
+ <div class="container-fluid px-3"><a class="navbar-brand d-flex align-items-center gap-2" href="${brandHref}"><img src="/logo.png" alt="Pietrobon" style="height:36px;object-fit:contain;"></a><div class="d-flex align-items-center gap-2 ms-auto"><button id="btn-sino" title="Ativar notificações" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);border-radius:8px;color:#fff;padding:6px 10px;font-size:1rem;cursor:pointer;">🔕</button><button id="btn-instalar-topo" title="Instalar app" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);border-radius:8px;color:#fff;padding:6px 12px;font-size:0.82rem;font-weight:600;cursor:pointer;">
  Instalar
  </button><div class="dropdown"><button class="btn btn-menu-pietrobon dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
  Menu
@@ -105,7 +118,23 @@ export function montarCabecalho(papel) {
  carregarBadgesPendencias()
  iniciarChat(papel)
 
- let promptInstalacao = null
+  // Botão sino — ativa notificações push ao clicar
+  const btnSino = document.getElementById('btn-sino')
+  if (btnSino && 'Notification' in window && 'PushManager' in window) {
+    btnSino.style.display = 'inline-block'
+    atualizarBotaoSino(btnSino)
+    if (Notification.permission === 'granted') registrarPushNotification().catch(() => {})
+    btnSino.addEventListener('click', async () => {
+      if (Notification.permission === 'granted') return
+      btnSino.disabled = true
+      const ok = await registrarPushNotification()
+      btnSino.disabled = false
+      atualizarBotaoSino(btnSino)
+      if (ok) btnSino.title = 'Notificações ativadas!'
+    })
+  }
+
+  let promptInstalacao = null
  window.addEventListener('beforeinstallprompt', (e) => {
  e.preventDefault()
  promptInstalacao = e
