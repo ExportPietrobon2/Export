@@ -21,7 +21,41 @@
         <p class="page-subtitulo">Declaração de estoque de insumos por produto e por PI</p>
       </div>
     </div>
-    <div id="conteudo-almoxarifado"><p class="text-muted">Carregando...</p></div>
+
+    <div id="alerta-declaracao-almox"></div>
+
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body">
+        <label class="form-label fw-semibold small">Selecionar PI</label>
+        <select id="select-pi" class="form-select">
+          <option value="">— Selecione uma PI —</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2 mb-3 flex-wrap nav-abas-almox">
+      <button class="btn btn-sm btn-outline-danger active" data-aba="estoque">Estoque PI</button>
+      <button class="btn btn-sm btn-outline-danger" data-aba="estoque-geral">Estoque Geral</button>
+      <button class="btn btn-sm btn-outline-danger" data-aba="recebimentos">Recebimentos B2</button>
+      <button class="btn btn-sm btn-outline-danger" data-aba="rendimentos">Rendimentos</button>
+      <button class="btn btn-sm btn-outline-danger" data-aba="pedidos">Pedidos ao Compras</button>
+    </div>
+
+    <div id="aba-estoque">
+      <div id="conteudo-pi"></div>
+    </div>
+    <div id="aba-estoque-geral" style="display:none">
+      <div id="conteudo-estoque-geral"></div>
+    </div>
+    <div id="aba-recebimentos" style="display:none">
+      <div id="conteudo-recebimentos"></div>
+    </div>
+    <div id="aba-rendimentos" style="display:none">
+      <div id="conteudo-referencia-wrapper-almox"></div>
+    </div>
+    <div id="aba-pedidos" style="display:none">
+      <div id="wrap-pedidos-compra-almox"></div>
+    </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script type="module" src="/JS/estoque/almoxarifado.js"></script>
