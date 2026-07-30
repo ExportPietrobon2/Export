@@ -138,7 +138,7 @@ function renderCard(pedido) {
  ${pedido.data_cadastro ? '· Cadastro ' + new Date(dataParaInput(pedido.data_cadastro) + 'T00:00:00').toLocaleDateString('pt-BR') : ''}
  ${pedido.data_embarque ? '· Embarque ' + new Date(dataParaInput(pedido.data_embarque) + 'T00:00:00').toLocaleDateString('pt-BR') : ''}
  </div><div class="mt-1 d-flex align-items-center gap-2 flex-wrap"><span class="badge ${pronta ? 'bg-success' : 'bg-danger'}">${pronta ? 'Pronto para produzir' : '⏳ Não pronto'}</span>
- ${pedido.comentario_embarque ? '<span class="badge bg-primary">Comentário do admin</span>' : ''}
+ ${pedido.comentario_embarque ? `<span class="badge bg-primary">💬 ${pedido.comentario_usuario || 'Admin'}</span>` : ''}
  ${totalRecb > 0 ? `<span class="small text-muted">Receb. B2: ${recebidos}/${totalRecb}</span>` : ''}
  </div></div><button class="btn btn-sm btn-outline-danger btn-expandir" data-id="${pedido.id}">${aberto ? 'Fechar ▴' : 'Ver detalhes ▾'}</button>
  `
@@ -180,7 +180,7 @@ function renderCard(pedido) {
  if (pedido.comentario_embarque) {
  const secComentario = document.createElement('div')
  secComentario.className = 'mt-3'
- secComentario.innerHTML = `<div class="alert alert-primary mb-0"><strong>Comentário do admin:</strong> ${pedido.comentario_embarque}</div>`
+ secComentario.innerHTML = `<div class="alert alert-primary mb-0"><strong>Comentário de:</strong> ${pedido.comentario_usuario || 'Admin'}<br>${pedido.comentario_embarque}</div>`
  detalhe.appendChild(secComentario)
  }
 
