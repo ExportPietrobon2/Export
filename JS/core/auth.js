@@ -1,5 +1,5 @@
-﻿function obterToken() {
-  return sessionStorage.getItem(''token'') || localStorage.getItem(''token_deposito'')
+function obterToken() {
+  return sessionStorage.getItem('token') || localStorage.getItem('token_deposito')
 }
 
 export function getPerfil() {
@@ -7,10 +7,10 @@ export function getPerfil() {
   if (!token) return null
 
   try {
-    const payload = JSON.parse(atob(token.split(''.'')[1]))
+    const payload = JSON.parse(atob(token.split('.')[1]))
     if (payload.exp * 1000 < Date.now()) {
-      sessionStorage.removeItem(''token'')
-      localStorage.removeItem(''token_deposito'')
+      sessionStorage.removeItem('token')
+      localStorage.removeItem('token_deposito')
       return null
     }
     return payload
@@ -23,12 +23,12 @@ export function exigirPapel(papeisPermitidos) {
   const perfil = getPerfil()
 
   if (!perfil) {
-    window.location.href = ''/index.html''
+    window.location.href = '/index.html'
     return null
   }
 
-  if (papeisPermitidos !== ''todos'' && !papeisPermitidos.includes(perfil.papel)) {
-    window.location.href = ''/index.html''
+  if (papeisPermitidos !== 'todos' && !papeisPermitidos.includes(perfil.papel)) {
+    window.location.href = '/index.html'
     return null
   }
 
@@ -36,15 +36,15 @@ export function exigirPapel(papeisPermitidos) {
 }
 
 export function salvarToken(token, papel) {
-  if (papel === ''deposito'') {
-    localStorage.setItem(''token_deposito'', token)
+  if (papel === 'deposito') {
+    localStorage.setItem('token_deposito', token)
   } else {
-    sessionStorage.setItem(''token'', token)
+    sessionStorage.setItem('token', token)
   }
 }
 
 export function sair() {
-  sessionStorage.removeItem(''token'')
-  localStorage.removeItem(''token_deposito'')
-  window.location.href = ''/index.html''
+  sessionStorage.removeItem('token')
+  localStorage.removeItem('token_deposito')
+  window.location.href = '/index.html'
 }

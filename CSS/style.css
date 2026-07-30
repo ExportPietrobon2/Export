@@ -1,4 +1,4 @@
-﻿@import url(''https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap'');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
   --red: #ED3237;
@@ -18,7 +18,7 @@
 
 body {
   background: var(--bg);
-  font-family: ''Segoe UI'', system-ui, -apple-system, sans-serif;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
@@ -797,7 +797,7 @@ body { letter-spacing: 0.005em; }
 }
 
 body {
-  font-family: ''Inter'', system-ui, -apple-system, ''Segoe UI'', sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   background: var(--bg);
   color: var(--text);
   letter-spacing: 0;

@@ -1,34 +1,34 @@
-﻿import { api } from ''/JS/core/api.js''
+import { api } from '/JS/core/api.js'
 
 const TITULOS_POR_PAPEL = {
-  admin: ''Assistente Geral'',
-  almoxarifado: ''Assistente do Almoxarifado'',
-  compras: ''Assistente de Compras'',
-  compras_aromas: ''Assistente de Aromas'',
-  gerente_producao: ''Assistente de Embarques'',
-  deposito: ''Assistente do Depósito'',
-  convidado: ''Assistente''
+  admin: 'Assistente Geral',
+  almoxarifado: 'Assistente do Almoxarifado',
+  compras: 'Assistente de Compras',
+  compras_aromas: 'Assistente de Aromas',
+  gerente_producao: 'Assistente de Embarques',
+  deposito: 'Assistente do Depósito',
+  convidado: 'Assistente'
 }
 
 const SUGESTOES_POR_PAPEL = {
-  almoxarifado: [''O que ainda falta declarar?'', ''Quais PIs estão pendentes?''],
-  compras: [''Tem pedidos pendentes pra mim?'', ''Alguma compra com entrega atrasada?''],
-  compras_aromas: [''Tem pedido de aroma pra responder?''],
-  gerente_producao: [''Quais PIs estão prontas sem data de embarque?''],
-  admin: [''Resumo das pendências'', ''O que está atrasado hoje?''],
-  deposito: [''O que preciso lançar no B2?''],
-  convidado: [''Como funciona o sistema?'']
+  almoxarifado: ['O que ainda falta declarar?', 'Quais PIs estão pendentes?'],
+  compras: ['Tem pedidos pendentes pra mim?', 'Alguma compra com entrega atrasada?'],
+  compras_aromas: ['Tem pedido de aroma pra responder?'],
+  gerente_producao: ['Quais PIs estão prontas sem data de embarque?'],
+  admin: ['Resumo das pendências', 'O que está atrasado hoje?'],
+  deposito: ['O que preciso lançar no B2?'],
+  convidado: ['Como funciona o sistema?']
 }
 
 let historico = []
 let painelAberto = false
 
 export function iniciarChat(papel) {
-  if (document.getElementById(''btn-chat'')) return
+  if (document.getElementById('btn-chat')) return
 
-  const titulo = TITULOS_POR_PAPEL[papel] || ''Assistente''
+  const titulo = TITULOS_POR_PAPEL[papel] || 'Assistente'
 
-  const estilo = document.createElement(''style'')
+  const estilo = document.createElement('style')
   estilo.textContent = `
     #btn-chat {
       position: fixed; right: 18px; bottom: 18px; z-index: 1050;
@@ -92,18 +92,18 @@ export function iniciarChat(papel) {
   `
   document.head.appendChild(estilo)
 
-  const btnChat = document.createElement(''button'')
-  btnChat.id = ''btn-chat''
+  const btnChat = document.createElement('button')
+  btnChat.id = 'btn-chat'
   btnChat.title = titulo
-  btnChat.textContent = ''💬''
+  btnChat.textContent = '💬'
   document.body.appendChild(btnChat)
 
   const sugestoes = (SUGESTOES_POR_PAPEL[papel] || SUGESTOES_POR_PAPEL.convidado)
     .map((s) => `<button class="chat-btn-sugestao" type="button">${s}</button>`)
-    .join('''')
+    .join('')
 
-  const painel = document.createElement(''div'')
-  painel.id = ''painel-chat''
+  const painel = document.createElement('div')
+  painel.id = 'painel-chat'
   painel.innerHTML = `
     <div class="chat-topo">
       <div>${titulo}<small>Tire dúvidas sobre o sistema ou as pendências do seu setor</small></div>
@@ -117,22 +117,22 @@ export function iniciarChat(papel) {
     </form>`
   document.body.appendChild(painel)
 
-  const elMensagens = painel.querySelector(''#chat-mensagens'')
-  const elInput = painel.querySelector(''#chat-input'')
-  const btnEnviar = painel.querySelector(''#chat-btn-enviar'')
+  const elMensagens = painel.querySelector('#chat-mensagens')
+  const elInput = painel.querySelector('#chat-input')
+  const btnEnviar = painel.querySelector('#chat-btn-enviar')
 
   function formatarTexto(texto) {
     return texto
-      .replace(/&/g, ''&amp;'').replace(/</g, ''&lt;'').replace(/>/g, ''&gt;'')
-      .replace(/\*\*(.+?)\*\*/g, ''<strong>$1</strong>'')
-      .replace(/(^|\n)\s*[-*]\s+(.+)/g, ''$1• $2'')
-      .replace(/\n/g, ''<br>'')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/(^|\n)\s*[-*]\s+(.+)/g, '$1• $2')
+      .replace(/\n/g, '<br>')
   }
 
   function adicionarBolha(texto, tipo) {
-    const bolha = document.createElement(''div'')
+    const bolha = document.createElement('div')
     bolha.className = `chat-bolha ${tipo}`
-    if (tipo === ''assistente'') bolha.innerHTML = formatarTexto(texto)
+    if (tipo === 'assistente') bolha.innerHTML = formatarTexto(texto)
     else bolha.textContent = texto
     elMensagens.appendChild(bolha)
     elMensagens.scrollTop = elMensagens.scrollHeight
@@ -141,49 +141,49 @@ export function iniciarChat(papel) {
 
   function abrirChat() {
     painelAberto = true
-    painel.classList.add(''aberto'')
+    painel.classList.add('aberto')
     if (!historico.length) {
-      adicionarBolha(`Olá! Sou o ${titulo.toLowerCase()}. No que posso ajudar?`, ''assistente'')
+      adicionarBolha(`Olá! Sou o ${titulo.toLowerCase()}. No que posso ajudar?`, 'assistente')
     }
     elInput.focus()
   }
 
   function fecharChat() {
     painelAberto = false
-    painel.classList.remove(''aberto'')
+    painel.classList.remove('aberto')
   }
 
-  btnChat.addEventListener(''click'', () => (painelAberto ? fecharChat() : abrirChat()))
-  painel.querySelector(''.chat-btn-fechar'').addEventListener(''click'', fecharChat)
+  btnChat.addEventListener('click', () => (painelAberto ? fecharChat() : abrirChat()))
+  painel.querySelector('.chat-btn-fechar').addEventListener('click', fecharChat)
 
   async function enviarMensagem(texto) {
     const msg = (texto || elInput.value).trim()
     if (!msg) return
 
-    elInput.value = ''''
-    adicionarBolha(msg, ''usuario'')
-    historico.push({ de: ''user'', texto: msg })
+    elInput.value = ''
+    adicionarBolha(msg, 'usuario')
+    historico.push({ de: 'user', texto: msg })
 
     btnEnviar.disabled = true
-    const aguardando = adicionarBolha(''digitando...'', ''assistente'')
+    const aguardando = adicionarBolha('digitando...', 'assistente')
 
     const resposta = await api.chat(msg, historico)
     aguardando.remove()
 
-    const textoResposta = resposta?.resposta || resposta?.erro || ''Não consegui responder agora.''
-    adicionarBolha(textoResposta, ''assistente'')
-    historico.push({ de: ''bot'', texto: textoResposta })
+    const textoResposta = resposta?.resposta || resposta?.erro || 'Não consegui responder agora.'
+    adicionarBolha(textoResposta, 'assistente')
+    historico.push({ de: 'bot', texto: textoResposta })
 
     btnEnviar.disabled = false
     elInput.focus()
   }
 
-  painel.querySelector(''#chat-form'').addEventListener(''submit'', (e) => {
+  painel.querySelector('#chat-form').addEventListener('submit', (e) => {
     e.preventDefault()
     enviarMensagem()
   })
 
-  painel.querySelectorAll(''.chat-btn-sugestao'').forEach((btn) => {
-    btn.addEventListener(''click'', () => enviarMensagem(btn.textContent))
+  painel.querySelectorAll('.chat-btn-sugestao').forEach((btn) => {
+    btn.addEventListener('click', () => enviarMensagem(btn.textContent))
   })
 }

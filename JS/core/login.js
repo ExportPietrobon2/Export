@@ -1,14 +1,14 @@
-﻿import { api } from ''/JS/core/api.js''
-import { getPerfil, salvarToken } from ''/JS/core/auth.js''
+import { api } from '/JS/core/api.js'
+import { getPerfil, salvarToken } from '/JS/core/auth.js'
 
 const paginaPorPapel = {
-  admin: ''/HTML/producao/admin.html'',
-  almoxarifado: ''/HTML/estoque/almoxarifado.html'',
-  deposito: ''/HTML/estoque/recebimento.html'',
-  convidado: ''/HTML/producao/admin.html'',
-  gerente_producao: ''/HTML/estoque/embarques.html'',
-  compras: ''/HTML/estoque/compras.html'',
-  compras_aromas: ''/HTML/estoque/compras.html''
+  admin: '/HTML/producao/admin.html',
+  almoxarifado: '/HTML/estoque/almoxarifado.html',
+  deposito: '/HTML/estoque/recebimento.html',
+  convidado: '/HTML/producao/admin.html',
+  gerente_producao: '/HTML/estoque/embarques.html',
+  compras: '/HTML/estoque/compras.html',
+  compras_aromas: '/HTML/estoque/compras.html'
 }
 
 function redirecionarSeJaLogado() {
@@ -18,14 +18,14 @@ function redirecionarSeJaLogado() {
   }
 }
 
-document.getElementById(''form-login'').addEventListener(''submit'', async (evento) => {
+document.getElementById('form-login').addEventListener('submit', async (evento) => {
   evento.preventDefault()
 
-  const email = document.getElementById(''campo-email'').value.trim()
-  const senha = document.getElementById(''campo-senha'').value
-  const msgErro = document.getElementById(''mensagem-erro'')
+  const email = document.getElementById('campo-email').value.trim()
+  const senha = document.getElementById('campo-senha').value
+  const msgErro = document.getElementById('mensagem-erro')
 
-  msgErro.textContent = ''''
+  msgErro.textContent = ''
 
   const resultado = await api.login(email, senha)
 
