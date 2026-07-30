@@ -1,5 +1,4 @@
 const express = require('express')
-const webpush = require('web-push')
 const mysql = require('mysql2/promise')
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
@@ -18,61 +17,6 @@ cloudinary.config({
 })
 
 const upload = multer({ storage: multer.memoryStorage() })
-
-const VAPID_PUBLIC  = process.env.VAPID_PUBLIC  || 'BBKXW9q8UQm07c-duKRqEFyyXEbDwQz4AeXipuuTOsPpcKB9nn7wJmXgTHE68GhjxUZej0YsGln4Cafu61_0slE'
-const VAPID_PRIVATE = process.env.VAPID_PRIVATE || 'APBGcOONkbNs6Bf0KNqNj-T9hJMsdVdUpxXKWg4JgF0'
-webpush.setVapidDetails('mailto:export2@pietrobon.com.br', VAPID_PUBLIC, VAPID_PRIVATE)
-
-async function garantirTabelaPush() {
-  await pool.query(`CREATE TABLE IF NOT EXISTS push_subscriptions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    usuario_id INT,
-    endpoint TEXT NOT NULL,
-    p256dh TEXT NOT NULL,
-    auth TEXT NOT NULL,
-    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_endpoint (endpoint(255))
-  )`)
-}
-
-// Controle de push: máx 3x por dia por chave
-async function podeEnviarPush(chave) {
-  try {
-    await pool.query(`CREATE TABLE IF NOT EXISTS push_log (
-      chave VARCHAR(80) PRIMARY KEY,
-      data_ref DATE NOT NULL,
-      contador TINYINT NOT NULL DEFAULT 0
-    )`)
-    const hoje = new Date().toISOString().slice(0, 10)
-    const [[r]] = await pool.query('SELECT data_ref, contador FROM push_log WHERE chave = ?', [chave])
-    if (r && r.data_ref && new Date(r.data_ref).toISOString().slice(0, 10) === hoje) {
-      if (r.contador >= 3) return false
-      await pool.query('UPDATE push_log SET contador = contador + 1 WHERE chave = ?', [chave])
-    } else {
-      await pool.query('INSERT INTO push_log (chave, data_ref, contador) VALUES (?, CURDATE(), 1) ON DUPLICATE KEY UPDATE data_ref = CURDATE(), contador = 1', [chave])
-    }
-    return true
-  } catch (e) { return true }
-}
-
-async function enviarPush(titulo, corpo, url, chave) {
-  if (!(await podeEnviarPush(chave))) return
-  try {
-    await garantirTabelaPush()
-    const [subs] = await pool.query('SELECT endpoint, p256dh, auth FROM push_subscriptions')
-    const payload = JSON.stringify({ titulo, corpo, url: url || '/' })
-    await Promise.allSettled(subs.map(async (s) => {
-      try {
-        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload)
-      } catch (e) {
-        // Subscription inválida — remove do banco
-        if (e.statusCode === 410 || e.statusCode === 404) {
-          await pool.query('DELETE FROM push_subscriptions WHERE endpoint = ?', [s.endpoint])
-        }
-      }
-    }))
-  } catch (e) { console.error('Erro enviarPush:', e.message) }
-}
 
 const EMAIL_TESTE = process.env.EMAIL_TESTE || 'pietrobonexport2@gmail.com'
 const MODO_TESTE = process.env.MODO_TESTE !== 'false'
@@ -195,23 +139,6 @@ function autenticar(papeis) {
 
 const TODOS = ['admin', 'almoxarifado', 'deposito', 'convidado', 'gerente_producao', 'compras', 'compras_aromas']
 
-
-app.get('/api/push/vapid-public', (req, res) => res.json({ key: VAPID_PUBLIC }))
-
-app.post('/api/push/subscribe', autenticar(['admin', 'almoxarifado', 'deposito', 'convidado']), async (req, res) => {
-  const { endpoint, keys } = req.body
-  if (!endpoint || !keys?.p256dh || !keys?.auth) return res.status(400).json({ erro: 'Dados inválidos' })
-  try {
-    await garantirTabelaPush()
-    const perfil = req.usuario
-    await pool.query(
-      'INSERT INTO push_subscriptions (usuario_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE p256dh = VALUES(p256dh), auth = VALUES(auth), usuario_id = VALUES(usuario_id)',
-      [perfil?.id || null, endpoint, keys.p256dh, keys.auth]
-    )
-    res.json({ ok: true })
-  } catch (e) { res.status(500).json({ erro: e.message }) }
-})
-
 app.post('/api/login', async (req, res) => {
  const { email, senha } = req.body
  const [rows] = await pool.query('SELECT * FROM usuarios WHERE email = ?', [email])
@@ -287,22 +214,6 @@ app.post('/api/pedidos', autenticar(['admin']), async (req, res) => {
  const piId = resultado.insertId
  const tiposRecebimento = ['embalagem', 'rotulo', 'caixa']
  res.json({ id: piId })
- // Notificar nova PI — push + e-mail (máx 3x/dia)
- const chave = `nova_pi_${new Date().toISOString().slice(0, 10)}`
- const titulo = `Nova PI cadastrada — ${numero_pi}`
- const detalhe = [cliente && `Cliente: ${cliente}`, destino && `Destino: ${destino}`].filter(Boolean).join(' · ')
- enviarPush(titulo, detalhe || 'Acesse o sistema para ver os detalhes.', '/HTML/producao/admin.html', chave).catch(() => {})
- enviarEmail(
-   titulo,
-   `<h2 style="color:#ED3237;margin:0 0 16px">Nova PI Cadastrada</h2>
-   <table style="width:100%;border-collapse:collapse;">
-     <tr><td style="padding:8px 0;color:#8a6a6a;width:140px">Número</td><td style="padding:8px 0;font-weight:700">${numero_pi}</td></tr>
-     ${cliente ? `<tr><td style="padding:8px 0;color:#8a6a6a">Cliente</td><td style="padding:8px 0;font-weight:600">${cliente}</td></tr>` : ''}
-     ${destino ? `<tr><td style="padding:8px 0;color:#8a6a6a">Destino</td><td style="padding:8px 0;font-weight:600">${destino}</td></tr>` : ''}
-     ${data_cadastro ? `<tr><td style="padding:8px 0;color:#8a6a6a">Data</td><td style="padding:8px 0">${new Date(data_cadastro + 'T00:00:00').toLocaleDateString('pt-BR')}</td></tr>` : ''}
-   </table>`,
-   ['admin', 'almoxarifado']
- ).catch(() => {})
 })
 
 app.patch('/api/pedidos/:id/embarque', autenticar(['admin', 'gerente_producao']), async (req, res) => {
@@ -326,8 +237,12 @@ app.patch('/api/pedidos/:id/embarque', autenticar(['admin', 'gerente_producao'])
 
 app.patch('/api/pedidos/:id/comentario-embarque', autenticar(['admin']), async (req, res) => {
  const { comentario } = req.body
- await pool.query('UPDATE pedidos SET comentario_embarque = ? WHERE id = ?', [comentario || null, req.params.id])
- const [[pi]] = await pool.query('SELECT numero_pi, cliente FROM pedidos WHERE id = ?', [req.params.id])
+ const nomeUsuario = req.usuario?.nome || req.usuario?.email || 'Admin'
+ await pool.query(
+   'UPDATE pedidos SET comentario_embarque = ?, comentario_usuario = ? WHERE id = ?',
+   [comentario || null, comentario ? nomeUsuario : null, req.params.id]
+ )
+ const [[pi]] = await pool.query('SELECT numero_pi, cliente, comentario_usuario FROM pedidos WHERE id = ?', [req.params.id])
  if (pi && comentario && comentario.trim()) {
  enviarEmail(
  `Cobrança de embarque — PI ${pi.numero_pi}`,
