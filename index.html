@@ -1,9 +1,9 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Controle de Insumos · Exportação</title>
+  <title>Pietrobon · Controle de Insumos</title>
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#ED3237">
   <meta name="mobile-web-app-capable" content="yes">
@@ -24,11 +24,13 @@
         <form id="form-login">
           <div class="mb-3">
             <label class="form-label fw-semibold small">E-mail</label>
-            <input type="email" id="campo-email" class="form-control form-control-lg" placeholder="seu@email.com" required>
+            <input type="email" id="campo-email" class="form-control form-control-lg"
+              placeholder="seu@email.com" required>
           </div>
           <div class="mb-4">
             <label class="form-label fw-semibold small">Senha</label>
-            <input type="password" id="campo-senha" class="form-control form-control-lg" placeholder="••••••••" required>
+            <input type="password" id="campo-senha" class="form-control form-control-lg"
+              placeholder="••••••••" required>
           </div>
           <button type="submit" class="btn btn-pietrobon w-100 btn-lg">Entrar</button>
           <p id="mensagem-erro" class="text-danger text-center mt-3 mb-0 small"></p>
@@ -38,8 +40,8 @@
   </div>
   <script type="module" src="/JS/core/login.js"></script>
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js')
+    if (''serviceWorker'' in navigator) {
+      navigator.serviceWorker.register(''/sw.js'')
     }
   </script>
 </body>

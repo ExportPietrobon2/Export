@@ -1,157 +1,222 @@
-import { sair, getPerfil } from '/JS/core/auth.js'
-import { api } from '/JS/core/api.js'
-import { iniciarChat } from '/JS/core/chat.js'
+﻿import { sair, getPerfil } from ''/JS/core/auth.js''
+import { api } from ''/JS/core/api.js''
+import { iniciarChat } from ''/JS/core/chat.js''
 
-const EMAILS_FINANCEIRO = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'joaoantonio@pietrobon.com.br']
+const EMAILS_FINANCEIRO = [
+  ''export2@pietrobon.com.br'',
+  ''export@pietrobon.com.br'',
+  ''joaoantonio@pietrobon.com.br''
+]
 
 async function carregarBadgesPendencias() {
- try {
- const p = await api.pendencias()
- if (!p || p.erro) return
- const add = (href, n, cor) => {
- if (!n) return
- const link = document.querySelector(`#menu-principal a[href="${href}"]`)
- if (!link) return
- const b = document.createElement('span')
- b.className = `badge rounded-pill ${cor} ms-2`
- b.style.fontSize = '0.68rem'
- b.textContent = n
- link.appendChild(b)
- }
- add('/HTML/estoque/almoxarifado.html', p.estoqueNaoDeclarado, 'bg-warning text-dark')
- add('/HTML/estoque/embarques.html', p.embarquesPendentes, 'bg-secondary')
- add('/HTML/estoque/compras.html', (p.pedidosCompra || 0) + (p.comprasAtrasadas || 0), 'bg-danger')
- } catch (e) { /* silencioso */ }
+  try {
+    const pendencias = await api.pendencias()
+    if (!pendencias || pendencias.erro) return
+
+    const adicionarBadge = (href, quantidade, cor) => {
+      if (!quantidade) return
+      const link = document.querySelector(`#menu-principal a[href="${href}"]`)
+      if (!link) return
+      const badge = document.createElement(''span'')
+      badge.className = `badge rounded-pill ${cor} ms-2`
+      badge.style.fontSize = ''0.68rem''
+      badge.textContent = quantidade
+      link.appendChild(badge)
+    }
+
+    adicionarBadge(''/HTML/estoque/almoxarifado.html'', pendencias.estoqueNaoDeclarado, ''bg-warning text-dark'')
+    adicionarBadge(''/HTML/estoque/embarques.html'', pendencias.embarquesPendentes, ''bg-secondary'')
+    adicionarBadge(
+      ''/HTML/estoque/compras.html'',
+      (pendencias.pedidosCompra || 0) + (pendencias.comprasAtrasadas || 0),
+      ''bg-danger''
+    )
+  } catch (_) {}
 }
 
-
-async function registrarPushNotification() {
+async function registrarNotificacaoPush() {
   try {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false
+    if (!(''serviceWorker'' in navigator) || !(''PushManager'' in window)) return false
+
     const sw = await navigator.serviceWorker.ready
     const permissao = await Notification.requestPermission()
-    if (permissao !== 'granted') return false
-    const { key } = await fetch('/api/push/vapid-public').then((r) => r.json())
-    const raw = atob(key.replace(/-/g, '+').replace(/_/g, '/'))
-    const vapidKey = new Uint8Array([...raw].map((c) => c.charCodeAt(0)))
-    const sub = await sw.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKey })
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
-    await fetch('/api/push/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(sub.toJSON())
+    if (permissao !== ''granted'') return false
+
+    const { key } = await fetch(''/api/push/vapid-public'').then((r) => r.json())
+    const raw = atob(key.replace(/-/g, ''+'').replace(/_/g, ''/''))
+    const chaveVapid = new Uint8Array([...raw].map((c) => c.charCodeAt(0)))
+
+    const inscricao = await sw.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: chaveVapid
     })
+
+    const token = localStorage.getItem(''token'') || sessionStorage.getItem(''token'')
+    await fetch(''/api/push/subscribe'', {
+      method: ''POST'',
+      headers: { ''Content-Type'': ''application/json'', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(inscricao.toJSON())
+    })
+
     return true
-  } catch (e) { return false }
+  } catch (_) {
+    return false
+  }
 }
 
-async function atualizarBotaoSino(btn) {
-  if (!('Notification' in window) || !('PushManager' in window)) { btn.style.display = 'none'; return }
-  if (Notification.permission === 'granted') {
-    btn.title = 'Notificações ativadas'
-    btn.innerHTML = '🔔'
-    btn.style.opacity = '1'
+async function atualizarBotaoNotificacao(btn) {
+  if (!(''Notification'' in window) || !(''PushManager'' in window)) {
+    btn.style.display = ''none''
+    return
+  }
+
+  if (Notification.permission === ''granted'') {
+    btn.title = ''Notificações ativadas''
+    btn.innerHTML = ''🔔''
+    btn.style.opacity = ''1''
   } else {
-    btn.title = 'Ativar notificações push'
-    btn.innerHTML = '🔕'
-    btn.style.opacity = '0.7'
+    btn.title = ''Ativar notificações''
+    btn.innerHTML = ''🔕''
+    btn.style.opacity = ''0.7''
   }
 }
 
 export function montarCabecalho(papel) {
- const paginaAtual = document.body.dataset.pagina
- const perfil = getPerfil()
- const emailAtual = perfil ? (perfil.email || '').toLowerCase() : ''
- const ehContabil = EMAILS_FINANCEIRO.includes(emailAtual)
- const ehChecklist = ['export2@pietrobon.com.br', 'export@pietrobon.com.br'].includes(emailAtual)
+  const paginaAtual = document.body.dataset.pagina
+  const perfil = getPerfil()
+  const emailAtual = perfil ? (perfil.email || '''').toLowerCase() : ''''
+  const temAcessoFinanceiro = EMAILS_FINANCEIRO.includes(emailAtual)
+  const temAcessoChecklist = [
+    ''export2@pietrobon.com.br'',
+    ''export@pietrobon.com.br''
+  ].includes(emailAtual)
 
- const brandHref = '/HTML/producao/admin.html'
+  const secoes = [
+    {
+      titulo: ''Produção'',
+      itens: [
+        { href: ''/HTML/producao/admin.html'', texto: ''Visão Geral das PIs'' },
+        { href: ''/HTML/producao/cadastro.html'', texto: ''Cadastrar PI'' },
+        { href: ''/HTML/producao/ordem-producao.html'', texto: ''Ordem de Produção'', quando: temAcessoFinanceiro },
+        { href: ''/HTML/producao/checklist.html'', texto: ''Check-list de Expedição'', quando: temAcessoChecklist }
+      ]
+    },
+    {
+      titulo: ''Estoque e Compras'',
+      itens: [
+        { href: ''/HTML/estoque/almoxarifado.html'', texto: ''Almoxarifado'' },
+        { href: ''/HTML/estoque/recebimento.html'', texto: ''Recebimento B2'' },
+        { href: ''/HTML/estoque/referencia.html'', texto: ''Rendimentos'' },
+        { href: ''/HTML/estoque/embarques.html'', texto: ''Embarques'' },
+        { href: ''/HTML/estoque/compras.html'', texto: ''Compras'' }
+      ]
+    },
+    {
+      titulo: ''Financeiro'',
+      quando: temAcessoFinanceiro,
+      itens: [
+        { href: ''/HTML/financeiro/contabil.html'', texto: ''Contábil / Faturamento'' },
+        { href: ''/HTML/financeiro/exp-contabil.html'', texto: ''Contab. de Exportação'' },
+        { href: ''/HTML/financeiro/financeiro.html'', texto: ''Financeiro (Importações)'' },
+        { href: ''/HTML/financeiro/comissoes.html'', texto: ''Comissões (Exportação)'' }
+      ]
+    }
+  ]
 
- // Menu organizado por seções. Cada item pode ter "quando" para controlar acesso.
- const secoes = [
- { titulo: 'Produção', itens: [
- { href: '/HTML/producao/admin.html', texto: 'Visão Geral das PIs' },
- { href: '/HTML/producao/cadastro.html', texto: 'Cadastrar PIs' },
- { href: '/HTML/producao/ordem-producao.html', texto: 'Ordem de Produção', quando: ehContabil },
- { href: '/HTML/producao/checklist.html', texto: 'Check-list de Expedição', quando: ehChecklist }
- ] },
- { titulo: 'Estoque & Compras', itens: [
- { href: '/HTML/estoque/almoxarifado.html', texto: 'Almoxarifado' },
- { href: '/HTML/estoque/recebimento.html', texto: 'Recebimento B2' },
- { href: '/HTML/estoque/referencia.html', texto: 'Rendimentos' },
- { href: '/HTML/estoque/embarques.html', texto: 'Embarques' },
- { href: '/HTML/estoque/compras.html', texto: 'Compras' }
- ] },
- { titulo: 'Financeiro', quando: ehContabil, itens: [
- { href: '/HTML/financeiro/contabil.html', texto: 'Contábil / Faturamento' },
- { href: '/HTML/financeiro/exp-contabil.html', texto: 'Contab. de Exportação' },
- { href: '/HTML/financeiro/financeiro.html', texto: 'Financeiro (Importações)' },
- { href: '/HTML/financeiro/comissoes.html', texto: 'Comissões (Exportação)' }
- ] }
- ]
+  const htmlSecoes = secoes
+    .filter((s) => s.quando !== false)
+    .map((s) => {
+      const itens = s.itens.filter((it) => it.quando !== false)
+      if (!itens.length) return ''''
 
- const secoesMenu = secoes
- .filter((s) => s.quando !== false)
- .map((s) => {
- const itens = s.itens.filter((it) => it.quando !== false)
- if (!itens.length) return ''
- const linhas = itens.map((it) => `
- <li><a class="dropdown-item ${it.href.endsWith(paginaAtual) ? 'active' : ''}" href="${it.href}">${it.texto}</a></li>`).join('')
- return `
- <li><h6 class="dropdown-header text-uppercase fw-bold">${s.titulo}</h6></li>${linhas}
- <li><hr class="dropdown-divider"></li>`
- }).join('')
+      const linhas = itens.map((it) => `
+        <li>
+          <a class="dropdown-item ${it.href.endsWith(paginaAtual) ? ''active'' : ''''}" href="${it.href}">
+            ${it.texto}
+          </a>
+        </li>`).join('''')
 
- const nav = document.createElement('nav')
- nav.className = 'navbar navbar-pietrobon sticky-top'
- nav.innerHTML = `
- <div class="container-fluid px-3"><a class="navbar-brand d-flex align-items-center gap-2" href="${brandHref}"><img src="/logo.png" alt="Pietrobon" style="height:36px;object-fit:contain;"></a><div class="d-flex align-items-center gap-2 ms-auto"><button id="btn-sino" title="Ativar notificações" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);border-radius:8px;color:#fff;padding:6px 10px;font-size:1rem;cursor:pointer;">🔕</button><button id="btn-instalar-topo" title="Instalar app" style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);border-radius:8px;color:#fff;padding:6px 12px;font-size:0.82rem;font-weight:600;cursor:pointer;">
- Instalar
- </button><div class="dropdown"><button class="btn btn-menu-pietrobon dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
- Menu
- </button><ul class="dropdown-menu dropdown-menu-end shadow" id="menu-principal">
- ${secoesMenu}
- <li><a class="dropdown-item text-danger fw-semibold" href="#" id="btn-sair">Sair</a></li></ul></div></div></div>
- `
- document.getElementById('cabecalho').appendChild(nav)
- document.getElementById('btn-sair').addEventListener('click', (e) => { e.preventDefault(); sair() })
- carregarBadgesPendencias()
- iniciarChat(papel)
+      return `
+        <li><h6 class="dropdown-header text-uppercase fw-bold">${s.titulo}</h6></li>
+        ${linhas}
+        <li><hr class="dropdown-divider"></li>`
+    }).join('''')
 
-  // Botão sino — ativa notificações push ao clicar
-  const btnSino = document.getElementById('btn-sino')
-  if (btnSino && 'Notification' in window && 'PushManager' in window) {
-    btnSino.style.display = 'inline-block'
-    atualizarBotaoSino(btnSino)
-    if (Notification.permission === 'granted') registrarPushNotification().catch(() => {})
-    btnSino.addEventListener('click', async () => {
-      if (Notification.permission === 'granted') return
-      btnSino.disabled = true
-      const ok = await registrarPushNotification()
-      btnSino.disabled = false
-      atualizarBotaoSino(btnSino)
-      if (ok) btnSino.title = 'Notificações ativadas!'
+  const nav = document.createElement(''nav'')
+  nav.className = ''navbar navbar-pietrobon sticky-top''
+  nav.innerHTML = `
+    <div class="container-fluid px-3">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="/HTML/producao/admin.html">
+        <img src="/logo.png" alt="Pietrobon" style="height:36px;object-fit:contain;">
+      </a>
+      <div class="d-flex align-items-center gap-2 ms-auto">
+        <button id="btn-notificacao" title="Ativar notificações"
+          style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);
+          border-radius:8px;color:#fff;padding:6px 10px;font-size:1rem;cursor:pointer;">🔕</button>
+        <button id="btn-instalar" title="Instalar app"
+          style="display:none;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);
+          border-radius:8px;color:#fff;padding:6px 12px;font-size:0.82rem;font-weight:600;cursor:pointer;">
+          Instalar
+        </button>
+        <div class="dropdown">
+          <button class="btn btn-menu-pietrobon dropdown-toggle" type="button"
+            data-bs-toggle="dropdown" aria-expanded="false">
+            Menu
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow" id="menu-principal">
+            ${htmlSecoes}
+            <li><a class="dropdown-item text-danger fw-semibold" href="#" id="btn-sair">Sair</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>`
+
+  document.getElementById(''cabecalho'').appendChild(nav)
+  document.getElementById(''btn-sair'').addEventListener(''click'', (e) => {
+    e.preventDefault()
+    sair()
+  })
+
+  carregarBadgesPendencias()
+  iniciarChat(papel)
+
+  const btnNotificacao = document.getElementById(''btn-notificacao'')
+  if (btnNotificacao && ''Notification'' in window && ''PushManager'' in window) {
+    btnNotificacao.style.display = ''inline-block''
+    atualizarBotaoNotificacao(btnNotificacao)
+
+    if (Notification.permission === ''granted'') {
+      registrarNotificacaoPush().catch(() => {})
+    }
+
+    btnNotificacao.addEventListener(''click'', async () => {
+      if (Notification.permission === ''granted'') return
+      btnNotificacao.disabled = true
+      const ok = await registrarNotificacaoPush()
+      btnNotificacao.disabled = false
+      atualizarBotaoNotificacao(btnNotificacao)
+      if (ok) btnNotificacao.title = ''Notificações ativadas!''
     })
   }
 
   let promptInstalacao = null
- window.addEventListener('beforeinstallprompt', (e) => {
- e.preventDefault()
- promptInstalacao = e
- const btn = document.getElementById('btn-instalar-topo')
- if (btn) {
- btn.style.display = 'inline-block'
- btn.addEventListener('click', async () => {
- if (!promptInstalacao) return
- promptInstalacao.prompt()
- const { outcome } = await promptInstalacao.userChoice
- if (outcome === 'accepted') btn.style.display = 'none'
- promptInstalacao = null
- })
- }
- })
- window.addEventListener('appinstalled', () => {
- const btn = document.getElementById('btn-instalar-topo')
- if (btn) btn.style.display = 'none'
- })
+  window.addEventListener(''beforeinstallprompt'', (e) => {
+    e.preventDefault()
+    promptInstalacao = e
+    const btn = document.getElementById(''btn-instalar'')
+    if (!btn) return
+    btn.style.display = ''inline-block''
+    btn.addEventListener(''click'', async () => {
+      if (!promptInstalacao) return
+      promptInstalacao.prompt()
+      const { outcome } = await promptInstalacao.userChoice
+      if (outcome === ''accepted'') btn.style.display = ''none''
+      promptInstalacao = null
+    })
+  })
+
+  window.addEventListener(''appinstalled'', () => {
+    const btn = document.getElementById(''btn-instalar'')
+    if (btn) btn.style.display = ''none''
+  })
 }

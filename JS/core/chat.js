@@ -1,141 +1,189 @@
-import { api } from '/JS/core/api.js'
+﻿import { api } from ''/JS/core/api.js''
 
-const TITULOS = {
-  admin: 'Assistente Geral',
-  almoxarifado: 'Assistente do Almoxarifado',
-  compras: 'Assistente de Compras',
-  compras_aromas: 'Assistente de Aromas',
-  gerente_producao: 'Assistente de Embarques',
-  deposito: 'Assistente do Depósito',
-  convidado: 'Assistente'
+const TITULOS_POR_PAPEL = {
+  admin: ''Assistente Geral'',
+  almoxarifado: ''Assistente do Almoxarifado'',
+  compras: ''Assistente de Compras'',
+  compras_aromas: ''Assistente de Aromas'',
+  gerente_producao: ''Assistente de Embarques'',
+  deposito: ''Assistente do Depósito'',
+  convidado: ''Assistente''
 }
 
-const SUGESTOES = {
-  almoxarifado: ['O que ainda falta declarar?', 'Quais PIs estão pendentes?'],
-  compras: ['Tenho pedidos pendentes?', 'Alguma compra atrasada?'],
-  compras_aromas: ['Tenho pedidos de aroma pendentes?'],
-  gerente_producao: ['Quais PIs estão sem data de embarque?'],
-  admin: ['Resumo das pendências de hoje', 'O que está atrasado?'],
-  deposito: ['O que preciso lançar no B2?'],
-  convidado: ['Como funciona o sistema?']
+const SUGESTOES_POR_PAPEL = {
+  almoxarifado: [''O que ainda falta declarar?'', ''Quais PIs estão pendentes?''],
+  compras: [''Tem pedidos pendentes pra mim?'', ''Alguma compra com entrega atrasada?''],
+  compras_aromas: [''Tem pedido de aroma pra responder?''],
+  gerente_producao: [''Quais PIs estão prontas sem data de embarque?''],
+  admin: [''Resumo das pendências'', ''O que está atrasado hoje?''],
+  deposito: [''O que preciso lançar no B2?''],
+  convidado: [''Como funciona o sistema?'']
 }
 
 let historico = []
-let aberto = false
+let painelAberto = false
 
 export function iniciarChat(papel) {
-  if (document.getElementById('chat-ia-botao')) return
-  const titulo = TITULOS[papel] || 'Assistente'
+  if (document.getElementById(''btn-chat'')) return
 
-  const estilo = document.createElement('style')
+  const titulo = TITULOS_POR_PAPEL[papel] || ''Assistente''
+
+  const estilo = document.createElement(''style'')
   estilo.textContent = `
-    #chat-ia-botao{position:fixed;right:18px;bottom:18px;z-index:1050;width:58px;height:58px;border-radius:50%;
-      background:linear-gradient(135deg,#ED3237,#C6242A);color:#fff;border:none;font-size:1.5rem;cursor:pointer;
-      box-shadow:0 6px 18px rgba(180,20,20,.4);transition:transform .15s;}
-    #chat-ia-botao:hover{transform:scale(1.07);}
-    #chat-ia-painel{position:fixed;right:18px;bottom:86px;z-index:1050;width:360px;max-width:calc(100vw - 24px);
-      height:520px;max-height:calc(100vh - 120px);background:#fff;border-radius:16px;overflow:hidden;display:none;
-      flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.25);border:1px solid #f0d0d0;}
-    #chat-ia-painel.aberto{display:flex;}
-    .chat-ia-topo{background:linear-gradient(120deg,#ED3237,#C6242A);color:#fff;padding:12px 16px;font-weight:700;
-      display:flex;align-items:center;justify-content:space-between;}
-    .chat-ia-topo small{display:block;font-weight:400;opacity:.85;font-size:.72rem;}
-    .chat-ia-fechar{background:none;border:none;color:#fff;font-size:1.3rem;cursor:pointer;line-height:1;}
-    .chat-ia-msgs{flex:1;overflow-y:auto;padding:14px;background:#FDF1F1;display:flex;flex-direction:column;gap:8px;}
-    .chat-ia-bolha{max-width:82%;padding:9px 12px;border-radius:14px;font-size:.9rem;line-height:1.4;white-space:pre-wrap;word-wrap:break-word;}
-    .chat-ia-bolha.user{align-self:flex-end;background:#ED3237;color:#fff;border-bottom-right-radius:4px;}
-    .chat-ia-bolha.bot{align-self:flex-start;background:#fff;color:#2E2E33;border:1px solid #f0d0d0;border-bottom-left-radius:4px;}
-    .chat-ia-sugestoes{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 8px;background:#FDF1F1;}
-    .chat-ia-sugestao{background:#fff;border:1px solid #f0d0d0;color:#C6242A;border-radius:16px;padding:5px 10px;
-      font-size:.78rem;cursor:pointer;}
-    .chat-ia-sugestao:hover{background:#fff8f8;}
-    .chat-ia-form{display:flex;gap:8px;padding:10px;border-top:1px solid #f0d0d0;background:#fff;}
-    .chat-ia-form input{flex:1;border:1px solid #e7d3d3;border-radius:10px;padding:9px 12px;font-size:.9rem;outline:none;}
-    .chat-ia-form input:focus{border-color:#ED3237;}
-    .chat-ia-form button{background:#2E7D32;color:#fff;border:none;border-radius:10px;padding:0 16px;font-weight:700;cursor:pointer;}
-    .chat-ia-form button:disabled{opacity:.5;cursor:default;}
+    #btn-chat {
+      position: fixed; right: 18px; bottom: 18px; z-index: 1050;
+      width: 58px; height: 58px; border-radius: 50%;
+      background: linear-gradient(135deg, #ED3237, #C6242A);
+      color: #fff; border: none; font-size: 1.5rem; cursor: pointer;
+      box-shadow: 0 6px 18px rgba(180, 20, 20, .4); transition: transform .15s;
+    }
+    #btn-chat:hover { transform: scale(1.07); }
+    #painel-chat {
+      position: fixed; right: 18px; bottom: 86px; z-index: 1050;
+      width: 360px; max-width: calc(100vw - 24px);
+      height: 520px; max-height: calc(100vh - 120px);
+      background: #fff; border-radius: 16px; overflow: hidden;
+      display: none; flex-direction: column;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, .25); border: 1px solid #f0d0d0;
+    }
+    #painel-chat.aberto { display: flex; }
+    .chat-topo {
+      background: linear-gradient(120deg, #ED3237, #C6242A);
+      color: #fff; padding: 12px 16px; font-weight: 700;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .chat-topo small { display: block; font-weight: 400; opacity: .85; font-size: .72rem; }
+    .chat-btn-fechar { background: none; border: none; color: #fff; font-size: 1.3rem; cursor: pointer; line-height: 1; }
+    .chat-mensagens {
+      flex: 1; overflow-y: auto; padding: 14px;
+      background: #FDF1F1; display: flex; flex-direction: column; gap: 8px;
+    }
+    .chat-bolha {
+      max-width: 82%; padding: 9px 12px; border-radius: 14px;
+      font-size: .9rem; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word;
+    }
+    .chat-bolha.usuario {
+      align-self: flex-end; background: #ED3237; color: #fff; border-bottom-right-radius: 4px;
+    }
+    .chat-bolha.assistente {
+      align-self: flex-start; background: #fff; color: #2E2E33;
+      border: 1px solid #f0d0d0; border-bottom-left-radius: 4px;
+    }
+    .chat-sugestoes { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 8px; background: #FDF1F1; }
+    .chat-btn-sugestao {
+      background: #fff; border: 1px solid #f0d0d0; color: #C6242A;
+      border-radius: 16px; padding: 5px 10px; font-size: .78rem; cursor: pointer;
+    }
+    .chat-btn-sugestao:hover { background: #fff8f8; }
+    .chat-rodape {
+      display: flex; gap: 8px; padding: 10px;
+      border-top: 1px solid #f0d0d0; background: #fff;
+    }
+    .chat-rodape input {
+      flex: 1; border: 1px solid #e7d3d3; border-radius: 10px;
+      padding: 9px 12px; font-size: .9rem; outline: none;
+    }
+    .chat-rodape input:focus { border-color: #ED3237; }
+    .chat-rodape button {
+      background: #2E7D32; color: #fff; border: none;
+      border-radius: 10px; padding: 0 16px; font-weight: 700; cursor: pointer;
+    }
+    .chat-rodape button:disabled { opacity: .5; cursor: default; }
   `
   document.head.appendChild(estilo)
 
-  const botao = document.createElement('button')
-  botao.id = 'chat-ia-botao'
-  botao.title = titulo
-  botao.textContent = '💬'
-  document.body.appendChild(botao)
+  const btnChat = document.createElement(''button'')
+  btnChat.id = ''btn-chat''
+  btnChat.title = titulo
+  btnChat.textContent = ''💬''
+  document.body.appendChild(btnChat)
 
-  const sugestoes = (SUGESTOES[papel] || SUGESTOES.convidado)
-    .map((s) => `<button class="chat-ia-sugestao" type="button">${s}</button>`).join('')
+  const sugestoes = (SUGESTOES_POR_PAPEL[papel] || SUGESTOES_POR_PAPEL.convidado)
+    .map((s) => `<button class="chat-btn-sugestao" type="button">${s}</button>`)
+    .join('''')
 
-  const painel = document.createElement('div')
-  painel.id = 'chat-ia-painel'
+  const painel = document.createElement(''div'')
+  painel.id = ''painel-chat''
   painel.innerHTML = `
-    <div class="chat-ia-topo">
-      <div>${titulo}<small>Tire dúvidas e veja pendências do seu setor</small></div>
-      <button class="chat-ia-fechar" title="Fechar">×</button>
+    <div class="chat-topo">
+      <div>${titulo}<small>Tire dúvidas sobre o sistema ou as pendências do seu setor</small></div>
+      <button class="chat-btn-fechar" title="Fechar">×</button>
     </div>
-    <div class="chat-ia-msgs" id="chat-ia-msgs"></div>
-    <div class="chat-ia-sugestoes" id="chat-ia-sugestoes">${sugestoes}</div>
-    <form class="chat-ia-form" id="chat-ia-form">
-      <input type="text" id="chat-ia-input" placeholder="Escreva sua pergunta..." autocomplete="off">
-      <button type="submit" id="chat-ia-enviar">➤</button>
+    <div class="chat-mensagens" id="chat-mensagens"></div>
+    <div class="chat-sugestoes" id="chat-sugestoes">${sugestoes}</div>
+    <form class="chat-rodape" id="chat-form">
+      <input type="text" id="chat-input" placeholder="Escreva sua pergunta..." autocomplete="off">
+      <button type="submit" id="chat-btn-enviar">➤</button>
     </form>`
   document.body.appendChild(painel)
 
-  const msgsEl = painel.querySelector('#chat-ia-msgs')
-  const inputEl = painel.querySelector('#chat-ia-input')
-  const btnEnviar = painel.querySelector('#chat-ia-enviar')
+  const elMensagens = painel.querySelector(''#chat-mensagens'')
+  const elInput = painel.querySelector(''#chat-input'')
+  const btnEnviar = painel.querySelector(''#chat-btn-enviar'')
 
-  function formatar(texto) {
-    const esc = texto
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    return esc
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/(^|\n)\s*[-*]\s+(.+)/g, '$1• $2')
-      .replace(/\n/g, '<br>')
+  function formatarTexto(texto) {
+    return texto
+      .replace(/&/g, ''&amp;'').replace(/</g, ''&lt;'').replace(/>/g, ''&gt;'')
+      .replace(/\*\*(.+?)\*\*/g, ''<strong>$1</strong>'')
+      .replace(/(^|\n)\s*[-*]\s+(.+)/g, ''$1• $2'')
+      .replace(/\n/g, ''<br>'')
   }
 
-  function addBolha(texto, de) {
-    const b = document.createElement('div')
-    b.className = `chat-ia-bolha ${de}`
-    if (de === 'bot') b.innerHTML = formatar(texto)
-    else b.textContent = texto
-    msgsEl.appendChild(b)
-    msgsEl.scrollTop = msgsEl.scrollHeight
-    return b
+  function adicionarBolha(texto, tipo) {
+    const bolha = document.createElement(''div'')
+    bolha.className = `chat-bolha ${tipo}`
+    if (tipo === ''assistente'') bolha.innerHTML = formatarTexto(texto)
+    else bolha.textContent = texto
+    elMensagens.appendChild(bolha)
+    elMensagens.scrollTop = elMensagens.scrollHeight
+    return bolha
   }
 
-  function abrir() {
-    aberto = true
-    painel.classList.add('aberto')
+  function abrirChat() {
+    painelAberto = true
+    painel.classList.add(''aberto'')
     if (!historico.length) {
-      addBolha(`Olá! Sou o ${titulo.toLowerCase()}. Como posso ajudar?`, 'bot')
+      adicionarBolha(`Olá! Sou o ${titulo.toLowerCase()}. No que posso ajudar?`, ''assistente'')
     }
-    inputEl.focus()
+    elInput.focus()
   }
-  function fechar() { aberto = false; painel.classList.remove('aberto') }
 
-  botao.addEventListener('click', () => (aberto ? fechar() : abrir()))
-  painel.querySelector('.chat-ia-fechar').addEventListener('click', fechar)
+  function fecharChat() {
+    painelAberto = false
+    painel.classList.remove(''aberto'')
+  }
 
-  async function enviar(texto) {
-    const msg = (texto || inputEl.value).trim()
+  btnChat.addEventListener(''click'', () => (painelAberto ? fecharChat() : abrirChat()))
+  painel.querySelector(''.chat-btn-fechar'').addEventListener(''click'', fecharChat)
+
+  async function enviarMensagem(texto) {
+    const msg = (texto || elInput.value).trim()
     if (!msg) return
-    inputEl.value = ''
-    addBolha(msg, 'user')
-    historico.push({ de: 'user', texto: msg })
+
+    elInput.value = ''''
+    adicionarBolha(msg, ''usuario'')
+    historico.push({ de: ''user'', texto: msg })
+
     btnEnviar.disabled = true
-    const pensando = addBolha('digitando...', 'bot')
-    const r = await api.chat(msg, historico)
-    pensando.remove()
-    const resposta = (r && r.resposta) ? r.resposta : (r && r.erro) ? r.erro : 'Não consegui responder.'
-    addBolha(resposta, 'bot')
-    historico.push({ de: 'bot', texto: resposta })
+    const aguardando = adicionarBolha(''digitando...'', ''assistente'')
+
+    const resposta = await api.chat(msg, historico)
+    aguardando.remove()
+
+    const textoResposta = resposta?.resposta || resposta?.erro || ''Não consegui responder agora.''
+    adicionarBolha(textoResposta, ''assistente'')
+    historico.push({ de: ''bot'', texto: textoResposta })
+
     btnEnviar.disabled = false
-    inputEl.focus()
+    elInput.focus()
   }
 
-  painel.querySelector('#chat-ia-form').addEventListener('submit', (e) => { e.preventDefault(); enviar() })
-  painel.querySelectorAll('.chat-ia-sugestao').forEach((s) => {
-    s.addEventListener('click', () => enviar(s.textContent))
+  painel.querySelector(''#chat-form'').addEventListener(''submit'', (e) => {
+    e.preventDefault()
+    enviarMensagem()
+  })
+
+  painel.querySelectorAll(''.chat-btn-sugestao'').forEach((btn) => {
+    btn.addEventListener(''click'', () => enviarMensagem(btn.textContent))
   })
 }
