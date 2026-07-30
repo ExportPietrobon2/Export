@@ -24,6 +24,27 @@ async function carregarBadgesPendencias() {
  } catch (e) { /* silencioso */ }
 }
 
+
+async function registrarPushNotification() {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+    const sw = await navigator.serviceWorker.ready
+    const permissao = await Notification.requestPermission()
+    if (permissao !== 'granted') return
+    const { key } = await fetch('/api/push/vapid-public').then((r) => r.json())
+    // Converter VAPID public key de base64url para Uint8Array
+    const raw = atob(key.replace(/-/g, '+').replace(/_/g, '/'))
+    const vapidKey = new Uint8Array([...raw].map((c) => c.charCodeAt(0)))
+    const sub = await sw.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKey })
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(sub.toJSON())
+    })
+  } catch (e) { /* silencioso — push não é crítico */ }
+}
+
 export function montarCabecalho(papel) {
  const paginaAtual = document.body.dataset.pagina
  const perfil = getPerfil()

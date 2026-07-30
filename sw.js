@@ -26,3 +26,28 @@ self.addEventListener('fetch', (e) => {
     fetch(e.request).catch(() => caches.match(e.request))
   )
 })
+self.addEventListener('push', (e) => {
+  let data = { titulo: 'Pietrobon · Insumos', corpo: 'Nova atualização no sistema.', url: '/' }
+  try { if (e.data) data = { ...data, ...JSON.parse(e.data.text()) } } catch (_) {}
+  e.waitUntil(
+    self.registration.showNotification(data.titulo, {
+      body: data.corpo,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      data: { url: data.url },
+      vibrate: [200, 100, 200]
+    })
+  )
+})
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close()
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) => {
+      const url = e.notification.data?.url || '/'
+      const c = cs.find((c) => c.url.includes(url) && 'focus' in c)
+      if (c) return c.focus()
+      return clients.openWindow(url)
+    })
+  )
+})
