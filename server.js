@@ -1836,46 +1836,14 @@ app.delete('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, re
 })
 
 // ---- Comissões de Representantes (exportação) ----
-const PIETROBON_CNPJ = '97580260000115'
-async function inicializarComissoes() {
-  try {
-    await pool.query(`CREATE TABLE IF NOT EXISTS fin_representantes (
-      id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(160) NOT NULL, ativo TINYINT DEFAULT 1)`)
-    await pool.query(`CREATE TABLE IF NOT EXISTS fin_com_faturas (
-      id INT AUTO_INCREMENT PRIMARY KEY, representante_id INT NOT NULL, ano INT, fatura VARCHAR(40),
-      pais VARCHAR(80), cliente VARCHAR(200), valor_invoice DECIMAL(14,2) DEFAULT 0, INDEX(representante_id))`)
-    await pool.query(`CREATE TABLE IF NOT EXISTS fin_com_lanc (
-      id INT AUTO_INCREMENT PRIMARY KEY, fatura_id INT NOT NULL, data_contrato DATE,
-      valor_usd DECIMAL(14,2) DEFAULT 0, taxa DECIMAL(12,6) DEFAULT 0, frete DECIMAL(14,2) DEFAULT 0,
-      pct DECIMAL(6,4) DEFAULT 0.0500, situacao VARCHAR(20) DEFAULT 'AGUARDANDO NF',
-      nf_numero VARCHAR(40), nf_valor DECIMAL(14,2) NULL, obs VARCHAR(300), INDEX(fatura_id))`)
-  } catch (e) { console.error('Erro init comissoes:', e.message) }
-}
-setTimeout(inicializarComissoes, 6500)
 
 // Cálculo de um lançamento de comissão
-function computarLanc(l) {
-  const usd = Number(l.valor_usd) || 0, taxa = Number(l.taxa) || 0, frete = Number(l.frete) || 0
-  const pct = Number(l.pct) || 0
-  const valorReais = usd * taxa
-  const dctFrete = frete * taxa * pct
-  const comissao = valorReais * pct - dctFrete
-  const umDozeAvos = comissao / 12
-  const totalNfEsperado = comissao + umDozeAvos
-  const nfValor = l.nf_valor == null || l.nf_valor === '' ? null : Number(l.nf_valor)
-  const semNf = !(l.nf_numero && String(l.nf_numero).trim())
-  const divergente = nfValor != null && Math.abs(nfValor - totalNfEsperado) > 0.02
-  return { valorReais, dctFrete, comissao, umDozeAvos, totalNfEsperado, semNf, divergente, nfValor, divergencia: nfValor != null ? nfValor - totalNfEsperado : 0 }
 }
-async function faturasComputadas(representanteId, ano) {
-  const cond = ['representante_id = ?'], args = [representanteId]
-  if (ano) { cond.push('ano = ?'); args.push(ano) }
   const [fats] = await pool.query(`SELECT * FROM fin_com_faturas WHERE ${cond.join(' AND ')} ORDER BY fatura`, args)
   if (!fats.length) return []
   const ids = fats.map((f) => f.id)
   const [lancs] = await pool.query(`SELECT * FROM fin_com_lanc WHERE fatura_id IN (${ids.map(() => '?').join(',')}) ORDER BY data_contrato, id`, ids)
   const porFat = {}
-  lancs.forEach((l) => { (porFat[l.fatura_id] = porFat[l.fatura_id] || []).push({ ...l, calc: computarLanc(l) }) })
   return fats.map((f) => {
     const ls = porFat[f.id] || []
     const somaUsd = ls.reduce((s, l) => s + (Number(l.valor_usd) || 0), 0)
@@ -1892,155 +1860,14 @@ async function faturasComputadas(representanteId, ano) {
 }
 
 // Representantes
-app.get('/api/fin/com/representantes', autenticarContabil(), async (req, res) => {
-  const [rows] = await pool.query('SELECT * FROM fin_representantes ORDER BY nome')
-  res.json(rows)
-})
-app.post('/api/fin/com/representantes', autenticarContabil(), async (req, res) => {
-  if (!(req.body.nome || '').trim()) return res.status(400).json({ erro: 'Informe o nome.' })
-  const [r] = await pool.query('INSERT INTO fin_representantes (nome) VALUES (?)', [req.body.nome.trim()])
-  res.json({ ok: true, id: r.insertId })
-})
-app.patch('/api/fin/com/representantes/:id', autenticarContabil(), async (req, res) => {
-  const sets = [], vals = []
-  for (const c of ['nome', 'ativo']) { if (c in req.body) { sets.push(`${c} = ?`); vals.push(req.body[c]) } }
-  if (!sets.length) return res.json({ ok: true })
-  vals.push(req.params.id)
-  await pool.query(`UPDATE fin_representantes SET ${sets.join(', ')} WHERE id = ?`, vals)
-  res.json({ ok: true })
-})
-app.delete('/api/fin/com/representantes/:id', autenticarContabil(), async (req, res) => {
-  const [fs] = await pool.query('SELECT id FROM fin_com_faturas WHERE representante_id = ?', [req.params.id])
-  for (const f of fs) await pool.query('DELETE FROM fin_com_lanc WHERE fatura_id = ?', [f.id])
-  await pool.query('DELETE FROM fin_com_faturas WHERE representante_id = ?', [req.params.id])
-  await pool.query('DELETE FROM fin_representantes WHERE id = ?', [req.params.id])
-  res.json({ ok: true })
-})
 
 // Faturas (com lançamentos computados)
-app.get('/api/fin/com/faturas', autenticarContabil(), async (req, res) => {
-  const repId = parseInt(req.query.representanteId) || 0
-  if (!repId) return res.json([])
-  res.json(await faturasComputadas(repId, parseInt(req.query.ano) || 0))
-})
-app.post('/api/fin/com/faturas', autenticarContabil(), async (req, res) => {
-  const b = req.body
-  if (!b.representante_id) return res.status(400).json({ erro: 'Representante obrigatório.' })
-  const [r] = await pool.query('INSERT INTO fin_com_faturas (representante_id, ano, fatura, pais, cliente, valor_invoice) VALUES (?,?,?,?,?,?)',
-    [b.representante_id, parseInt(b.ano) || null, b.fatura || null, b.pais || null, b.cliente || null, Number(b.valor_invoice) || 0])
-  res.json({ ok: true, id: r.insertId })
-})
-app.patch('/api/fin/com/faturas/:id', autenticarContabil(), async (req, res) => {
-  const sets = [], vals = []
-  for (const c of ['ano', 'fatura', 'pais', 'cliente', 'valor_invoice']) { if (c in req.body) { let v = req.body[c]; if (v === '') v = null; if (c === 'valor_invoice') v = Number(v) || 0; if (c === 'ano') v = parseInt(v) || null; sets.push(`${c} = ?`); vals.push(v) } }
-  if (!sets.length) return res.json({ ok: true })
-  vals.push(req.params.id)
-  await pool.query(`UPDATE fin_com_faturas SET ${sets.join(', ')} WHERE id = ?`, vals)
-  res.json({ ok: true })
-})
-app.delete('/api/fin/com/faturas/:id', autenticarContabil(), async (req, res) => {
-  await pool.query('DELETE FROM fin_com_lanc WHERE fatura_id = ?', [req.params.id])
-  await pool.query('DELETE FROM fin_com_faturas WHERE id = ?', [req.params.id])
-  res.json({ ok: true })
-})
 
 // Lançamentos (contratos/comissões)
 const CAMPOS_LANC = ['data_contrato', 'valor_usd', 'taxa', 'frete', 'pct', 'situacao', 'nf_numero', 'nf_valor', 'obs']
-app.post('/api/fin/com/lanc', autenticarContabil(), async (req, res) => {
-  const b = req.body
-  if (!b.fatura_id) return res.status(400).json({ erro: 'Fatura obrigatória.' })
-  await pool.query('INSERT INTO fin_com_lanc (fatura_id, data_contrato, valor_usd, taxa, frete, pct, situacao, nf_numero, nf_valor, obs) VALUES (?,?,?,?,?,?,?,?,?,?)',
-    [b.fatura_id, b.data_contrato || null, Number(b.valor_usd) || 0, Number(b.taxa) || 0, Number(b.frete) || 0, Number(b.pct) || 0.05, b.situacao || 'AGUARDANDO NF', b.nf_numero || null, b.nf_valor === '' || b.nf_valor == null ? null : Number(b.nf_valor), b.obs || null])
-  res.json({ ok: true })
-})
-app.patch('/api/fin/com/lanc/:id', autenticarContabil(), async (req, res) => {
-  const sets = [], vals = []
-  for (const c of CAMPOS_LANC) {
-    if (c in req.body) {
-      let v = req.body[c]
-      if (v === '') v = (c === 'nf_valor') ? null : (['data_contrato', 'nf_numero', 'obs', 'situacao'].includes(c) ? null : 0)
-      else if (['valor_usd', 'taxa', 'frete', 'pct', 'nf_valor'].includes(c)) v = Number(v)
-      sets.push(`${c} = ?`); vals.push(v)
-    }
-  }
-  if (!sets.length) return res.json({ ok: true })
-  vals.push(req.params.id)
-  await pool.query(`UPDATE fin_com_lanc SET ${sets.join(', ')} WHERE id = ?`, vals)
-  res.json({ ok: true })
-})
-app.delete('/api/fin/com/lanc/:id', autenticarContabil(), async (req, res) => {
-  await pool.query('DELETE FROM fin_com_lanc WHERE id = ?', [req.params.id])
-  res.json({ ok: true })
-})
 
 // Importação em massa a partir das planilhas (parseadas no navegador)
 // v2 - blindada: clamp de %, truncamento de textos e erro detalhado
-app.post('/api/fin/com/importar', autenticarContabil(), async (req, res) => {
-  const { representante_id, faturas, substituir } = req.body
-  if (!representante_id || !Array.isArray(faturas)) return res.status(400).json({ erro: 'Dados inválidos.' })
-  const cut = (v, n) => v == null ? null : String(v).slice(0, n)
-  const numOk = (v) => { const x = Number(v); return isFinite(x) ? x : 0 }
-  const dataOk = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? v : null
-  const pctOk = (v) => { let x = Number(v); if (!isFinite(x) || x < 0 || x > 9.9999) x = 0.05; return x }
-  let nFat = 0, nLanc = 0
-  try {
-    for (const f of faturas) {
-      const ano = parseInt(f.ano) || null
-      const fatura = cut(f.fatura, 40)
-      if (substituir) {
-        const [ex] = await pool.query('SELECT id FROM fin_com_faturas WHERE representante_id = ? AND ano <=> ? AND fatura <=> ?', [representante_id, ano, fatura])
-        for (const e of ex) { await pool.query('DELETE FROM fin_com_lanc WHERE fatura_id = ?', [e.id]); await pool.query('DELETE FROM fin_com_faturas WHERE id = ?', [e.id]) }
-      }
-      const [r] = await pool.query('INSERT INTO fin_com_faturas (representante_id, ano, fatura, pais, cliente, valor_invoice) VALUES (?,?,?,?,?,?)',
-        [representante_id, ano, fatura, cut(f.pais, 80), cut(f.cliente, 200), numOk(f.valor_invoice)])
-      nFat++
-      for (const l of (f.lancamentos || [])) {
-        await pool.query('INSERT INTO fin_com_lanc (fatura_id, data_contrato, valor_usd, taxa, frete, pct, situacao, nf_numero, nf_valor, obs) VALUES (?,?,?,?,?,?,?,?,?,?)',
-          [r.insertId, dataOk(l.data_contrato), numOk(l.valor_usd), numOk(l.taxa), numOk(l.frete), pctOk(l.pct), cut(l.situacao, 20) || 'AGUARDANDO NF', cut(l.nf_numero, 40), (l.nf_valor === '' || l.nf_valor == null) ? null : numOk(l.nf_valor), cut(l.obs, 300)])
-        nLanc++
-      }
-    }
-    res.json({ ok: true, faturas: nFat, lancamentos: nLanc })
-  } catch (e) {
-    console.error('Erro import comissoes:', e.message)
-    res.status(500).json({ erro: 'Falha ao importar: ' + e.message + ` (${nFat} faturas gravadas antes do erro)` })
-  }
-})
-
-// =============================================
-// CHECK-LIST DE EXPEDIÇÃO (exportação) — restrito ao export2 e export
-// =============================================
-const EMAILS_CHECKLIST = ['export2@pietrobon.com.br', 'export@pietrobon.com.br']
-function autenticarChecklist() {
-  const base = autenticar(['admin'])
-  return (req, res, next) => base(req, res, () => {
-    if (!EMAILS_CHECKLIST.includes((req.usuario.email || '').toLowerCase())) {
-      return res.status(403).json({ erro: 'Sem permissão' })
-    }
-    next()
-  })
-}
-
-async function inicializarChecklist() {
-  try {
-    await pool.query(`CREATE TABLE IF NOT EXISTS checklist_exp (
-      id INT AUTO_INCREMENT PRIMARY KEY, fatura VARCHAR(60), pedido VARCHAR(60), data_emb DATE,
-      cliente_nome VARCHAR(200), cliente_endereco VARCHAR(400), cliente_contato VARCHAR(200),
-      embarque VARCHAR(200), descarga VARCHAR(200), destino VARCHAR(200),
-      peso_liquido VARCHAR(40), peso_bruto VARCHAR(40), volume VARCHAR(40),
-      observacoes VARCHAR(800), criado_por VARCHAR(160), criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`)
-    await pool.query(`CREATE TABLE IF NOT EXISTS checklist_exp_itens (
-      id INT AUTO_INCREMENT PRIMARY KEY, checklist_id INT NOT NULL, ordem INT DEFAULT 0,
-      produto VARCHAR(300), gramatura VARCHAR(80), qtd_cx VARCHAR(40), lote VARCHAR(80), validade VARCHAR(40),
-      INDEX(checklist_id))`)
-  } catch (e) { console.error('Erro init checklist:', e.message) }
-}
-setTimeout(inicializarChecklist, 3000)
-
-app.get('/api/checklist', autenticarChecklist(), async (req, res) => {
-  const [rows] = await pool.query('SELECT id, fatura, pedido, cliente_nome, data_emb, destino, criado_em FROM checklist_exp ORDER BY id DESC LIMIT 300')
-  res.json(rows)
-})
 app.get('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
   const [[cab]] = await pool.query('SELECT * FROM checklist_exp WHERE id = ?', [req.params.id])
   if (!cab) return res.status(404).json({ erro: 'Não encontrado.' })
