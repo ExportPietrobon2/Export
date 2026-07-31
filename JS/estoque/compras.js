@@ -39,7 +39,7 @@ async function carregarCompras() {
  const alerta = atraso ? ' card-alerta-embarque' : ''
  const opcoesStatus = Object.keys(statusLabel).map((s) => `<option value="${s}" ${c.status === s ? 'selected' : ''}>${statusLabel[s]}</option>`).join('')
  return `
- <div class="card border-0 shadow-sm mb-2${alerta}" id="compra-${c.id}">
+ <div class="card border-0 shadow-sm mb-2${alerta}${classeOk}" id="compra-${c.id}">
  ${atraso ? `<div class="banner-alerta-embarque">ENTREGA ATRASADA ${atraso} DIA(S)</div>` : ''}
  <div class="card-body"><div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1"><div><div class="fw-bold">${c.descricao}</div><div class="small text-muted">
  ${c.quantidade > 0 ? `${c.quantidade} ${c.unidade || ''}` : ''}

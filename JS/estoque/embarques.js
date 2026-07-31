@@ -121,7 +121,7 @@ function renderCard(pedido) {
  const emAlerta = piEmAlerta(pedido)
  const aberto = abertos.has(String(pedido.id))
  const card = document.createElement('div')
- card.className = `card card-pi-admin mb-3${pedido.concluida ? ' pi-concluida' : ''}${emAlerta ? ' card-alerta-embarque' : ''}`
+ card.className = `card card-pi-admin mb-3${pedido.concluida ? ' pi-concluida' : ''}${emAlerta ? ' card-alerta-embarque' : ''}${(pronta && pedido.data_embarque && !pedido.concluida) ? ' card-ok' : ''}`
 
  if (emAlerta) {
  const banner = document.createElement('div')

@@ -103,23 +103,37 @@ function renderImportacoes() {
       <button class="btn btn-ok-grande mt-3" id="btn-nova-imp">${ed ? 'Salvar alterações' : 'Lançar importação'}</button>
       ${ed ? '<button class="btn btn-outline-secondary mt-3 ms-2" id="btn-cancel-imp">Cancelar</button>' : ''}
     </div></div>
-    <div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:.82rem">
-      <thead><tr><th>Invoice</th><th>Fornecedor</th><th>Mercadoria</th><th class="text-end">Valor (moeda)</th><th class="text-end">Taxa</th><th class="text-end">Valor R$</th><th class="text-end">Pago R$</th><th class="text-end">Saldo R$</th><th>Status</th><th></th></tr></thead>
-      <tbody>${imps.map((i) => `<tr class="${i.id === editImp ? 'table-primary' : ''}">
-        <td class="fw-semibold">${esc(i.invoice)}</td>
-        <td>${esc(i.fornecedor_nome || '-')}</td>
-        <td>${esc(i.mercadoria || '-')}</td>
-        <td class="text-end">${i.moeda || ''} ${numf(i.valor_moeda)}</td>
-        <td class="text-end">${numf(i.taxa_cambio, 4)}</td>
-        <td class="text-end">${brl(i.valor_reais)}</td>
-        <td class="text-end">${brl(i.pago)}</td>
-        <td class="text-end fw-semibold ${i.saldo > 0.01 ? 'text-danger' : 'text-success'}">${brl(i.saldo)}</td>
-        <td><span class="badge ${STATUS_COR[i.status]}">${i.status}</span></td>
-        <td style="white-space:nowrap"><button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="editarImp(${i.id})">Editar</button>
-          <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="abrirPagamentos(${i.id})">Pagamentos</button>
-          <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="excluirImp(${i.id})">🗑</button></td>
-      </tr>`).join('')}</tbody>
-    </table></div></div>`
+    <div id="lista-importacoes">${imps.map((i) => {
+      const pago = i.status === 'PAGO'
+      return `<div class="card mb-2 ${pago ? 'card-ok' : ''}" id="imp-card-${i.id}">
+        <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2 py-2">
+          <div>
+            <span class="fw-bold">${esc(i.invoice)}</span>
+            <span class="text-muted small ms-2">${esc(i.fornecedor_nome || '')}</span>
+            <span class="badge ${STATUS_COR[i.status]} ms-2">${i.status}</span>
+          </div>
+          <div class="d-flex gap-2 align-items-center flex-wrap">
+            <span class="small text-muted">${brl(i.valor_reais)}</span>
+            <span class="small fw-semibold ${i.saldo > 0.01 ? 'text-danger' : 'text-success'}">${brl(i.saldo)}</span>
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="toggleImpDetalhe(${i.id})">Ver ▾</button>
+          </div>
+        </div>
+        <div id="imp-det-${i.id}" style="display:none" class="border-top px-3 pb-3 pt-2">
+          <div class="row g-2 mb-2 small">
+            <div class="col-6 col-md-3"><span class="text-muted">Mercadoria</span><br><strong>${esc(i.mercadoria || '-')}</strong></div>
+            <div class="col-6 col-md-2"><span class="text-muted">Moeda / Valor</span><br><strong>${i.moeda || ''} ${numf(i.valor_moeda)}</strong></div>
+            <div class="col-6 col-md-2"><span class="text-muted">Taxa</span><br><strong>${numf(i.taxa_cambio, 4)}</strong></div>
+            <div class="col-6 col-md-2"><span class="text-muted">Pago R$</span><br><strong class="text-success">${brl(i.pago)}</strong></div>
+            <div class="col-6 col-md-3"><span class="text-muted">Saldo R$</span><br><strong class="${i.saldo > 0.01 ? 'text-danger' : 'text-success'}">${brl(i.saldo)}</strong></div>
+          </div>
+          <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-sm btn-outline-secondary" onclick="editarImp(${i.id})">Editar</button>
+            <button class="btn btn-sm btn-outline-primary" onclick="abrirPagamentos(${i.id})">Pagamentos</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="excluirImp(${i.id})">🗑</button>
+          </div>
+        </div>
+      </div>`
+    }).join('')}</div>`
   if (ed) {
     $('i-fornecedor_id').value = ed.fornecedor_id || ''
     $('i-invoice').value = ed.invoice || ''

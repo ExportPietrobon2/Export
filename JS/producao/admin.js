@@ -216,6 +216,7 @@ function construirCard(pedido) {
   card.className = [
     'card card-pi-admin mb-3',
     pedido.concluida ? 'pi-concluida' : '',
+    (!pedido.concluida && liberado) ? 'card-ok' : '',
     emAlerta ? 'card-alerta-embarque' : '',
     naoDeclarada ? 'card-alerta-declaracao' : ''
   ].filter(Boolean).join(' ')

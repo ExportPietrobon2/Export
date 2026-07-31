@@ -1096,3 +1096,11 @@ body[data-pagina="checklist.html"] .page-header-icon::before { content: "📋"; 
 /* Ícone da aba Ordem de Produção */
 body[data-pagina="ordem-producao.html"] .page-header-icon::before { content: "🏭"; }
 #menu-principal a[href$="ordem-producao.html"]::before { content: "🏭"; margin-right: 8px; }
+.card-ok {
+  background: #e9f7ef !important;
+  border: 1px solid #a8d5b5 !important;
+  box-shadow: 0 2px 8px rgba(25,135,84,.10) !important;
+}
+.linha-ok {
+  background: #e9f7ef !important;
+}
