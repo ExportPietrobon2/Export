@@ -105,7 +105,7 @@ export function montarCabecalho(papel) {
       titulo: 'Estoque e Compras',
       itens: [
         { href: '/HTML/estoque/almoxarifado.html', texto: 'Almoxarifado' },
-        { href: '/HTML/estoque/recebimento.html', texto: 'Recebimento B2' },
+        { href: '/HTML/estoque/recebimento.html', texto: 'Recebimentos' },
         { href: '/HTML/estoque/referencia.html', texto: 'Rendimentos' },
         { href: '/HTML/estoque/embarques.html', texto: 'Embarques' },
         { href: '/HTML/estoque/compras.html', texto: 'Compras' }
@@ -115,10 +115,10 @@ export function montarCabecalho(papel) {
       titulo: 'Financeiro',
       quando: temAcessoFinanceiro,
       itens: [
-        { href: '/HTML/financeiro/contabil.html', texto: 'Contábil / Faturamento' },
-        { href: '/HTML/financeiro/exp-contabil.html', texto: 'Contab. de Exportação' },
-        { href: '/HTML/financeiro/financeiro.html', texto: 'Financeiro (Importações)' },
-        { href: '/HTML/financeiro/comissoes.html', texto: 'Comissões (Exportação)' }
+        { href: '/HTML/financeiro/contabil.html', texto: 'Mensal Contabil' },
+        { href: '/HTML/financeiro/exp-contabil.html', texto: 'Fechamento Contabil' },
+        { href: '/HTML/financeiro/financeiro.html', texto: 'Importações' },
+        { href: '/HTML/financeiro/comissoes.html', texto: 'Comissões de Exportação' }
       ]
     }
   ]
