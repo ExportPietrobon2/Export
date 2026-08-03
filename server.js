@@ -1982,6 +1982,75 @@ app.delete('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
 })
 
 
+app.post('/api/conferencia-nfse', autenticar(['admin']), async (req, res) => {
+  try {
+    const { pdfBase64, aliquotaIssqn } = req.body
+    if (!pdfBase64) return res.status(400).json({ erro: 'PDF não enviado.' })
+
+    const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
+    if (!ANTHROPIC_API_KEY) return res.status(500).json({ erro: 'ANTHROPIC_API_KEY não configurada no servidor.' })
+
+    const aliq = parseFloat(aliquotaIssqn) || 2.0
+    const prompt = `Você é um especialista em notas fiscais de serviço eletrônicas (NFS-e) brasileiras.
+Analise o PDF desta NFS-e e extraia EXATAMENTE os seguintes campos em formato JSON.
+Retorne SOMENTE o JSON, sem texto antes ou depois, sem markdown, sem explicações.
+
+{
+  "numero_nfse": "número da NFS-e",
+  "emitente": "nome do emitente",
+  "tomador": "nome do tomador",
+  "descricao_servico": "descrição completa do serviço",
+  "valor_servico": 0.00,
+  "valor_comissao": 0.00,
+  "valor_doze_avos": 0.00,
+  "valor_total_declarado": 0.00,
+  "irrf_declarado": 0.00,
+  "issqn_declarado": 0.00,
+  "valor_liquido": 0.00,
+  "aliquota_issqn": ${aliq},
+  "faturas_referenciadas": "texto das faturas mencionadas"
+}
+
+Campos numéricos devem ser números (não strings). Use ponto como separador decimal.
+Se algum campo não existir na nota, use null.`
+
+    const resposta = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
+            { type: 'text', text: prompt }
+          ]
+        }]
+      })
+    })
+
+    const dados = await resposta.json()
+    if (dados.error) return res.status(500).json({ erro: dados.error.message })
+
+    const texto = dados.content?.[0]?.text || ''
+    try {
+      const json = JSON.parse(texto.replace(/```json|```/g, '').trim())
+      res.json({ ok: true, dados: json })
+    } catch (_) {
+      res.status(500).json({ erro: 'Não foi possível extrair os dados da nota. Verifique se o PDF é uma NFS-e válida.' })
+    }
+  } catch (e) {
+    console.error('Erro conferencia-nfse:', e.message)
+    res.status(500).json({ erro: e.message })
+  }
+})
+
+
 app.get('*', (req, res) => {
  res.sendFile(path.join(__dirname, 'index.html'))
 })

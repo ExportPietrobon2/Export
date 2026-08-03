@@ -26,54 +26,17 @@ async function lerPdfComoBase64(arquivo) {
   })
 }
 
-async function extrairDadosNfse(base64Pdf) {
-  const prompt = `Você é um especialista em notas fiscais de serviço eletrônicas (NFS-e) brasileiras.
-Analise o PDF desta NFS-e e extraia EXATAMENTE os seguintes campos em formato JSON.
-Retorne SOMENTE o JSON, sem texto antes ou depois, sem markdown, sem explicações.
-
-{
-  "numero_nfse": "número da NFS-e",
-  "emitente": "nome do emitente",
-  "tomador": "nome do tomador",
-  "descricao_servico": "descrição completa do serviço",
-  "valor_servico": 0.00,
-  "valor_comissao": 0.00,
-  "valor_doze_avos": 0.00,
-  "valor_total_declarado": 0.00,
-  "irrf_declarado": 0.00,
-  "issqn_declarado": 0.00,
-  "valor_liquido": 0.00,
-  "aliquota_issqn": 0.00,
-  "faturas_referenciadas": "texto das faturas mencionadas"
-}
-
-Campos numéricos devem ser números (não strings). Use ponto como separador decimal.
-Se algum campo não existir na nota, use null.`
-
-  const resposta = await fetch('https://api.anthropic.com/v1/messages', {
+async function extrairDadosNfse(base64Pdf, aliquotaIssqn) {
+  const token = obterToken()
+  const resposta = await fetch('/api/conferencia-nfse', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1000,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64Pdf } },
-          { type: 'text', text: prompt }
-        ]
-      }]
-    })
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ pdfBase64: base64Pdf, aliquotaIssqn })
   })
 
-  const dados = await resposta.json()
-  const texto = dados.content?.[0]?.text || ''
-
-  try {
-    return JSON.parse(texto.replace(/```json|```/g, '').trim())
-  } catch (_) {
-    throw new Error('Não foi possível extrair os dados da nota. Verifique se o PDF é uma NFS-e válida.')
-  }
+  const json = await resposta.json()
+  if (json.erro) throw new Error(json.erro)
+  return json.dados
 }
 
 function conferirCalculos(dados) {
@@ -279,7 +242,8 @@ async function processarArquivo(arquivo) {
     areaResultado.querySelector('.fw-semibold').textContent = 'Conferindo os cálculos...'
     areaResultado.querySelector('.text-muted').textContent = 'Verificando IRRF, ISSQN, 1/12 avos e total'
 
-    const dados = await extrairDadosNfse(base64)
+    const aliquotaIssqn = parseFloat(document.getElementById('aliquota-issqn')?.value) || 2.0
+    const dados = await extrairDadosNfse(base64, aliquotaIssqn)
     const resultados = conferirCalculos(dados)
     const tudoOk = resultados.every(r => r.ok)
 
