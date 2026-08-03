@@ -1104,3 +1104,6 @@ body[data-pagina="ordem-producao.html"] .page-header-icon::before { content: "�
 .linha-ok {
   background: #e9f7ef !important;
 }
+
+body[data-pagina="conferencia-nfse.html"] .page-header-icon::before { content: "🔍"; }
+#menu-principal a[href$="conferencia-nfse.html"]::before { content: "🔍"; margin-right: 8px; }
