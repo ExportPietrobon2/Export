@@ -1985,65 +1985,63 @@ app.delete('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
 
 app.post('/api/conferencia-nfse', autenticar(['admin']), async (req, res) => {
   try {
-    const { pdfBase64, aliquotaIssqn } = req.body
-    if (!pdfBase64) return res.status(400).json({ erro: 'PDF não enviado.' })
-
-    const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
-    if (!ANTHROPIC_API_KEY) return res.status(500).json({ erro: 'ANTHROPIC_API_KEY não configurada no servidor.' })
+    const { textoNfse, aliquotaIssqn } = req.body
+    if (!textoNfse) return res.status(400).json({ erro: 'Texto da NFS-e não enviado.' })
+    if (!process.env.GEMINI_API_KEY) return res.status(500).json({ erro: 'GEMINI_API_KEY não configurada no servidor.' })
 
     const aliq = parseFloat(aliquotaIssqn) || 2.0
     const prompt = `Você é um especialista em notas fiscais de serviço eletrônicas (NFS-e) brasileiras.
-Analise o PDF desta NFS-e e extraia EXATAMENTE os seguintes campos em formato JSON.
+Analise o texto abaixo de uma NFS-e e extraia EXATAMENTE os campos indicados em formato JSON.
 Retorne SOMENTE o JSON, sem texto antes ou depois, sem markdown, sem explicações.
 
 {
   "numero_nfse": "número da NFS-e",
-  "emitente": "nome do emitente",
+  "emitente": "nome do emitente/prestador",
   "tomador": "nome do tomador",
   "descricao_servico": "descrição completa do serviço",
-  "valor_servico": 0.00,
   "valor_comissao": 0.00,
   "valor_doze_avos": 0.00,
   "valor_total_declarado": 0.00,
   "irrf_declarado": 0.00,
   "issqn_declarado": 0.00,
   "valor_liquido": 0.00,
-  "aliquota_issqn": ${aliq},
-  "faturas_referenciadas": "texto das faturas mencionadas"
+  "faturas_referenciadas": "texto das faturas mencionadas na descrição"
 }
 
-Campos numéricos devem ser números (não strings). Use ponto como separador decimal.
-Se algum campo não existir na nota, use null.`
+Regras:
+- valor_comissao: valor base da comissão (sem o 1/12 avos)
+- valor_doze_avos: valor do 1/12 avos declarado na nota
+- valor_total_declarado: valor total do serviço (comissão + 1/12 avos)
+- irrf_declarado: IRRF retido declarado na nota
+- issqn_declarado: ISSQN apurado declarado na nota
+- valor_liquido: valor líquido final da NFS-e
+- Campos numéricos devem ser números com ponto decimal, não strings
+- Se algum campo não existir, use null
 
-    const resposta = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
-            { type: 'text', text: prompt }
-          ]
-        }]
-      })
-    })
+TEXTO DA NFS-e:
+${textoNfse}`
 
-    const dados = await resposta.json()
-    if (dados.error) return res.status(500).json({ erro: dados.error.message })
+    const resp = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=' + process.env.GEMINI_API_KEY,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 1000 }
+        })
+      }
+    )
 
-    const texto = dados.content?.[0]?.text || ''
+    const data = await resp.json()
+    if (data.error) return res.status(500).json({ erro: data.error.message })
+
+    const texto = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
     try {
       const json = JSON.parse(texto.replace(/```json|```/g, '').trim())
       res.json({ ok: true, dados: json })
     } catch (_) {
-      res.status(500).json({ erro: 'Não foi possível extrair os dados da nota. Verifique se o PDF é uma NFS-e válida.' })
+      res.status(500).json({ erro: 'Não foi possível extrair os dados da nota. Verifique se o texto copiado é de uma NFS-e válida.' })
     }
   } catch (e) {
     console.error('Erro conferencia-nfse:', e.message)
