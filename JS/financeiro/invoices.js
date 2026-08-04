@@ -371,6 +371,13 @@ function gerarFormInvoice(inv) {
           </select>
         </div>
         <div class="col-6 col-md-3">
+          <label class="form-label fw-semibold small">Tipo de produto</label>
+          <select id="inv-tipo" class="form-select">
+            <option value="alimentos" ${(!inv.tipo||inv.tipo==='alimentos')?'selected':''}>🔴 Alimentos</option>
+            <option value="tubos" ${inv.tipo==='tubos'?'selected':''}>🔵 Tubos e Mangueiras</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
           <label class="form-label fw-semibold small">Unidade dos itens</label>
           <input type="text" id="inv-unidade-item" class="form-control" placeholder="Cartons / Und" value="${esc(inv.unidade_item||'Cartons')}">
         </div>
@@ -484,6 +491,7 @@ window.adicionarItem = () => {
 function lerFormInvoice() {
   const g = (id) => $(id)?.value?.trim() || ''
   return {
+    tipo: g('inv-tipo') || 'alimentos',
     numero: g('inv-numero'),
     data: g('inv-data'),
     moeda: g('inv-moeda'),

@@ -2048,6 +2048,7 @@ async function inicializarInvoices() {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS invoices (
       id INT AUTO_INCREMENT PRIMARY KEY,
+      tipo VARCHAR(20) DEFAULT 'alimentos',
       numero VARCHAR(20) NOT NULL,
       data DATE,
       moeda VARCHAR(3) DEFAULT 'USD',
@@ -2111,8 +2112,8 @@ app.post('/api/invoices', autenticarContabil(), async (req, res) => {
   const b = req.body
   if (!b.numero) return res.status(400).json({ erro: 'Informe o número da invoice.' })
   const [r] = await pool.query(
-    'INSERT INTO invoices (numero, data, moeda, unidade_item, buyer, consignee, notify, pagamento, incoterm, banco, porto_embarque, porto_descarga, local_entrega, container, endereco_entrega, frete, charges) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-    [b.numero, b.data || null, b.moeda || 'USD', b.unidade_item || 'Cartons', b.buyer || null, b.consignee || null, b.notify || null, b.pagamento || null, b.incoterm || null, b.banco || null, b.porto_embarque || null, b.porto_descarga || null, b.local_entrega || null, b.container || null, b.endereco_entrega || null, b.frete || 0, b.charges || 0]
+    'INSERT INTO invoices (tipo, numero, data, moeda, unidade_item, buyer, consignee, notify, pagamento, incoterm, banco, porto_embarque, porto_descarga, local_entrega, container, endereco_entrega, frete, charges) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    [b.tipo || 'alimentos', b.numero, b.data || null, b.moeda || 'USD', b.unidade_item || 'Cartons', b.buyer || null, b.consignee || null, b.notify || null, b.pagamento || null, b.incoterm || null, b.banco || null, b.porto_embarque || null, b.porto_descarga || null, b.local_entrega || null, b.container || null, b.endereco_entrega || null, b.frete || 0, b.charges || 0]
   )
   await salvarItensInvoice(r.insertId, b.itens)
   res.json({ ok: true, id: r.insertId })
@@ -2121,8 +2122,8 @@ app.post('/api/invoices', autenticarContabil(), async (req, res) => {
 app.put('/api/invoices/:id', autenticarContabil(), async (req, res) => {
   const b = req.body
   await pool.query(
-    'UPDATE invoices SET numero=?, data=?, moeda=?, unidade_item=?, buyer=?, consignee=?, notify=?, pagamento=?, incoterm=?, banco=?, porto_embarque=?, porto_descarga=?, local_entrega=?, container=?, endereco_entrega=?, frete=?, charges=? WHERE id=?',
-    [b.numero, b.data || null, b.moeda || 'USD', b.unidade_item || 'Cartons', b.buyer || null, b.consignee || null, b.notify || null, b.pagamento || null, b.incoterm || null, b.banco || null, b.porto_embarque || null, b.porto_descarga || null, b.local_entrega || null, b.container || null, b.endereco_entrega || null, b.frete || 0, b.charges || 0, req.params.id]
+    'UPDATE invoices SET tipo=?, numero=?, data=?, moeda=?, unidade_item=?, buyer=?, consignee=?, notify=?, pagamento=?, incoterm=?, banco=?, porto_embarque=?, porto_descarga=?, local_entrega=?, container=?, endereco_entrega=?, frete=?, charges=? WHERE id=?',
+    [b.tipo || 'alimentos', b.numero, b.data || null, b.moeda || 'USD', b.unidade_item || 'Cartons', b.buyer || null, b.consignee || null, b.notify || null, b.pagamento || null, b.incoterm || null, b.banco || null, b.porto_embarque || null, b.porto_descarga || null, b.local_entrega || null, b.container || null, b.endereco_entrega || null, b.frete || 0, b.charges || 0, req.params.id]
   )
   await salvarItensInvoice(req.params.id, b.itens)
   res.json({ ok: true })
@@ -2136,37 +2137,43 @@ app.delete('/api/invoices/:id', autenticarContabil(), async (req, res) => {
 
 
 const MOEDAS_INV = {
-  USD: { simbolo: 'US$', nome: 'Dollar USA', idioma: 'en' },
-  EUR: { simbolo: '€',   nome: 'Euro',       idioma: 'en' },
-  BRL: { simbolo: 'R$',  nome: 'Reais',      idioma: 'es' }
+  USD: { simbolo: 'US$', nome: 'Dollar USA', idioma: 'en', cor: 'C0392B' },
+  EUR: { simbolo: '€',   nome: 'Euro',       idioma: 'en', cor: 'C0392B' },
+  BRL: { simbolo: 'R$',  nome: 'Reais',      idioma: 'es', cor: 'C0392B' }
 }
 
 const TEXTOS_INV = {
   en: {
-    invoice: 'COMMERCIAL INVOICE', packing: 'PACKING LIST', date: 'DATE', number: 'NUMBER',
-    buyer: 'BUYER', consignee: 'CONSIGNEE', notify: 'NOTIFY', payment: 'PAYMENTS TERMS',
-    bl: 'BILL OF LADING', vessel: 'VESSEL', sailing: 'SAILING DATE', shipping: 'SHIPPING CNY.',
-    loading: 'PORT OF LOADING', discharge: 'PORT OF DISCHARGE', delivery: 'PLACE OF DELIVERY',
-    currency: 'CURRENCY', marks: 'MARKS', qty: 'QUANTITY', item: 'ITEM',
-    desc: 'PRODUCT DESCRIPTION', ncm: 'SH / NCM', unit: 'UNIT', total: 'TOTAL',
-    totalCartons: 'TOTAL CARTONS', totalPacks: 'TOTAL PACKS',
-    netWeight: 'NET WEIGHT', grossWeight: 'GROSS WEIGHT', cubic: 'CUBIC MEASUREMENT',
+    invoice: 'COMMERCIAL INVOICE', packing: 'PACKING LIST',
+    date: 'DATE', number: 'NUMBER', buyer: 'BUYER',
+    consignee: 'CONSIGNEE', notify: 'NOTIFY', payment: 'PAYMENTS TERMS',
+    instrucoes: 'INSTRUCCIONES DE PAGO',
+    bl: 'BILL OF LADING:', vessel: 'VESSEL:', sailing: 'SAILING DATE:',
+    shipping: 'SHIPPING CNY.:', loading: 'PORT OF LOADING:',
+    discharge: 'PORT OF DISCHARGE:', delivery: 'PLACE OF DELIVERY:',
+    currency: 'CURRENCY:', marks: 'MARKS:',
+    qty: '       QUANTITY        ', item: 'ITEM', desc: 'PRODUCT DESCRIPTION',
+    ncm: 'SH / NCM', totalCartons: 'TOTAL CARTONS:', totalPacks: 'TOTAL PACKS:',
+    netWeight: 'NET WEIGHT:', grossWeight: 'GROSS WEIGHT:', cubic: 'CUBIC MEASUREMENT:',
     freight: 'OCEAN FREIGHT', charges: 'EXPORT CHARGES',
     wooden: 'WOODEN PACKAGE: NOT APPLICABLE (NOT USED)',
-    netW: 'NET WEIGHT', grossW: 'GROSS WEIGHT', m3: 'M/3'
+    netW: 'NET WEIGHT', grossW: 'GROSS WEIGHT', m3: 'M/3', fdaNumber: 'FDA NUMBER'
   },
   es: {
-    invoice: 'FACTURA COMERCIAL', packing: 'LISTA DE EMPAQUE', date: 'FECHA', number: 'Nro.',
-    buyer: 'COMPRADOR', consignee: 'CONSIGNEE', notify: 'NOTIFY', payment: 'TERMO DE PAGO',
-    bl: 'BILL OF LADING', vessel: 'BARCO', sailing: 'FECHA SALIDA', shipping: 'NAVIERA',
-    loading: 'LOCAL DE EMBARQUE', discharge: 'LOCAL DE DESCARGA', delivery: 'LUGAR DE ENTREGA',
-    currency: 'MONEDA', marks: 'MARCA', qty: 'CANTIDAD', item: 'ITEM',
-    desc: 'MERCADERIA', ncm: 'S H / N C M', unit: 'UNITARIO', total: 'TOTAL',
-    totalCartons: 'CANTIDAD TOTAL', totalPacks: 'TOTAL BULTOS',
-    netWeight: 'PESO NETO', grossWeight: 'PESO BRUTO', cubic: 'CUBICOS',
+    invoice: 'FACTURA COMERCIAL', packing: 'LISTA DE EMPAQUE',
+    date: 'FECHA', number: 'Nro.:', buyer: 'COMPRADOR',
+    consignee: 'CONSIGNEE:', notify: ' NOTIFY:', payment: 'TERMO DE PAGO:',
+    instrucoes: 'INSTRUCCIONES DE PAGO',
+    bl: 'BILL OF LADING:', vessel: 'BARCO:', sailing: 'FECHA SALIDA:',
+    shipping: 'NAVIERA:', loading: 'LOCAL DE EMBARQUE:',
+    discharge: 'LOCAL DE DESCARGA:', delivery: 'LUGAR DE ENTREGA:',
+    currency: 'MONEDA:', marks: 'MARCA:',
+    qty: 'CANTIDAD', item: 'ITEM', desc: 'MERCADERIA',
+    ncm: 'S H / N C M', totalCartons: 'CANTIDAD TOTAL:', totalPacks: 'TOTAL BULTOS:',
+    netWeight: 'PESO NETO:', grossWeight: 'PESO BRUTO:', cubic: 'CUBICOS:',
     freight: 'FLETE MARITIMO', charges: 'GASTOS DE EXPORTACION',
     wooden: 'EMBALAJE DE MADERA: NO APLICA (NO UTILIZADO)',
-    netW: 'PESO NETO', grossW: 'PESO BRUTO', m3: 'M/3'
+    netW: 'PESO NETO', grossW: 'PESO BRUTO', m3: 'M/3', fdaNumber: ''
   }
 }
 
@@ -2183,24 +2190,47 @@ function fmtDataInv(dataStr, idioma) {
   return `${ms[d.getMonth()]} ${dd}${su}, ${d.getFullYear()}`
 }
 
-function excelFill(cor) {
-  return { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + cor } }
+function excelFill(argb) {
+  return { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + argb } }
 }
 
-function excelFont(bold, size, color) {
-  return { name: 'Arial', bold: !!bold, size: size || 9, color: { argb: 'FF' + (color || '000000') } }
+function bordaThin() {
+  const s = { style: 'thin', color: { argb: 'FF000000' } }
+  return { top: s, bottom: s, left: s, right: s }
 }
 
-function excelAlign(h, v, wrap) {
+function bordaTopo() {
+  return { top: { style: 'thin', color: { argb: 'FF000000' } } }
+}
+
+function fn(bold, size, name, color) {
+  return { name: name || 'Arial', bold: !!bold, size: size || 10, color: { argb: 'FF' + (color || '000000') } }
+}
+
+function al(h, v, wrap) {
   return { horizontal: h || 'left', vertical: v || 'top', wrapText: !!wrap }
 }
 
-const VERMELHO = 'C0392B'
-const CINZA = 'F2F2F2'
-const BRANCO = 'FFFFFF'
+function w(ws, r, c, val, opts) {
+  const cell = ws.getCell(r, c)
+  if (val !== undefined && val !== null) cell.value = val
+  if (!opts) return cell
+  if (opts.font) cell.font = opts.font
+  if (opts.fill) cell.fill = opts.fill
+  if (opts.align) cell.alignment = opts.align
+  if (opts.fmt) cell.numFmt = opts.fmt
+  if (opts.border) cell.border = opts.border
+  return cell
+}
+
+function mc(ws, r1, c1, r2, c2) {
+  ws.mergeCells(r1, c1, r2, c2)
+}
 
 async function gerarExcelInvoice(inv, itens) {
+  const tipoTubos = (inv.tipo === 'tubos')
   const mo = MOEDAS_INV[inv.moeda] || MOEDAS_INV.USD
+  const corAcento = tipoTubos ? '1F4E79' : 'C0392B'
   const t = TEXTOS_INV[mo.idioma]
   const dt = fmtDataInv(inv.data, mo.idioma)
   const sim = mo.simbolo
@@ -2208,292 +2238,403 @@ async function gerarExcelInvoice(inv, itens) {
   const frete = Number(inv.frete) || 0
   const chg = Number(inv.charges) || 0
 
+  const pathLogo = tipoTubos
+    ? path.join(__dirname, 'logo_tubos.png')
+    : path.join(__dirname, 'logo_alimentos.png')
+
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Pietrobon'
 
-  function addAba(titulo, ncols, larguras, construir) {
-    const ws = wb.addWorksheet(titulo, { pageSetup: { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1 } })
-    larguras.forEach((w, i) => { ws.getColumn(i + 1).width = w })
-    construir(ws)
-  }
-
-  function cel(ws, r, c) { return ws.getCell(r, c) }
-
-  function esc(ws, r, c, val, opts) {
-    const cell = ws.getCell(r, c)
-    cell.value = val
-    if (opts) {
-      if (opts.font) cell.font = opts.font
-      if (opts.fill) cell.fill = opts.fill
-      if (opts.align) cell.alignment = opts.align
-      if (opts.fmt) cell.numFmt = opts.fmt
-      if (opts.border) cell.border = opts.border
-    }
-  }
-
-  function hdr(ws, r, c, val, cor) {
-    const cell = ws.getCell(r, c)
-    cell.value = val
-    cell.font = excelFont(true, 9, BRANCO)
-    cell.fill = excelFill(cor || VERMELHO)
-    cell.alignment = excelAlign('center', 'center')
-  }
-
-  function faixaVm(ws, r, ncols) {
-    ws.getRow(r).height = 4
-    for (let c = 1; c <= ncols; c++) {
-      ws.getCell(r, c).fill = excelFill(VERMELHO)
-    }
-  }
-
-  function linhaBloco(ws, r, label, texto) {
-    const lns = (texto || '').split('\n')
-    ws.getRow(r).height = 13
-    esc(ws, r, 1, label + ':', { font: excelFont(true, 9) })
-    ws.mergeCells(r, 2, r, 7)
-    esc(ws, r, 2, lns[0] || '', { font: excelFont(true, 9) })
-    lns.slice(1).forEach((ln, i) => {
-      ws.getRow(r + i + 1).height = 11
-      ws.mergeCells(r + i + 1, 2, r + i + 1, 7)
-      esc(ws, r + i + 1, 2, ln, { font: excelFont(false, 8, '555555') })
-    })
-    return r + Math.max(lns.length, 1)
-  }
-
-  const logistica = [
-    [[t.bl, ''], [t.vessel, ''], [t.sailing, '']],
-    [[t.shipping, ''], [t.loading, inv.porto_embarque || ''], [t.discharge, inv.porto_descarga || '']],
-    [[t.currency, `${sim} - ${mo.nome}`], [t.delivery, inv.local_entrega || ''], ['', '']],
-    [[t.marks, 'MADE IN BRAZIL - PIETROBON'], ['', ''], ['', '']],
+  const logistica289 = [
+    [t.bl, '', t.vessel, '', t.sailing, ''],
+    [t.shipping, '', '', '', t.loading, inv.porto_embarque || ''],
+    [t.currency, `${sim} - ${mo.nome}`, '', '', t.discharge, inv.porto_descarga || ''],
+    [t.marks, 'MADE IN BRAZIL - PIETROBON', '', '', t.delivery, inv.local_entrega || ''],
   ]
 
-  // ── ABA INVOICE ──────────────────────────────────────────────
-  addAba('Invoice', 7, [14, 9, 30, 14, 12, 12, 12], (ws) => {
-    let r = 1
-    ws.getRow(r).height = 42
-    ws.mergeCells(r, 2, r, 4)
-    esc(ws, r, 2, 'PIETROBON & CIA. LTDA.', { font: excelFont(true, 13, VERMELHO), align: excelAlign('left', 'center') })
-    ws.mergeCells(r, 5, r, 7)
-    esc(ws, r, 5, t.invoice, { font: excelFont(true, 13), align: excelAlign('right', 'center') })
+  function construirFatura(ws) {
+    // Larguras iguais às originais (289: A=17.6, B=10.1, C=19.1, D=12.4, E=16.4, F=13.4, G=4.1, H=15.3, I=17.1, J=17.9)
+    const larguras = [17.6, 10.1, 19.1, 12.4, 16.4, 13.4, 4.1, 15.3, 17.1, 17.9]
+    larguras.forEach((ww, i) => { ws.getColumn(i + 1).width = ww })
 
-    r++; ws.getRow(r).height = 11
-    ws.mergeCells(r, 1, r, 7)
-    esc(ws, r, 1, 'RUA OSVALDO CRUZ, 126 · TAPEJARA · RS · BRAZIL · CEP 99.950-000 · CNPJ 97.580.260/0001-15', { font: excelFont(false, 8, '777777') })
-
-    r++; ws.getRow(r).height = 13
-    ws.mergeCells(r, 1, r, 4)
-    esc(ws, r, 1, `${t.date}: ${dt}`, { font: excelFont(false, 9) })
-    ws.mergeCells(r, 5, r, 7)
-    esc(ws, r, 5, `${t.number}: ${inv.numero || ''}`, { font: excelFont(true, 11), align: excelAlign('right') })
-
-    r++; faixaVm(ws, r, 7)
-
-    r++
-    r = linhaBloco(ws, r, t.buyer, inv.buyer)
-    r = linhaBloco(ws, r, t.consignee, inv.consignee)
-    r = linhaBloco(ws, r, t.notify, inv.notify || inv.consignee)
-
-    ws.getRow(r).height = 12
-    esc(ws, r, 1, t.payment + ':', { font: excelFont(true, 9) })
-    ws.mergeCells(r, 2, r, 7)
-    esc(ws, r, 2, inv.pagamento || '', { font: excelFont(false, 9) })
-    r++
-
-    if (inv.banco) {
-      ws.getRow(r).height = 28
-      ws.mergeCells(r, 1, r, 7)
-      esc(ws, r, 1, inv.banco, { font: excelFont(false, 8, '555555'), align: excelAlign('left', 'top', true) })
-      r++
-    }
-
-    const bdBot = { bottom: { style: 'medium', color: { argb: 'FF999999' } } }
-    for (let c = 1; c <= 7; c++) ws.getCell(r, c).border = bdBot
-    r++
-
-    logistica.forEach(([kv1, kv2, kv3]) => {
-      ws.getRow(r).height = 12
-      ws.mergeCells(r, 1, r, 2)
-      esc(ws, r, 1, kv1[0] ? `${kv1[0]}: ${kv1[1]}` : '', { font: excelFont(false, 9) })
-      ws.mergeCells(r, 3, r, 4)
-      esc(ws, r, 3, kv2[0] ? `${kv2[0]}: ${kv2[1]}` : '', { font: excelFont(false, 9) })
-      ws.mergeCells(r, 5, r, 7)
-      esc(ws, r, 5, kv3[0] ? `${kv3[0]}: ${kv3[1]}` : '', { font: excelFont(false, 9) })
-      r++
+    // Linhas 1-4: nome e endereço da empresa (lado esquerdo)
+    const empresa = [
+      'PIETROBON & CIA. LTDA.',
+      'RUA OSVALDO CRUZ, 126',
+      'TAPEJARA - RS - BRAZIL',
+      'CEP.: 99.950-000 - CNPJ: 97.580.260/0001-15'
+    ]
+    empresa.forEach((txt, i) => {
+      const r = i + 1
+      ws.getRow(r).height = 15.9
+      mc(ws, r, 1, r, 7)
+      const bold = i === 0
+      const sz = i === 0 ? 12 : 10
+      w(ws, r, 1, txt, { font: fn(bold, sz, 'Times New Roman', corAcento) })
     })
-    r++
 
-    ws.getRow(r).height = 18
-    for (const [c, lbl] of [[1, t.qty], [2, t.item], [5, t.ncm], [6, `${t.unit} ${sim}`], [7, `${t.total} ${sim}`]]) hdr(ws, r, c, lbl)
-    ws.mergeCells(r, 3, r, 4)
-    hdr(ws, r, 3, t.desc)
-    r++
+    // Logo no canto superior direito (col I = col 9, row 1)
+    try {
+      const imgId = wb.addImage({ filename: pathLogo, extension: 'png' })
+      ws.addImage(imgId, { tl: { col: 8, row: 0 }, br: { col: 10, row: 4 } })
+    } catch (_) {}
 
+    // L5: vazio
+    ws.getRow(5).height = 15.9
+
+    // L6: título (COMMERCIAL INVOICE / FACTURA COMERCIAL)
+    ws.getRow(6).height = 15.0
+    mc(ws, 6, 1, 6, 10)
+    w(ws, 6, 1, t.invoice, { font: fn(true, 12, 'Arial', corAcento) })
+
+    // L7: data
+    ws.getRow(7).height = 15.0
+    mc(ws, 7, 1, 7, 10)
+    w(ws, 7, 1, `${t.date}: ${dt}`, { font: fn(false, 9) })
+
+    // L8: vazio
+    ws.getRow(8).height = 15.0
+
+    // L9-12: BUYER (col A label, col B valor, col I NUMBER, col J valor)
+    ws.getRow(9).height = 15.0
+    w(ws, 9, 1, t.buyer, { font: fn(true, 9) })
+    const buyerLns = (inv.buyer || '').split('\n')
+    mc(ws, 9, 2, 9, 7); w(ws, 9, 2, buyerLns[0] || '', { font: fn(true, 9, 'Helvetica') })
+    w(ws, 9, 9, 'NUMBER:', { font: fn(true, 10) })
+    w(ws, 9, 10, inv.numero || '', { font: fn(false, 10) })
+    if (t.fdaNumber) {
+      w(ws, 10, 9, t.fdaNumber, { font: fn(true, 10) })
+    }
+
+    buyerLns.slice(1).forEach((ln, i) => {
+      const r = 10 + i
+      ws.getRow(r).height = 15.0
+      mc(ws, r, 2, r, 7); w(ws, r, 2, ln, { font: fn(false, 9, 'Helvetica') })
+    })
+
+    // L13-14: espaço
+    ws.getRow(13).height = 14.2
+    ws.getRow(14).height = 7.5
+
+    // L15-18: CONSIGNEE
+    ws.getRow(15).height = 15.0
+    w(ws, 15, 1, t.consignee, { font: fn(true, 9) })
+    const consLns = (inv.consignee || '').split('\n')
+    mc(ws, 15, 2, 15, 7); w(ws, 15, 2, consLns[0] || '', { font: fn(true, 9, 'Helvetica') })
+    consLns.slice(1).forEach((ln, i) => {
+      const r = 16 + i
+      ws.getRow(r).height = 15.0
+      mc(ws, r, 2, r, 7); w(ws, r, 2, ln, { font: fn(false, 9, 'Helvetica') })
+    })
+
+    // L19-20: espaço
+    ws.getRow(19).height = 15.0
+    ws.getRow(20).height = 8.2
+
+    // L21-24: NOTIFY
+    ws.getRow(21).height = 15.0
+    w(ws, 21, 1, t.notify, { font: fn(true, 9) })
+    const notLns = (inv.notify || inv.consignee || '').split('\n')
+    mc(ws, 21, 2, 21, 7); w(ws, 21, 2, notLns[0] || '', { font: fn(true, 9, 'Helvetica') })
+    notLns.slice(1).forEach((ln, i) => {
+      const r = 22 + i
+      ws.getRow(r).height = 15.0
+      mc(ws, r, 2, r, 7); w(ws, r, 2, ln, { font: fn(false, 9, 'Helvetica') })
+    })
+
+    // L25-26: espaço
+    ws.getRow(25).height = 15.0
+    ws.getRow(26).height = 7.5
+
+    // L27: PAYMENTS TERMS
+    ws.getRow(27).height = 15.0
+    w(ws, 27, 1, t.payment, { font: fn(true, 9) })
+    mc(ws, 27, 3, 27, 10); w(ws, 27, 3, inv.pagamento || '', { font: fn(false, 9) })
+
+    // L28-29: espaço
+    ws.getRow(28).height = 13.5
+    ws.getRow(29).height = 9.8
+
+    // L30: instruções bancárias
+    ws.getRow(30).height = 24.0
+    if (inv.banco) {
+      w(ws, 30, 1, t.instrucoes + ':', { font: fn(true, 9) })
+      mc(ws, 30, 3, 30, 10); w(ws, 30, 3, inv.banco, { font: fn(false, 9), align: al('left','top',true) })
+    }
+
+    // L31-35: espaços
+    ;[31,32,33,34].forEach(r => { ws.getRow(r).height = 20 })
+    ws.getRow(35).height = 13.5
+
+    // L36-39: logística (sem fundo, texto simples)
+    const logRows = [
+      [[t.bl, ''], ['', ''], [t.vessel, ''], ['', ''], [t.sailing, ''], ['', '']],
+      [[t.shipping, ''], ['', ''], ['', ''], ['', ''], [t.loading, inv.porto_embarque||''], ['', '']],
+      [[t.currency, `${sim} - ${mo.nome}`], ['', ''], ['', ''], ['', ''], [t.discharge, inv.porto_descarga||''], ['', '']],
+      [[t.marks, 'MADE IN BRAZIL - PIETROBON'], ['', ''], ['', ''], ['', ''], [t.delivery, inv.local_entrega||''], ['', '']],
+    ]
+    ;[36,37,38,39].forEach((r, ri) => {
+      ws.getRow(r).height = 15.0
+      const lr = logRows[ri]
+      // col 1: label bold
+      w(ws, r, 1, lr[0][0], { font: fn(true, 10) })
+      if (lr[0][1]) w(ws, r, 2, lr[0][1], { font: fn(false, 10) })
+      // col 4: segundo campo label
+      if (lr[2][0]) w(ws, r, 4, lr[2][0], { font: fn(true, 10) })
+      // col 8: terceiro campo label (direita)
+      if (lr[4][0]) w(ws, r, 8, lr[4][0], { font: fn(true, 10), align: al('right') })
+      if (lr[4][1]) w(ws, r, 9, lr[4][1], { font: fn(false, 10) })
+    })
+
+    // L40: cabeçalho tabela com bordas thin
+    ws.getRow(40).height = 15.0
+    const borda = bordaThin()
+    ;[
+      [1, t.qty, 'center'], [2, t.item, 'center'], [3, t.desc, 'center'],
+      [8, t.ncm, 'center'], [9, `UNIT ${sim}`, 'center'], [10, `TOTAL ${sim}`, 'center']
+    ].forEach(([c, val, ha]) => {
+      w(ws, 40, c, val, { font: fn(true, 10), align: al(ha), border: borda })
+    })
+    mc(ws, 40, 3, 40, 7)
+
+    // L41: container + símbolo moeda (sem linha vazia — a linha vazia é L42)
+    ws.getRow(41).height = 15.0
     if (inv.container) {
-      ws.getRow(r).height = 12; ws.mergeCells(r, 1, r, 7)
-      esc(ws, r, 1, `In ${inv.container}:`, { font: excelFont(true, 8), fill: excelFill('EEEEEE') }); r++
+      mc(ws, 41, 3, 41, 7)
+      w(ws, 41, 3, `In ${inv.container}:`, { font: fn(true, 9) })
     }
+    w(ws, 41, 9, sim, { font: fn(true, 10), align: al('center') })
+    w(ws, 41, 10, sim, { font: fn(true, 10), align: al('center') })
 
-    const bd = { top: { style: 'thin', color: { argb: 'FFDDDDDD' } }, bottom: { style: 'thin', color: { argb: 'FFDDDDDD' } }, left: { style: 'thin', color: { argb: 'FFDDDDDD' } }, right: { style: 'thin', color: { argb: 'FFDDDDDD' } } }
-    const liInv = r
-    for (let idx = 0; idx < itens.length; idx++) {
-      const it = itens[idx]; ws.getRow(r).height = 13
-      const bg = idx % 2 === 0 ? BRANCO : 'F5F5F5'
-      const qtd = Number(it.quantidade) || 0; const pr = Number(it.preco_unit) || 0
-      esc(ws, r, 1, qtd, { font: excelFont(false, 9), fill: excelFill(bg), align: excelAlign('right'), border: bd })
-      esc(ws, r, 2, uni, { font: excelFont(false, 9), fill: excelFill(bg), border: bd })
-      ws.mergeCells(r, 3, r, 4)
-      esc(ws, r, 3, it.descricao || '', { font: excelFont(false, 9), fill: excelFill(bg), border: bd })
-      esc(ws, r, 5, it.ncm || '', { font: excelFont(false, 9), fill: excelFill(bg), align: excelAlign('center'), border: bd })
-      esc(ws, r, 6, pr, { font: excelFont(false, 9), fill: excelFill(bg), align: excelAlign('right'), fmt: '#,##0.00', border: bd })
-      esc(ws, r, 7, qtd * pr, { font: excelFont(false, 9), fill: excelFill(bg), align: excelAlign('right'), fmt: '#,##0.00', border: bd })
-      r++
-    }
-    const lfInv = r - 1
+    // L42: linha vazia entre container e itens
+    ws.getRow(42).height = 15.0
 
-    const tq = itens.reduce((s, i) => s + (Number(i.quantidade) || 0), 0)
-    const tn = itens.reduce((s, i) => s + (Number(i.peso_neto) || 0), 0)
-    const tb = itens.reduce((s, i) => s + (Number(i.peso_bruto) || 0), 0)
-    const tm = itens.reduce((s, i) => s + (Number(i.m3) || 0), 0)
-    const tg = itens.reduce((s, i) => s + ((Number(i.quantidade) || 0) * (Number(i.preco_unit) || 0)), 0) + frete + chg
+    // L43+: itens
+    const liInv = 43
+    itens.forEach((it, idx) => {
+      const r = liInv + idx
+      ws.getRow(r).height = 15.0
+      const qtd = Number(it.quantidade) || 0
+      const pr = Number(it.preco_unit) || 0
+      w(ws, r, 1, qtd, { font: fn(false, 10), align: al('left') })
+      w(ws, r, 2, uni, { font: fn(false, 10) })
+      mc(ws, r, 3, r, 7)
+      w(ws, r, 3, it.descricao || '', { font: fn(false, 10) })
+      w(ws, r, 8, it.ncm || '', { font: fn(false, 10) })
+      w(ws, r, 9, pr, { font: fn(false, 10), fmt: '#,##0.00' })
+      w(ws, r, 10, { formula: `I${r}*A${r}` }, { font: fn(false, 10), fmt: '#,##0.00' })
+    })
 
-    r++; ws.getRow(r).height = 15
-    ws.mergeCells(r, 1, r, 5)
-    esc(ws, r, 1, `${t.totalCartons}: ${tq} ${uni}`, { font: excelFont(true, 9), fill: excelFill(CINZA) })
-    esc(ws, r, 6, `${t.total} ${sim}`, { font: excelFont(true, 9), fill: excelFill(CINZA), align: excelAlign('right') })
-    esc(ws, r, 7, { formula: `SUM(G${liInv}:G${lfInv})` }, { font: excelFont(true, 9), fill: excelFill(CINZA), align: excelAlign('right'), fmt: '#,##0.00' })
+    const lfInv = liInv + itens.length - 1
+    const tq = itens.reduce((s,i) => s+(Number(i.quantidade)||0), 0)
+    const tn = itens.reduce((s,i) => s+(Number(i.peso_neto)||0), 0)
+    const tb = itens.reduce((s,i) => s+(Number(i.peso_bruto)||0), 0)
+    const tm = itens.reduce((s,i) => s+(Number(i.m3)||0), 0)
+    const tg = itens.reduce((s,i) => s+(Number(i.quantidade)||0)*(Number(i.preco_unit)||0), 0) + frete + chg
 
-    for (const [le, ld, vd] of [
-      [`${t.totalPacks}: ${tq} ${uni}`, `${t.freight} ${sim}`, frete],
-      [`${t.netWeight}: ${tn.toFixed(2)} KGS`, `${t.charges} ${sim}`, chg],
-      [`${t.grossWeight}: ${tb.toFixed(2)} KGS`, '', null],
-    ]) {
-      r++; ws.getRow(r).height = 13
-      ws.mergeCells(r, 1, r, 5)
-      esc(ws, r, 1, le, { font: excelFont(false, 9), fill: excelFill(CINZA) })
-      if (ld) esc(ws, r, 6, ld, { font: excelFont(false, 9), fill: excelFill(CINZA), align: excelAlign('right') })
-      if (vd !== null) esc(ws, r, 7, vd, { font: excelFont(false, 9), fill: excelFill(CINZA), align: excelAlign('right'), fmt: '#,##0.00' })
-    }
+    // Linha totais (mesmo padrão da original)
+    let r = lfInv + 1
+    ws.getRow(r).height = 15.0
+    w(ws, r, 1, t.totalCartons, { font: fn(true, 10) })
+    w(ws, r, 3, { formula: `SUM(A${liInv}:A${lfInv})` }, { font: fn(true, 10) })
+    w(ws, r, 4, uni, { font: fn(true, 10) })
+    w(ws, r, 5, 'TOTAL', { font: fn(true, 10) })
+    w(ws, r, 9, sim, { font: fn(true, 10) })
+    w(ws, r, 10, { formula: `SUM(J${liInv}:J${lfInv})` }, { font: fn(true, 10), fmt: '#,##0.00' })
 
-    r++; ws.getRow(r).height = 16
-    ws.mergeCells(r, 1, r, 2)
-    esc(ws, r, 1, `${t.cubic}: ${tm.toFixed(4)} M/3`, { font: excelFont(true, 9), fill: excelFill(CINZA) })
-    ws.mergeCells(r, 3, r, 6)
-    esc(ws, r, 3, `TOTAL ${inv.incoterm || ''} ${inv.local_entrega || ''}`, { font: excelFont(true, 9, BRANCO), fill: excelFill(VERMELHO), align: excelAlign('right', 'center') })
-    esc(ws, r, 7, tg, { font: excelFont(true, 10, BRANCO), fill: excelFill(VERMELHO), align: excelAlign('right'), fmt: '#,##0.00' })
+    r++; ws.getRow(r).height = 15.0
+    w(ws, r, 1, t.totalPacks, { font: fn(false, 10) })
+    w(ws, r, 3, { formula: `C${r-1}` }, { font: fn(false, 10) })
+    w(ws, r, 4, uni, { font: fn(false, 10) })
+    w(ws, r, 5, t.freight, { font: fn(false, 10) })
+    w(ws, r, 9, sim, { font: fn(false, 10) })
+    w(ws, r, 10, frete, { font: fn(false, 10), fmt: '#,##0.00' })
+
+    r++; ws.getRow(r).height = 15.0
+    w(ws, r, 1, t.netWeight, { font: fn(false, 10) })
+    w(ws, r, 3, tn, { font: fn(false, 10) })
+    w(ws, r, 4, 'KGS', { font: fn(false, 10) })
+    w(ws, r, 6, t.charges, { font: fn(false, 10) })
+    w(ws, r, 9, sim, { font: fn(false, 10) })
+    w(ws, r, 10, chg, { font: fn(false, 10), fmt: '#,##0.00' })
+
+    r++; ws.getRow(r).height = 15.0
+    w(ws, r, 1, t.grossWeight, { font: fn(false, 10) })
+    w(ws, r, 3, tb, { font: fn(false, 10) })
+    w(ws, r, 4, 'KGS', { font: fn(false, 10) })
+
+    r++; ws.getRow(r).height = 15.0
+    w(ws, r, 1, t.cubic, { font: fn(false, 10) })
+    w(ws, r, 3, tm, { font: fn(false, 10), fmt: '#,##0.0000' })
+    w(ws, r, 4, 'M/3', { font: fn(false, 10) })
+    const totalLabel = `TOTAL ${inv.incoterm || ''} ${inv.local_entrega || ''}`.trim()
+    mc(ws, r, 5, r, 8)
+    w(ws, r, 5, totalLabel, { font: fn(true, 10) })
+    w(ws, r, 9, sim, { font: fn(true, 10) })
+    w(ws, r, 10, tg, { font: fn(true, 10), fmt: '#,##0.00' })
 
     if (inv.endereco_entrega) {
-      r++; ws.getRow(r).height = 11; ws.mergeCells(r, 1, r, 7)
-      esc(ws, r, 1, inv.endereco_entrega, { font: excelFont(false, 8, '777777'), align: excelAlign('center') })
+      r++; ws.getRow(r).height = 15.0
+      mc(ws, r, 5, r, 10)
+      w(ws, r, 5, inv.endereco_entrega, { font: fn(false, 9) })
     }
 
-    r += 2; ws.mergeCells(r, 5, r, 7)
-    esc(ws, r, 5, 'PIETROBON & CIA. LTDA.', { font: excelFont(true, 10), align: excelAlign('right') })
-  })
+    // Assinatura
+    r += 4; ws.getRow(r).height = 14.1
+    mc(ws, r, 5, r, 6)
+    w(ws, r, 5, 'PIETROBON & CIA. LTDA.', { font: fn(false, 10) })
 
-  // ── ABA PACKING LIST ─────────────────────────────────────────
-  addAba('Packing List', 7, [14, 9, 30, 14, 14, 14, 10], (ws) => {
-    let r = 1
-    ws.getRow(r).height = 42
-    ws.mergeCells(r, 2, r, 4)
-    esc(ws, r, 2, 'PIETROBON & CIA. LTDA.', { font: excelFont(true, 13, VERMELHO), align: excelAlign('left', 'center') })
-    ws.mergeCells(r, 5, r, 7)
-    esc(ws, r, 5, t.packing, { font: excelFont(true, 13), align: excelAlign('right', 'center') })
+    ws.pageSetup = { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
+  }
 
-    r++; ws.getRow(r).height = 11
-    ws.mergeCells(r, 1, r, 7)
-    esc(ws, r, 1, 'RUA OSVALDO CRUZ, 126 · TAPEJARA · RS · BRAZIL · CEP 99.950-000 · CNPJ 97.580.260/0001-15', { font: excelFont(false, 8, '777777') })
+  function construirPacking(ws) {
+    // Packing list — mesma estrutura mas com NET/GROSS/M3 em vez de preços
+    const larguras = [17.6, 10.1, 30, 12, 12, 12, 6]
+    larguras.forEach((ww, i) => { ws.getColumn(i + 1).width = ww })
 
-    r++; ws.getRow(r).height = 13
-    ws.mergeCells(r, 1, r, 4)
-    esc(ws, r, 1, `${t.date}: ${dt}`, { font: excelFont(false, 9) })
-    ws.mergeCells(r, 5, r, 7)
-    esc(ws, r, 5, `${t.number}: ${inv.numero || ''}`, { font: excelFont(true, 11), align: excelAlign('right') })
-
-    r++; faixaVm(ws, r, 7)
-
-    r++
-    for (const [lbl, txt] of [[t.buyer, inv.buyer], [t.consignee, inv.consignee], [t.notify, inv.notify || inv.consignee]]) {
-      const lns = (txt || '').split('\n')
-      ws.getRow(r).height = 13
-      esc(ws, r, 1, lbl + ':', { font: excelFont(true, 9) })
-      ws.mergeCells(r, 2, r, 7)
-      esc(ws, r, 2, lns[0] || '', { font: excelFont(true, 9) })
-      lns.slice(1).forEach((ln, i) => {
-        ws.getRow(r + i + 1).height = 11
-        ws.mergeCells(r + i + 1, 2, r + i + 1, 7)
-        esc(ws, r + i + 1, 2, ln, { font: excelFont(false, 8, '555555') })
-      })
-      r += Math.max(lns.length, 1)
-    }
-
-    const bdBot = { bottom: { style: 'medium', color: { argb: 'FF999999' } } }
-    for (let c = 1; c <= 7; c++) ws.getCell(r, c).border = bdBot
-    r++
-
-    logistica.forEach(([kv1, kv2, kv3]) => {
-      ws.getRow(r).height = 12
-      ws.mergeCells(r, 1, r, 2)
-      esc(ws, r, 1, kv1[0] ? `${kv1[0]}: ${kv1[1]}` : '', { font: excelFont(false, 9) })
-      ws.mergeCells(r, 3, r, 4)
-      esc(ws, r, 3, kv2[0] ? `${kv2[0]}: ${kv2[1]}` : '', { font: excelFont(false, 9) })
-      ws.mergeCells(r, 5, r, 7)
-      esc(ws, r, 5, kv3[0] ? `${kv3[0]}: ${kv3[1]}` : '', { font: excelFont(false, 9) })
-      r++
+    // L1-4: empresa
+    ;['PIETROBON & CIA. LTDA.', 'RUA OSVALDO CRUZ, 126', 'TAPEJARA - RS - BRAZIL', 'CEP.: 99.950-000 - CNPJ: 97.580.260/0001-15'].forEach((txt, i) => {
+      const r = i + 1; ws.getRow(r).height = 15.9
+      mc(ws, r, 1, r, 5); w(ws, r, 1, txt, { font: fn(i===0, i===0?12:10, 'Times New Roman', corAcento) })
     })
-    r++
 
-    ws.getRow(r).height = 18
-    for (const [c, lbl] of [[1, t.qty], [2, t.item], [5, `${t.netW} KGS`], [6, `${t.grossW} KGS`], [7, t.m3]]) hdr(ws, r, c, lbl)
-    ws.mergeCells(r, 3, r, 4); hdr(ws, r, 3, t.desc)
-    r++
+    try {
+      const imgId = wb.addImage({ filename: pathLogo, extension: 'png' })
+      ws.addImage(imgId, { tl: { col: 5, row: 0 }, br: { col: 7, row: 4 } })
+    } catch (_) {}
+
+    ws.getRow(5).height = 15.9
+
+    ws.getRow(6).height = 15.0
+    mc(ws, 6, 1, 6, 7)
+    w(ws, 6, 1, t.packing, { font: fn(true, 12, 'Arial', corAcento) })
+
+    ws.getRow(7).height = 15.0
+    mc(ws, 7, 1, 7, 4)
+    w(ws, 7, 1, `${t.date}: ${dt}`, { font: fn(false, 9) })
+    w(ws, 7, 6, 'NUMBER:', { font: fn(true, 10) })
+    w(ws, 7, 7, inv.numero || '', { font: fn(false, 10) })
+
+    ws.getRow(8).height = 15.0
+
+    // BUYER
+    ws.getRow(9).height = 15.0
+    w(ws, 9, 1, t.buyer, { font: fn(true, 9) })
+    const buyLns = (inv.buyer || '').split('\n')
+    mc(ws, 9, 2, 9, 5); w(ws, 9, 2, buyLns[0]||'', { font: fn(true, 9, 'Helvetica') })
+    if (t.fdaNumber) w(ws, 9, 6, t.fdaNumber, { font: fn(true, 10) })
+    buyLns.slice(1).forEach((ln, i) => {
+      const r = 10+i; ws.getRow(r).height = 15.0
+      mc(ws, r, 2, r, 5); w(ws, r, 2, ln, { font: fn(false, 9, 'Helvetica') })
+    })
+
+    ws.getRow(13).height = 14.2; ws.getRow(14).height = 7.5
+
+    // CONSIGNEE
+    ws.getRow(15).height = 15.0
+    w(ws, 15, 1, t.consignee, { font: fn(true, 9) })
+    const consLns = (inv.consignee||'').split('\n')
+    mc(ws, 15, 2, 15, 5); w(ws, 15, 2, consLns[0]||'', { font: fn(true, 9, 'Helvetica') })
+    consLns.slice(1).forEach((ln, i) => {
+      const r = 16+i; ws.getRow(r).height = 15.0
+      mc(ws, r, 2, r, 5); w(ws, r, 2, ln, { font: fn(false, 9, 'Helvetica') })
+    })
+
+    ws.getRow(19).height = 15.0; ws.getRow(20).height = 8.2
+
+    // NOTIFY
+    ws.getRow(21).height = 15.0
+    w(ws, 21, 1, t.notify, { font: fn(true, 9) })
+    const notLns = (inv.notify||inv.consignee||'').split('\n')
+    mc(ws, 21, 2, 21, 5); w(ws, 21, 2, notLns[0]||'', { font: fn(true, 9, 'Helvetica') })
+    notLns.slice(1).forEach((ln, i) => {
+      const r = 22+i; ws.getRow(r).height = 15.0
+      mc(ws, r, 2, r, 5); w(ws, r, 2, ln, { font: fn(false, 9, 'Helvetica') })
+    })
+
+    ws.getRow(25).height = 15.0; ws.getRow(26).height = 7.5
+
+    // Logística
+    ;[
+      [t.bl, '', t.vessel, '', t.sailing, ''],
+      [t.shipping, '', '', '', t.loading, inv.porto_embarque||''],
+      [t.currency, `${sim} - ${mo.nome}`, '', '', t.discharge, inv.porto_descarga||''],
+      [t.marks, 'MADE IN BRAZIL - PIETROBON', '', '', t.delivery, inv.local_entrega||''],
+    ].forEach(([l1,v1,l2,v2,l3,v3], ri) => {
+      const r = 27+ri; ws.getRow(r).height = 15.0
+      w(ws, r, 1, l1, { font: fn(true, 10) })
+      if (v1) w(ws, r, 2, v1, { font: fn(false, 10) })
+      if (l3) w(ws, r, 5, l3, { font: fn(true, 10) })
+      if (v3) w(ws, r, 6, v3, { font: fn(false, 10) })
+    })
+
+    ws.getRow(31).height = 15.0
+
+    // Cabeçalho tabela packing
+    ws.getRow(32).height = 15.0
+    const borda = bordaThin()
+    ;[
+      [1, t.qty, 'center'], [2, t.item, 'center'], [3, t.desc, 'center'],
+      [5, `${t.netW} KGS`, 'center'], [6, `${t.grossW} KGS`, 'center'], [7, t.m3, 'center']
+    ].forEach(([c, val, ha]) => {
+      w(ws, 32, c, val, { font: fn(true, 10), align: al(ha), border: borda })
+    })
+    mc(ws, 32, 3, 32, 4)
 
     if (inv.container) {
-      ws.getRow(r).height = 12; ws.mergeCells(r, 1, r, 7)
-      esc(ws, r, 1, `In ${inv.container}:`, { font: excelFont(true, 8), fill: excelFill('EEEEEE') }); r++
+      ws.getRow(33).height = 15.0
+      mc(ws, 33, 3, 33, 4)
+      w(ws, 33, 3, `In ${inv.container}:`, { font: fn(true, 9) })
     }
 
-    const bd = { top: { style: 'thin', color: { argb: 'FFDDDDDD' } }, bottom: { style: 'thin', color: { argb: 'FFDDDDDD' } }, left: { style: 'thin', color: { argb: 'FFDDDDDD' } }, right: { style: 'thin', color: { argb: 'FFDDDDDD' } } }
-    const liPk = r
-    for (let idx = 0; idx < itens.length; idx++) {
-      const it = itens[idx]; ws.getRow(r).height = 13
-      const bg = idx % 2 === 0 ? BRANCO : 'F5F5F5'
-      esc(ws, r, 1, Number(it.quantidade) || 0, { font: excelFont(false, 9), fill: excelFill(bg), align: excelAlign('right'), border: bd })
-      esc(ws, r, 2, uni, { font: excelFont(false, 9), fill: excelFill(bg), border: bd })
-      ws.mergeCells(r, 3, r, 4)
-      esc(ws, r, 3, it.descricao || '', { font: excelFont(false, 9), fill: excelFill(bg), border: bd })
-      esc(ws, r, 5, Number(it.peso_neto) || 0, { font: excelFont(false, 9), fill: excelFill(bg), align: excelAlign('right'), fmt: '#,##0.00', border: bd })
-      esc(ws, r, 6, Number(it.peso_bruto) || 0, { font: excelFont(false, 9), fill: excelFill(bg), align: excelAlign('right'), fmt: '#,##0.00', border: bd })
-      esc(ws, r, 7, Number(it.m3) || 0, { font: excelFont(false, 9), fill: excelFill(bg), align: excelAlign('right'), fmt: '#,##0.0000', border: bd })
-      r++
-    }
-    const lfPk = r - 1
-    const tq = itens.reduce((s, i) => s + (Number(i.quantidade) || 0), 0)
+    ws.getRow(34).height = 15.0
 
-    r++; ws.getRow(r).height = 15
-    esc(ws, r, 1, tq, { font: excelFont(true, 9), fill: excelFill(CINZA), align: excelAlign('right') })
-    esc(ws, r, 2, tq, { font: excelFont(true, 9), fill: excelFill(CINZA), align: excelAlign('right') })
-    ws.mergeCells(r, 3, r, 4)
-    esc(ws, r, 3, '', { fill: excelFill(CINZA) })
-    esc(ws, r, 5, { formula: `SUM(E${liPk}:E${lfPk})` }, { font: excelFont(true, 9), fill: excelFill(CINZA), align: excelAlign('right'), fmt: '#,##0.00' })
-    esc(ws, r, 6, { formula: `SUM(F${liPk}:F${lfPk})` }, { font: excelFont(true, 9), fill: excelFill(CINZA), align: excelAlign('right'), fmt: '#,##0.00' })
-    esc(ws, r, 7, { formula: `SUM(G${liPk}:G${lfPk})` }, { font: excelFont(true, 9), fill: excelFill(CINZA), align: excelAlign('right'), fmt: '#,##0.0000' })
+    const liPk = 35
+    itens.forEach((it, idx) => {
+      const r = liPk + idx; ws.getRow(r).height = 15.0
+      w(ws, r, 1, Number(it.quantidade)||0, { font: fn(false, 10) })
+      w(ws, r, 2, uni, { font: fn(false, 10) })
+      mc(ws, r, 3, r, 4)
+      w(ws, r, 3, it.descricao||'', { font: fn(false, 10) })
+      w(ws, r, 5, Number(it.peso_neto)||0, { font: fn(false, 10), fmt: '#,##0.00' })
+      w(ws, r, 6, Number(it.peso_bruto)||0, { font: fn(false, 10), fmt: '#,##0.00' })
+      w(ws, r, 7, Number(it.m3)||0, { font: fn(false, 10), fmt: '#,##0.0000' })
+    })
 
-    r++; ws.getRow(r).height = 11
-    esc(ws, r, 1, 'UNIDADES', { font: excelFont(true, 8), fill: excelFill(CINZA), align: excelAlign('center') })
-    esc(ws, r, 2, 'UNIDADES', { font: excelFont(true, 8), fill: excelFill(CINZA), align: excelAlign('center') })
-    ws.mergeCells(r, 3, r, 4); esc(ws, r, 3, '', { fill: excelFill(CINZA) })
-    esc(ws, r, 5, 'KGS', { font: excelFont(true, 8), fill: excelFill(CINZA), align: excelAlign('center') })
-    esc(ws, r, 6, 'KGS', { font: excelFont(true, 8), fill: excelFill(CINZA), align: excelAlign('center') })
-    esc(ws, r, 7, 'M/3', { font: excelFont(true, 8), fill: excelFill(CINZA), align: excelAlign('center') })
+    const lfPk = liPk + itens.length - 1
+    const tq = itens.reduce((s,i)=>s+(Number(i.quantidade)||0),0)
 
-    r += 2; ws.mergeCells(r, 1, r, 7)
-    esc(ws, r, 1, t.wooden, { font: excelFont(true, 9) })
-    r += 2; ws.mergeCells(r, 5, r, 7)
-    esc(ws, r, 5, 'PIETROBON & CIA. LTDA.', { font: excelFont(true, 10), align: excelAlign('right') })
-  })
+    let r = lfPk + 1; ws.getRow(r).height = 15.0
+    w(ws, r, 1, `Total ${uni}`, { font: fn(true, 10) })
+    w(ws, r, 2, tq, { font: fn(true, 10) })
+    w(ws, r, 5, { formula: `SUM(E${liPk}:E${lfPk})` }, { font: fn(true, 10), fmt: '#,##0.00' })
+    w(ws, r, 6, { formula: `SUM(F${liPk}:F${lfPk})` }, { font: fn(true, 10), fmt: '#,##0.00' })
+    w(ws, r, 7, { formula: `SUM(G${liPk}:G${lfPk})` }, { font: fn(true, 10), fmt: '#,##0.0000' })
+
+    r++; ws.getRow(r).height = 15.0
+    ;['UNIDADES','UNIDADES','','','KGS','KGS','M/3'].forEach((v, ci) => {
+      if (v) w(ws, r, ci+1, v, { font: fn(true, 10), align: al('center') })
+    })
+
+    r += 2; ws.getRow(r).height = 15.0
+    mc(ws, r, 1, r, 7)
+    w(ws, r, 1, t.wooden, { font: fn(false, 10) })
+
+    r += 3; ws.getRow(r).height = 14.1
+    w(ws, r, 4, 'PIETROBON & CIA. LTDA.', { font: fn(false, 10) })
+
+    ws.pageSetup = { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
+  }
+
+  const wsFatura = wb.addWorksheet('Fatura')
+  construirFatura(wsFatura)
+
+  const wsPacking = wb.addWorksheet('Packing')
+  construirPacking(wsPacking)
 
   return wb
 }
+
 
 app.get('/api/invoices/:id/excel', autenticarContabil(), async (req, res) => {
   try {
