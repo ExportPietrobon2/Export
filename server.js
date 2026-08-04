@@ -2016,7 +2016,7 @@ ${textoNfse.slice(0, 4000)}`
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 1000 }
+          generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
         })
       }
     )
@@ -2024,14 +2024,12 @@ ${textoNfse.slice(0, 4000)}`
     const data = await resp.json()
     if (data.error) return res.status(500).json({ erro: data.error.message })
 
-    console.log('Gemini resposta completa:', JSON.stringify(data).slice(0, 800))
     const texto = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    console.log('Texto extraído do Gemini:', texto.slice(0, 500))
     try {
       const limpo = texto.replace(/```json/g, '').replace(/```/g, '').trim()
       const inicioJson = limpo.indexOf('{')
       const fimJson = limpo.lastIndexOf('}')
-      if (inicioJson === -1 || fimJson === -1) throw new Error('JSON não encontrado na resposta: ' + limpo.slice(0, 200))
+      if (inicioJson === -1 || fimJson === -1) throw new Error('JSON incompleto')
       const json = JSON.parse(limpo.slice(inicioJson, fimJson + 1))
       res.json({ ok: true, dados: json })
     } catch (parseErr) {
