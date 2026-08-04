@@ -8,7 +8,8 @@ const multer = require('multer')
 const path = require('path')
 
 const app = express()
-app.use(express.json())
+app.use(express.json({ limit: '20mb' }))
+app.use(express.urlencoded({ limit: '20mb', extended: true }))
 app.use(express.static(path.join(__dirname, '.')))
 
 cloudinary.config({
