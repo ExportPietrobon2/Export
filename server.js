@@ -2236,8 +2236,9 @@ async function gerarExcelInvoice(inv, itens) {
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Pietrobon'
 
-  function montarCabecalho(ws) {
-    COLS.forEach((w, i) => { ws.getColumn(i+1).width = w })
+  function montarCabecalho(ws, nCols) {
+    const NC = nCols || NCOLS
+    COLS.slice(0, NC).forEach((w, i) => { ws.getColumn(i+1).width = w })
 
     // Dimensões da logo por tipo
     const hLogo = 50
@@ -2255,7 +2256,7 @@ async function gerarExcelInvoice(inv, itens) {
 
     // L1: fundo colorido suave + logo
     ws.getRow(1).height = 40
-    fillRow(ws, 1, COR_BG, NCOLS)
+    fillRow(ws, 1, COR_BG, NC)
     try {
       const imgId = wb.addImage({ filename: LOGO_PATH, extension: 'png' })
       ws.addImage(imgId, { tl: { col: colAncora-1, row: 0 }, ext: { width: wLogo, height: hLogo } })
@@ -2263,12 +2264,12 @@ async function gerarExcelInvoice(inv, itens) {
 
     // L2: faixa colorida sólida
     ws.getRow(2).height = 5
-    fillRow(ws, 2, COR, NCOLS)
+    fillRow(ws, 2, COR, NC)
 
     // L3: endereço — fundo escuro, texto branco
     ws.getRow(3).height = 13
-    fillRow(ws, 3, '1A1A1A', NCOLS)
-    mc(ws, 3,1,3,NCOLS)
+    fillRow(ws, 3, '1A1A1A', NC)
+    mc(ws, 3,1,3,NC)
     cx(ws, 3,1, 'RUA OSVALDO CRUZ, 126  ·  TAPEJARA - RS - BRAZIL  ·  CEP: 99.950-000  ·  CNPJ: 97.580.260/0001-15', {
       font: exFont(false, 9, 'Arial', 'FFFFFF'),
       fill: exFill('1A1A1A'),
@@ -2277,7 +2278,7 @@ async function gerarExcelInvoice(inv, itens) {
   }
 
   function construirFatura(ws) {
-    montarCabecalho(ws)
+    montarCabecalho(ws, NCOLS)
 
     // L4: respiro
     ws.getRow(4).height = 8
@@ -2460,7 +2461,7 @@ async function gerarExcelInvoice(inv, itens) {
   }
 
   function construirPacking(ws) {
-    montarCabecalho(ws)
+    montarCabecalho(ws, 7)
 
     const COLS_PK=[17.6,10.1,30,14,14,14,10]
     COLS_PK.forEach((w,i)=>{ ws.getColumn(i+1).width=w })
