@@ -2024,17 +2024,19 @@ ${textoNfse.slice(0, 4000)}`
     const data = await resp.json()
     if (data.error) return res.status(500).json({ erro: data.error.message })
 
+    console.log('Gemini resposta completa:', JSON.stringify(data).slice(0, 800))
     const texto = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    console.log('Texto extraído do Gemini:', texto.slice(0, 500))
     try {
       const limpo = texto.replace(/```json/g, '').replace(/```/g, '').trim()
       const inicioJson = limpo.indexOf('{')
       const fimJson = limpo.lastIndexOf('}')
-      if (inicioJson === -1 || fimJson === -1) throw new Error('JSON não encontrado')
+      if (inicioJson === -1 || fimJson === -1) throw new Error('JSON não encontrado na resposta: ' + limpo.slice(0, 200))
       const json = JSON.parse(limpo.slice(inicioJson, fimJson + 1))
       res.json({ ok: true, dados: json })
     } catch (parseErr) {
       console.error('Erro parse conferencia:', parseErr.message)
-      res.status(500).json({ erro: 'Não foi possível extrair os dados da nota. Verifique se o arquivo é uma NFS-e válida.' })
+      res.status(500).json({ erro: 'Não foi possível extrair os dados da nota.' })
     }
   } catch (e) {
     console.error('Erro conferencia-nfse:', e.message)
