@@ -552,6 +552,7 @@ async function carregarLista() {
           <button class="btn btn-sm btn-outline-primary" onclick="verInvoice(${inv.id}, 'invoice')">Invoice</button>
           <button class="btn btn-sm btn-outline-primary" onclick="verInvoice(${inv.id}, 'packing')">Packing</button>
           <button class="btn btn-sm btn-outline-primary" onclick="verInvoice(${inv.id}, 'ambos')">Ambos</button>
+          <button class="btn btn-sm btn-outline-success" onclick="baixarExcel(${inv.id})">📊 Excel</button>
           <button class="btn btn-sm btn-outline-danger" onclick="excluirInvoice(${inv.id})">🗑</button>
         </div>
       </div>
@@ -562,6 +563,14 @@ async function carregarLista() {
       <button class="btn btn-pietrobon" onclick="abrirNovaInvoice()">➕ Nova Invoice</button>
     </div>
     ${linhas}`
+}
+
+
+window.baixarExcel = (id) => {
+  const token = obterToken()
+  const link = document.createElement('a')
+  link.href = `/api/invoices/${id}/excel`
+  link.click()
 }
 
 window.abrirNovaInvoice = () => {
