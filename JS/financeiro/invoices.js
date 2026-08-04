@@ -566,11 +566,28 @@ async function carregarLista() {
 }
 
 
-window.baixarExcel = (id) => {
+window.baixarExcel = async (id) => {
   const token = obterToken()
-  const link = document.createElement('a')
-  link.href = `/api/invoices/${id}/excel`
-  link.click()
+  const btn = document.querySelector(`[onclick="baixarExcel(${id})"]`)
+  if (btn) { btn.disabled = true; btn.textContent = '⏳' }
+  try {
+    const resposta = await fetch(`/api/invoices/${id}/excel`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!resposta.ok) { alert('Erro ao gerar o Excel.'); return }
+    const blob = await resposta.blob()
+    const nome = resposta.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] || `Invoice_${id}.xlsx`
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = nome
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    alert('Erro ao baixar o Excel: ' + e.message)
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📊 Excel' }
+  }
 }
 
 window.abrirNovaInvoice = () => {
