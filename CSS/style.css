@@ -1107,3 +1107,6 @@ body[data-pagina="ordem-producao.html"] .page-header-icon::before { content: "�
 
 body[data-pagina="conferencia-nfse.html"] .page-header-icon::before { content: "🔍"; }
 #menu-principal a[href$="conferencia-nfse.html"]::before { content: "🔍"; margin-right: 8px; }
+
+body[data-pagina="invoices.html"] .page-header-icon::before { content: "📋"; }
+#menu-principal a[href$="invoices.html"]::before { content: "📋"; margin-right: 8px; }

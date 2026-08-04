@@ -2043,6 +2043,97 @@ ${textoNfse.slice(0, 4000)}`
 })
 
 
+async function inicializarInvoices() {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS invoices (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      numero VARCHAR(20) NOT NULL,
+      data DATE,
+      moeda VARCHAR(3) DEFAULT 'USD',
+      unidade_item VARCHAR(30) DEFAULT 'Cartons',
+      buyer TEXT,
+      consignee TEXT,
+      notify TEXT,
+      pagamento VARCHAR(200),
+      incoterm VARCHAR(20),
+      banco TEXT,
+      porto_embarque VARCHAR(200),
+      porto_descarga VARCHAR(200),
+      local_entrega VARCHAR(200),
+      container VARCHAR(100),
+      endereco_entrega VARCHAR(300),
+      frete DECIMAL(14,2) DEFAULT 0,
+      charges DECIMAL(14,2) DEFAULT 0,
+      criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`)
+    await pool.query(`CREATE TABLE IF NOT EXISTS invoice_itens (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      invoice_id INT NOT NULL,
+      ordem INT DEFAULT 0,
+      descricao VARCHAR(400),
+      ncm VARCHAR(20),
+      quantidade DECIMAL(14,4) DEFAULT 0,
+      preco_unit DECIMAL(14,4) DEFAULT 0,
+      peso_neto DECIMAL(14,4) DEFAULT 0,
+      peso_bruto DECIMAL(14,4) DEFAULT 0,
+      m3 DECIMAL(14,6) DEFAULT 0,
+      INDEX(invoice_id))`)
+  } catch (e) { console.error('Erro init invoices:', e.message) }
+}
+setTimeout(inicializarInvoices, 3500)
+
+app.get('/api/invoices', autenticarContabil(), async (req, res) => {
+  const [rows] = await pool.query('SELECT id, numero, data, moeda, consignee, atualizado_em FROM invoices ORDER BY id DESC LIMIT 200')
+  res.json(rows)
+})
+
+app.get('/api/invoices/:id', autenticarContabil(), async (req, res) => {
+  const [[inv]] = await pool.query('SELECT * FROM invoices WHERE id = ?', [req.params.id])
+  if (!inv) return res.status(404).json({ erro: 'Invoice não encontrada.' })
+  const [itens] = await pool.query('SELECT * FROM invoice_itens WHERE invoice_id = ? ORDER BY ordem, id', [req.params.id])
+  res.json({ ...inv, itens })
+})
+
+async function salvarItensInvoice(invoiceId, itens) {
+  await pool.query('DELETE FROM invoice_itens WHERE invoice_id = ?', [invoiceId])
+  for (let i = 0; i < (itens || []).length; i++) {
+    const it = itens[i]
+    if (!it.descricao) continue
+    await pool.query(
+      'INSERT INTO invoice_itens (invoice_id, ordem, descricao, ncm, quantidade, preco_unit, peso_neto, peso_bruto, m3) VALUES (?,?,?,?,?,?,?,?,?)',
+      [invoiceId, i, it.descricao, it.ncm || null, it.quantidade || 0, it.preco_unit || 0, it.peso_neto || 0, it.peso_bruto || 0, it.m3 || 0]
+    )
+  }
+}
+
+app.post('/api/invoices', autenticarContabil(), async (req, res) => {
+  const b = req.body
+  if (!b.numero) return res.status(400).json({ erro: 'Informe o número da invoice.' })
+  const [r] = await pool.query(
+    'INSERT INTO invoices (numero, data, moeda, unidade_item, buyer, consignee, notify, pagamento, incoterm, banco, porto_embarque, porto_descarga, local_entrega, container, endereco_entrega, frete, charges) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    [b.numero, b.data || null, b.moeda || 'USD', b.unidade_item || 'Cartons', b.buyer || null, b.consignee || null, b.notify || null, b.pagamento || null, b.incoterm || null, b.banco || null, b.porto_embarque || null, b.porto_descarga || null, b.local_entrega || null, b.container || null, b.endereco_entrega || null, b.frete || 0, b.charges || 0]
+  )
+  await salvarItensInvoice(r.insertId, b.itens)
+  res.json({ ok: true, id: r.insertId })
+})
+
+app.put('/api/invoices/:id', autenticarContabil(), async (req, res) => {
+  const b = req.body
+  await pool.query(
+    'UPDATE invoices SET numero=?, data=?, moeda=?, unidade_item=?, buyer=?, consignee=?, notify=?, pagamento=?, incoterm=?, banco=?, porto_embarque=?, porto_descarga=?, local_entrega=?, container=?, endereco_entrega=?, frete=?, charges=? WHERE id=?',
+    [b.numero, b.data || null, b.moeda || 'USD', b.unidade_item || 'Cartons', b.buyer || null, b.consignee || null, b.notify || null, b.pagamento || null, b.incoterm || null, b.banco || null, b.porto_embarque || null, b.porto_descarga || null, b.local_entrega || null, b.container || null, b.endereco_entrega || null, b.frete || 0, b.charges || 0, req.params.id]
+  )
+  await salvarItensInvoice(req.params.id, b.itens)
+  res.json({ ok: true })
+})
+
+app.delete('/api/invoices/:id', autenticarContabil(), async (req, res) => {
+  await pool.query('DELETE FROM invoice_itens WHERE invoice_id = ?', [req.params.id])
+  await pool.query('DELETE FROM invoices WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
+})
+
+
 app.get('*', (req, res) => {
  res.sendFile(path.join(__dirname, 'index.html'))
 })
