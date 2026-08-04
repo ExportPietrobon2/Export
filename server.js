@@ -1990,36 +1990,24 @@ app.post('/api/conferencia-nfse', autenticar(['admin']), async (req, res) => {
     if (!process.env.GEMINI_API_KEY) return res.status(500).json({ erro: 'GEMINI_API_KEY não configurada no servidor.' })
 
     const aliq = parseFloat(aliquotaIssqn) || 2.0
-    const prompt = `Você é um especialista em notas fiscais de serviço eletrônicas (NFS-e) brasileiras.
-Analise o texto abaixo de uma NFS-e e extraia EXATAMENTE os campos indicados em formato JSON.
-Retorne SOMENTE o JSON, sem texto antes ou depois, sem markdown, sem explicações.
+    console.log('Texto NFS-e recebido (primeiros 300 chars):', textoNfse.slice(0, 300))
+    const prompt = `Extraia os dados desta NFS-e brasileira e retorne APENAS um objeto JSON válido, sem nenhum texto antes ou depois, sem markdown, sem explicação.
 
-{
-  "numero_nfse": "número da NFS-e",
-  "emitente": "nome do emitente/prestador",
-  "tomador": "nome do tomador",
-  "descricao_servico": "descrição completa do serviço",
-  "valor_comissao": 0.00,
-  "valor_doze_avos": 0.00,
-  "valor_total_declarado": 0.00,
-  "irrf_declarado": 0.00,
-  "issqn_declarado": 0.00,
-  "valor_liquido": 0.00,
-  "faturas_referenciadas": "texto das faturas mencionadas na descrição"
-}
+Formato exato que deve retornar:
+{"numero_nfse":"","emitente":"","tomador":"","descricao_servico":"","valor_comissao":0,"valor_doze_avos":0,"valor_total_declarado":0,"irrf_declarado":0,"issqn_declarado":0,"valor_liquido":0,"faturas_referenciadas":""}
 
-Regras:
-- valor_comissao: valor base da comissão (sem o 1/12 avos)
-- valor_doze_avos: valor do 1/12 avos declarado na nota
-- valor_total_declarado: valor total do serviço (comissão + 1/12 avos)
-- irrf_declarado: IRRF retido declarado na nota
-- issqn_declarado: ISSQN apurado declarado na nota
-- valor_liquido: valor líquido final da NFS-e
-- Campos numéricos devem ser números com ponto decimal, não strings
-- Se algum campo não existir, use null
+Instruções:
+- valor_comissao: valor base da comissão declarada
+- valor_doze_avos: valor do 1/12 avos (doze avos) declarado
+- valor_total_declarado: valor total do serviço na nota
+- irrf_declarado: valor do IRRF retido
+- issqn_declarado: valor do ISSQN apurado
+- valor_liquido: valor liquido final
+- Use ponto como separador decimal nos números
+- Se não encontrar um campo, use null
 
 TEXTO DA NFS-e:
-${textoNfse}`
+${textoNfse.slice(0, 4000)}`
 
     const resp = await fetch(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=' + process.env.GEMINI_API_KEY,
