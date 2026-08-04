@@ -2037,10 +2037,15 @@ ${textoNfse}`
     if (data.error) return res.status(500).json({ erro: data.error.message })
 
     const texto = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    console.log('Gemini conferencia-nfse resposta:', texto.slice(0, 500))
     try {
-      const json = JSON.parse(texto.replace(/```json|```/g, '').trim())
+      // Tentar extrair JSON mesmo que venha com texto ao redor
+      const match = texto.match(/\{[\s\S]*\}/)
+      if (!match) throw new Error('JSON não encontrado na resposta')
+      const json = JSON.parse(match[0])
       res.json({ ok: true, dados: json })
-    } catch (_) {
+    } catch (parseErr) {
+      console.error('Erro parse JSON conferencia:', parseErr.message, '| Texto:', texto.slice(0, 300))
       res.status(500).json({ erro: 'Não foi possível extrair os dados da nota. Verifique se o texto copiado é de uma NFS-e válida.' })
     }
   } catch (e) {
