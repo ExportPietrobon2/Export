@@ -84,9 +84,23 @@ function conferirCalculos(dados, aliquotaIssqn) {
 
 async function analisarComGemini(dados, resultados) {
   const pendencias = resultados.filter(r => !r.ok)
+  const valorBase = Number(dados.valor_comissao) || 0
+  const dozeAvosDeclarado = Number(dados.valor_doze_avos) || 0
+  const totalDeclarado = Number(dados.valor_total_declarado) || 0
+  const calculoCircular = pendencias.some(p => p.rotulo === '1/12 avos') &&
+    Math.abs((dozeAvosDeclarado * 12) - totalDeclarado) < 0.10
+
+  const contextoDivergencia = pendencias.map(p =>
+    `${p.rotulo}: declarado ${brl(p.declarado)}, esperado ${brl(p.esperado)}`
+  ).join('; ')
+
+  const dicaCircular = calculoCircular
+    ? ` ATENÇÃO: o 1/12 avos declarado (${brl(dozeAvosDeclarado)}) × 12 = ${brl(dozeAvosDeclarado * 12)}, que é aproximadamente o total da nota — isso indica cálculo circular: o emitente calculou o 1/12 sobre o total da nota em vez de calcular sobre a comissão base (${brl(valorBase)}). O correto: ${brl(valorBase)} ÷ 12 = ${brl(valorBase / 12)}.`
+    : ''
+
   const prompt = pendencias.length === 0
-    ? `NFS-e de comissão conferida — todos os cálculos estão corretos. Emitente: ${dados.emitente}. Valor total: ${brl(dados.valor_total_declarado)}. Confirme em 2 linhas de forma profissional.`
-    : `NFS-e com ${pendencias.length} divergência(s): ${pendencias.map(p => `${p.rotulo}: declarado ${brl(p.declarado)}, esperado ${brl(p.esperado)}`).join('; ')}. Descreva o problema de forma clara em até 3 linhas.`
+    ? `NFS-e de comissão conferida — todos os cálculos estão corretos. Emitente: ${dados.emitente}. Valor total: ${brl(totalDeclarado)}. Confirme em 2 linhas de forma profissional.`
+    : `NFS-e com ${pendencias.length} divergência(s): ${contextoDivergencia}.${dicaCircular} Explique o problema de forma clara e objetiva em até 4 linhas, indicando o que está errado e como deveria ser calculado.`
 
   const token = obterToken()
   const resposta = await fetch('/api/chat', {
