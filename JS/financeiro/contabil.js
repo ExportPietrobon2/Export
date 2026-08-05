@@ -120,6 +120,18 @@ function renderTabela() {
                     <span class="badge bg-secondary">${d.pais || '—'}</span>
                     ${d.produto ? `<span class="text-muted small">${d.produto}</span>` : ''}
                     ${d.data ? `<span class="text-muted small">${dBR(d.data)}</span>` : ''}
+                    ${(() => {
+                      const faltando = []
+                      if (!d.num_due)          faltando.push('DUE')
+                      if (!d.data_due)         faltando.push('Data DUE')
+                      if (!d.num_conhecimento) faltando.push('Conhec.')
+                      if (!d.data_conhecimento)faltando.push('Data Conhec.')
+                      if (!d.tipo)             faltando.push('Tipo')
+                      if (!d.vendedor)         faltando.push('Vendedor')
+                      if (!d.peso)             faltando.push('Peso')
+                      if (!faltando.length) return '<span class="badge bg-success" title="Todos os campos preenchidos">✔ Completo</span>'
+                      return faltando.map(f => `<span class="badge bg-warning text-dark" title="Não preenchido">⚠ ${f}</span>`).join('')
+                    })()}
                   </div>
                   <div class="d-flex align-items-center gap-3">
                     <span class="fw-semibold text-success">R$ ${money(d.valor_nfe)}</span>
