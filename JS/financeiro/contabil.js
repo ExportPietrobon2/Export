@@ -62,15 +62,11 @@ function gerarFormEdicaoInline(d) {
   return `
     <div class="border-top pt-3 mt-1 bg-light rounded-bottom-3 px-3 pb-3" id="form-inline-${d.id}">
       <div class="row g-2">
-        ${COLS.filter(c => !['data','fatura','nf','pais','valor_nfe'].includes(c.k)).map(col => `
+        ${COLS.map(col => `
           <div class="col-6 col-md-3">
             <label class="form-label small fw-semibold mb-1">${col.t}</label>
             ${campo(col)}
           </div>`).join('')}
-        <div class="col-6 col-md-3">
-          <label class="form-label small fw-semibold mb-1">Peso (kg)</label>
-          <input type="number" step="any" id="ei-peso-${d.id}" class="form-control form-control-sm" value="${d.peso || ''}">
-        </div>
       </div>
       <div class="d-flex gap-2 mt-3">
         <button class="btn btn-sm btn-ok-grande" onclick="salvarEdicaoInline(${d.id})">💾 Salvar</button>
@@ -181,22 +177,23 @@ window.salvarEdicaoInline = async function(id) {
   const dataVal = g('data')
   const mes = dataVal ? (new Date(dataVal + 'T00:00:00').getMonth() + 1) : d.mes
 
+  // Campos que não estão no form inline → manter valor original do banco
   const registro = {
     ano: anoAtual,
     mes,
-    data: g('data'),
-    nf: g('nf'),
-    fatura: g('fatura'),
-    num_due: g('num_due'),
-    data_due: g('data_due'),
-    num_conhecimento: g('num_conhecimento'),
+    data:              g('data'),
+    nf:                g('nf'),
+    fatura:            g('fatura'),
+    num_due:           g('num_due'),
+    data_due:          g('data_due'),
+    num_conhecimento:  g('num_conhecimento'),
     data_conhecimento: g('data_conhecimento'),
-    tipo: g('tipo'),
-    valor_nfe: g('valor_nfe'),
-    peso: g('peso'),
-    vendedor: g('vendedor'),
-    produto: g('produto'),
-    pais: g('pais')
+    tipo:              g('tipo'),
+    valor_nfe:         g('valor_nfe'),
+    peso:              g('peso'),
+    vendedor:          g('vendedor'),
+    produto:           g('produto'),
+    pais:              g('pais')
   }
 
   const btn = document.querySelector(`#form-inline-${id} .btn-ok-grande`)
