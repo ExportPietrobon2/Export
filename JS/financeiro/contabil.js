@@ -310,95 +310,148 @@ const BORDA = {
 function preencher(cell, argb) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb } } }
 
 async function exportarExcel() {
-  const wb  = new ExcelJS.Workbook()
-  const ws  = wb.addWorksheet(String(anoAtual), { views: [{ showGridLines: false }] })
-  const nc  = COLS.length
+  const wb = new ExcelJS.Workbook()
+  const ws = wb.addWorksheet(String(anoAtual), { views: [{ showGridLines: false }] })
+  const nc = COLS.length
+  const LARGURAS = { data:14, nf:13, fatura:14, num_due:20, data_due:14, num_conhecimento:20, data_conhecimento:15, tipo:8, valor_nfe:16, peso:13, vendedor:20, produto:25, pais:18 }
+  COLS.forEach((c, i) => { ws.getColumn(i+1).width = LARGURAS[c.k] || 15 })
 
+  const c1 = ws.getCell(1, 1)
   ws.mergeCells(1, 1, 1, nc)
-  const tit = ws.getCell(1, 1)
-  tit.value = `FATURAMENTO NFe — ${anoAtual}`
-  tit.font  = { bold: true, size: 15, color: { argb: COR_AZUL } }
-  tit.alignment = { horizontal: 'center' }
+  c1.value = 'FATURAMENTO NFe — ' + anoAtual
+  c1.font = { bold: true, size: 16, color: { argb: COR_AZUL } }
+  c1.alignment = { horizontal: 'center', vertical: 'middle' }
+  ws.getRow(1).height = 30
 
-  let r = 3
+  const totalValor = dados.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
+  const totalPeso  = dados.reduce((s, d) => s + (Number(d.peso) || 0), 0)
+  ws.mergeCells(2, 1, 2, nc)
+  const c2 = ws.getCell(2, 1)
+  c2.value = 'Total do ano: R$ ' + money(totalValor) + '   •   Kilos: ' + money(totalPeso) + ' kg   •   Notas: ' + dados.length
+  c2.font = { size: 10, italic: true, color: { argb: 'FF555555' } }
+  c2.alignment = { horizontal: 'center', vertical: 'middle' }
+  ws.getRow(2).height = 18
+  ws.getRow(3).height = 8
+
+  let r = 4
   for (let m = 1; m <= 12; m++) {
     const doMes = dados.filter(d => d.mes === m)
     if (!doMes.length) continue
+    const tv = doMes.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
+    const tp = doMes.reduce((s, d) => s + (Number(d.peso) || 0), 0)
 
+    // Cabeçalho do mês
     ws.mergeCells(r, 1, r, nc)
-    const ml = ws.getCell(r, 1)
-    ml.value = MESES[m-1].toUpperCase()
-    ml.font  = { bold: true, color: { argb: 'FFFFFFFF' } }
-    preencher(ml, COR_AZUL)
-    ml.alignment = { horizontal: 'left', indent: 1 }
+    const cm = ws.getCell(r, 1)
+    cm.value = MESES[m-1].toUpperCase() + '   —   ' + doMes.length + ' nota' + (doMes.length>1?'s':'') + '   •   R$ ' + money(tv) + '   •   ' + money(tp) + ' kg'
+    cm.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } }
+    preencher(cm, COR_AZUL.replace('FF','FF'))
+    cm.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 }
+    ws.getRow(r).height = 22
     r++
 
+    // Cabeçalho colunas
     COLS.forEach((c, i) => {
       const cell = ws.getCell(r, i+1)
       cell.value = c.t
-      cell.font  = { bold: true, color: { argb: 'FFFFFFFF' } }
-      preencher(cell, COR_AZUL)
-      cell.border    = BORDA
-      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+      cell.font = { bold: true, size: 9, color: { argb: 'FFFFFFFF' } }
+      preencher(cell, '2C3E50')
+      cell.border = BORDA
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: false }
     })
+    ws.getRow(r).height = 18
     r++
 
-    doMes.forEach(d => {
+    // Linhas de dados
+    doMes.forEach((d, idx) => {
+      ws.getRow(r).height = 16
       COLS.forEach((c, i) => {
         const cell = ws.getCell(r, i+1)
         let v = d[c.k]
         if (c.tipo === 'date')     { cell.value = dBR(v) }
         else if (c.tipo === 'num') { cell.value = Number(v) || 0; cell.numFmt = '#,##0.00' }
         else                       { cell.value = v == null ? '' : v }
-        cell.font      = { bold: true, color: { argb: 'FF000000' } }
-        preencher(cell, COR_VERDE)
-        cell.border    = BORDA
+        cell.font = { size: 10, color: { argb: 'FF111111' } }
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: idx % 2 === 0 ? 'FFFFFFFF' : 'FFF5F5F5' } }
+        cell.border = BORDA
         cell.alignment = { horizontal: c.tipo === 'num' ? 'right' : 'left', vertical: 'middle' }
       })
       r++
     })
 
-    const tv = doMes.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
-    const tp = doMes.reduce((s, d) => s + (Number(d.peso) || 0), 0)
-    for (let i = 1; i <= nc; i++) { const c = ws.getCell(r, i); preencher(c, COR_TOTAL); c.border = BORDA; c.font = { bold: true } }
+    // Linha de total do mês
+    ws.getRow(r).height = 16
+    for (let i = 1; i <= nc; i++) {
+      const cell = ws.getCell(r, i)
+      preencher(cell, COR_TOTAL)
+      cell.border = BORDA
+      cell.font = { bold: true, size: 10 }
+    }
     ws.mergeCells(r, 1, r, 8)
-    const lt = ws.getCell(r, 1); lt.value = `TOTAL ${MESES[m-1]}`; lt.alignment = { horizontal: 'right' }
-    const cv = ws.getCell(r, 9); cv.value = tv; cv.numFmt = '#,##0.00'; cv.alignment = { horizontal: 'right' }
-    const cp = ws.getCell(r, 10); cp.value = tp; cp.numFmt = '#,##0.00'; cp.alignment = { horizontal: 'right' }
-    r += 2
+    const lt = ws.getCell(r, 1)
+    lt.value = 'TOTAL ' + MESES[m-1]
+    lt.alignment = { horizontal: 'right', vertical: 'middle' }
+    const cv = ws.getCell(r, 9); cv.value = tv; cv.numFmt = '#,##0.00'; cv.alignment = { horizontal: 'right', vertical: 'middle' }
+    const cp = ws.getCell(r, 10); cp.value = tp; cp.numFmt = '#,##0.00'; cp.alignment = { horizontal: 'right', vertical: 'middle' }
+    r++
+
+    // Espaço entre meses
+    ws.getRow(r).height = 10
+    r++
   }
 
-  const totalValor = dados.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
-  const totalPeso  = dados.reduce((s, d) => s + (Number(d.peso) || 0), 0)
+  // Resumo anual
+  r++
   ws.mergeCells(r, 1, r, 4)
-  const rh = ws.getCell(r, 1); rh.value = 'RELATÓRIO ANUAL'; rh.font = { bold: true, color: { argb: 'FFFFFFFF' } }; preencher(rh, COR_AZUL); r++
-  ;[['Valor Comercializado', totalValor], ['Kilos Produzidos', totalPeso], ['Total de Notas', dados.length]].forEach(([lbl, val]) => {
-    const a = ws.getCell(r, 1); a.value = lbl; a.font = { bold: true }; preencher(a, COR_VERDE); a.border = BORDA
-    const b = ws.getCell(r, 2); b.value = val; b.numFmt = '#,##0.00'; preencher(b, COR_VERDE); b.border = BORDA; b.alignment = { horizontal: 'right' }
-    r++
-  })
+  const rh = ws.getCell(r, 1)
+  rh.value = 'VENDAS POR MÊS — ' + anoAtual
+  rh.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } }
+  preencher(rh, COR_AZUL)
+  rh.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 }
+  ws.getRow(r).height = 22
   r++
 
-  ws.mergeCells(r, 1, r, 4)
-  const vh = ws.getCell(r, 1); vh.value = 'VENDAS POR MÊS'; vh.font = { bold: true, color: { argb: 'FFFFFFFF' } }; preencher(vh, COR_AZUL); r++
-  ;['Mês','Notas','Valor','Peso'].forEach((h, i) => { const c = ws.getCell(r, i+1); c.value = h; c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; preencher(c, COR_AZUL); c.border = BORDA })
-  r++
+  ;['Mês', 'Notas', 'Valor (R$)', 'Peso (kg)'].forEach((h, i) => {
+    const cell = ws.getCell(r, i+1)
+    cell.value = h; cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } }
+    preencher(cell, '2C3E50'); cell.border = BORDA
+    cell.alignment = { horizontal: i === 0 ? 'left' : 'right', vertical: 'middle' }
+  })
+  ws.getRow(r).height = 18; r++
+
   for (let m = 1; m <= 12; m++) {
     const doMes = dados.filter(d => d.mes === m)
     if (!doMes.length) continue
-    const vals = [MESES[m-1], doMes.length, doMes.reduce((s,d)=>s+(Number(d.valor_nfe)||0),0), doMes.reduce((s,d)=>s+(Number(d.peso)||0),0)]
-    vals.forEach((v, i) => { const c = ws.getCell(r, i+1); c.value = v; if (i >= 2) c.numFmt = '#,##0.00'; c.font = { bold: true }; preencher(c, COR_VERDE); c.border = BORDA; if (i >= 1) c.alignment = { horizontal: 'right' } })
+    const v = doMes.reduce((s,d) => s+(Number(d.valor_nfe)||0), 0)
+    const p = doMes.reduce((s,d) => s+(Number(d.peso)||0), 0)
+    const vals = [MESES[m-1], doMes.length, v, p]
+    ws.getRow(r).height = 16
+    vals.forEach((val, i) => {
+      const cell = ws.getCell(r, i+1)
+      cell.value = val
+      if (i >= 2) cell.numFmt = '#,##0.00'
+      cell.font = { size: 10 }
+      preencher(cell, COR_VERDE)
+      cell.border = BORDA
+      cell.alignment = { horizontal: i === 0 ? 'left' : 'right', vertical: 'middle' }
+    })
     r++
   }
+  ws.getRow(r).height = 16
+  const totais = ['TOTAL', dados.length, totalValor, totalPeso]
+  totais.forEach((val, i) => {
+    const cell = ws.getCell(r, i+1)
+    cell.value = val; cell.font = { bold: true, size: 10 }
+    if (i >= 2) cell.numFmt = '#,##0.00'
+    preencher(cell, COR_TOTAL); cell.border = BORDA
+    cell.alignment = { horizontal: i === 0 ? 'left' : 'right', vertical: 'middle' }
+  })
 
-  const larguras = { data:12, nf:12, fatura:12, num_due:18, data_due:12, num_conhecimento:18, data_conhecimento:13, tipo:7, valor_nfe:15, peso:12, vendedor:18, produto:22, pais:16 }
-  COLS.forEach((c, i) => { ws.getColumn(i+1).width = larguras[c.k] || 14 })
-
-  const buf  = await wb.xlsx.writeBuffer()
+  const buf = await wb.xlsx.writeBuffer()
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href = url; a.download = `Faturamento_NFe_${anoAtual}.xlsx`; a.click()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = 'Faturamento_NFe_' + anoAtual + '.xlsx'; a.click()
   URL.revokeObjectURL(url)
 }
 
