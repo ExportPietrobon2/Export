@@ -402,6 +402,150 @@ async function exportarExcel() {
   URL.revokeObjectURL(url)
 }
 
+function exportarPDF() {
+  const totalValor = dados.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
+  const totalPeso  = dados.reduce((s, d) => s + (Number(d.peso) || 0), 0)
+
+  const secoesMes = []
+  for (let m = 1; m <= 12; m++) {
+    const doMes = dados.filter(d => d.mes === m)
+    if (!doMes.length) continue
+    const tv = doMes.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
+    const tp = doMes.reduce((s, d) => s + (Number(d.peso) || 0), 0)
+
+    const linhas = doMes.map(d => `
+      <tr>
+        <td>${dBR(d.data)}</td>
+        <td>${d.nf || ''}</td>
+        <td><strong>${d.fatura || ''}</strong></td>
+        <td>${d.num_due || ''}</td>
+        <td>${dBR(d.data_due)}</td>
+        <td>${d.num_conhecimento || ''}</td>
+        <td>${dBR(d.data_conhecimento)}</td>
+        <td>${d.tipo || ''}</td>
+        <td class="num">R$ ${money(d.valor_nfe)}</td>
+        <td class="num">${money(d.peso)}</td>
+        <td>${d.vendedor || ''}</td>
+        <td>${d.produto || ''}</td>
+        <td>${d.pais || ''}</td>
+      </tr>`).join('')
+
+    secoesMes.push(`
+      <div class="mes-bloco">
+        <div class="mes-header">
+          <span>${MESES[m-1].toUpperCase()}</span>
+          <span>${doMes.length} nota${doMes.length > 1 ? 's' : ''} &nbsp;·&nbsp; R$ ${money(tv)} &nbsp;·&nbsp; ${money(tp)} kg</span>
+        </div>
+        <table>
+          <thead><tr>
+            <th>Data</th><th>NF</th><th>Fatura</th><th>Núm. DUE</th><th>Data DUE</th>
+            <th>Nº Conhec.</th><th>Data Conhec.</th><th>Tipo</th>
+            <th class="num">Valor NFE</th><th class="num">Peso (kg)</th>
+            <th>Vendedor</th><th>Produto</th><th>País</th>
+          </tr></thead>
+          <tbody>${linhas}</tbody>
+          <tfoot><tr>
+            <td colspan="8" style="text-align:right;font-weight:700">TOTAL ${MESES[m-1]}</td>
+            <td class="num" style="font-weight:700">R$ ${money(tv)}</td>
+            <td class="num" style="font-weight:700">${money(tp)} kg</td>
+            <td colspan="3"></td>
+          </tr></tfoot>
+        </table>
+      </div>`)
+  }
+
+  const porMes = MESES.map((nome, i) => {
+    const doMes = dados.filter(d => d.mes === i + 1)
+    if (!doMes.length) return ''
+    const v = doMes.reduce((s,d) => s+(Number(d.valor_nfe)||0), 0)
+    const p = doMes.reduce((s,d) => s+(Number(d.peso)||0), 0)
+    return `<tr><td>${nome}</td><td class="num">${doMes.length}</td><td class="num">R$ ${money(v)}</td><td class="num">${money(p)} kg</td></tr>`
+  }).join('')
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Faturamento NFe ${anoAtual}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; font-size: 8.5pt; color: #111; }
+  .cabecalho { background: #C0392B; color: #fff; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .cabecalho h1 { font-size: 14pt; font-weight: 700; }
+  .cabecalho p { font-size: 9pt; opacity: .85; margin-top: 2px; }
+  .resumo { display: flex; gap: 12px; padding: 0 20px 16px; flex-wrap: wrap; }
+  .resumo-card { border: 1px solid #ddd; border-radius: 6px; padding: 8px 14px; flex: 1; min-width: 140px; }
+  .resumo-card .label { font-size: 7.5pt; color: #666; }
+  .resumo-card .valor { font-size: 11pt; font-weight: 700; color: #C0392B; margin-top: 2px; }
+  .mes-bloco { margin: 0 20px 20px; page-break-inside: avoid; }
+  .mes-header { background: #1A1A2E; color: #fff; padding: 6px 10px; font-size: 9pt; font-weight: 700; display: flex; justify-content: space-between; border-radius: 4px 4px 0 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
+  thead tr { background: #2C3E50; color: #fff; }
+  thead th { padding: 4px 5px; text-align: left; font-weight: 600; border: 1px solid #455; white-space: nowrap; }
+  tbody tr:nth-child(even) { background: #F8F9FA; }
+  tbody td { padding: 3px 5px; border: 1px solid #DDD; vertical-align: top; }
+  tfoot tr { background: #D9E1F2; }
+  tfoot td { padding: 4px 5px; border: 1px solid #BCC; font-size: 8pt; }
+  .num { text-align: right; white-space: nowrap; }
+  .rodape-resumo { margin: 0 20px; page-break-before: always; }
+  .rodape-resumo h2 { font-size: 11pt; color: #C0392B; margin-bottom: 8px; border-bottom: 2px solid #C0392B; padding-bottom: 4px; }
+  .rodape-resumo table { max-width: 400px; }
+  .rodape-resumo thead th { background: #2C3E50; }
+  .rodape-resumo tbody td { padding: 4px 8px; }
+  @media print {
+    body { font-size: 7.5pt; }
+    .cabecalho { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .mes-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    thead { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    tfoot { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    tbody tr:nth-child(even) { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+  @page { size: A4 landscape; margin: 10mm; }
+</style>
+</head>
+<body>
+  <div class="cabecalho">
+    <div>
+      <h1>Faturamento NFe — ${anoAtual}</h1>
+      <p>PIETROBON & CIA. LTDA. &nbsp;·&nbsp; Gerado em ${new Date().toLocaleDateString('pt-BR')}</p>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:13pt;font-weight:700">R$ ${money(totalValor)}</div>
+      <div style="opacity:.85;font-size:9pt">${money(totalPeso)} kg &nbsp;·&nbsp; ${dados.length} notas</div>
+    </div>
+  </div>
+  <div class="resumo">
+    ${MESES.map((nome, i) => {
+      const doMes = dados.filter(d => d.mes === i+1)
+      if (!doMes.length) return ''
+      const v = doMes.reduce((s,d)=>s+(Number(d.valor_nfe)||0),0)
+      return \`<div class="resumo-card"><div class="label">\${nome}</div><div class="valor">R$ \${money(v)}</div></div>\`
+    }).join('')}
+  </div>
+  ${secoesMes.join('')}
+  <div class="rodape-resumo">
+    <h2>Vendas por Mês — ${anoAtual}</h2>
+    <table>
+      <thead><tr><th>Mês</th><th class="num">Notas</th><th class="num">Valor</th><th class="num">Peso</th></tr></thead>
+      <tbody>${porMes}</tbody>
+      <tfoot><tr>
+        <td><strong>TOTAL</strong></td>
+        <td class="num"><strong>${dados.length}</strong></td>
+        <td class="num"><strong>R$ ${money(totalValor)}</strong></td>
+        <td class="num"><strong>${money(totalPeso)} kg</strong></td>
+      </tr></tfoot>
+    </table>
+  </div>
+  <script>window.onload = () => window.print()<\/script>
+</body>
+</html>`
+
+  const janela = window.open('', '_blank')
+  janela.document.write(html)
+  janela.document.close()
+}
+
+
 function montarInterface() {
   const cont = document.getElementById('conteudo-contabil')
   cont.innerHTML = `
@@ -467,7 +611,7 @@ function montarInterface() {
   })
   document.getElementById('btn-salvar-nota').addEventListener('click', salvarNota)
   document.getElementById('btn-excel').addEventListener('click', exportarExcel)
-  document.getElementById('btn-pdf').addEventListener('click', () => window.print())
+  document.getElementById('btn-pdf').addEventListener('click', exportarPDF)
 }
 
 async function iniciar() {
