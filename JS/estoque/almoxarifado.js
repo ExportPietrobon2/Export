@@ -273,7 +273,6 @@ function atualizarResultado(input) {
 }
 
 function atualizarIndicador(produtoId) {
- const btn = containerConteudo.querySelector(`.btn-salvar-produto[data-produto="${produtoId}"]`)
  const quantidade = Number(btn?.dataset.quantidade) || 0
  const insumosAtuais = {}
  ;['embalagem', 'caixa'].forEach((chave) => {
@@ -290,13 +289,15 @@ function atualizarIndicador(produtoId) {
 }
 
 async function salvarProduto(produtoId, quantidade) {
+  const btn = containerConteudo.querySelector(`.btn-salvar-produto[data-produto="${produtoId}"]`)
+  if (btn) { btn.disabled = true; btn.textContent = 'Salvando...' }
  const insumosParaSalvar = ['embalagem', 'caixa', 'etiqueta'].map((chave) => {
  const inputSobra = containerConteudo.querySelector(`input[data-produto="${produtoId}"][data-campo="sobra"][data-tipo="${chave}"]`)
  const inputPacotes = containerConteudo.querySelector(`input[data-produto="${produtoId}"][data-campo="quantidade_por_pacote"][data-tipo="${chave}"]`)
  return {
  tipo: chave,
- sobra: inputSobra ? inputSobra.value : 0,
- quantidade_por_pacote: inputPacotes ? inputPacotes.value : 0
+    sobra: inputSobra ? (parseFloat(inputSobra.value) || 0) : 0,
+    quantidade_por_pacote: inputPacotes ? (parseFloat(inputPacotes.value) || 0) : 0
  }
  })
 
@@ -314,12 +315,11 @@ async function salvarProduto(produtoId, quantidade) {
  quantidade
  })
 
- if (resultado?.erro) { alert(resultado.erro || 'Erro ao salvar. Tente novamente.'); return }
+  if (resultado?.erro) { if (btn) { btn.disabled = false; btn.textContent = '💾 Salvar' }; alert(resultado.erro || 'Erro ao salvar. Tente novamente.'); return }
 
  limparRascunho(produtoId)
  carregarAlertaDeclaracao()
 
- const btn = containerConteudo.querySelector(`.btn-salvar-produto[data-produto="${produtoId}"]`)
  const form = document.getElementById(`form-produto-${produtoId}`)
  const btnExpandir = containerConteudo.querySelector(`.btn-expandir-produto[data-id="${produtoId}"]`)
 
@@ -638,7 +638,7 @@ async function carregarEstoqueGeral() {
 
  window.deletarVinculo = async function(id) {
  if (!confirm('Apagar este vínculo?')) return
- const resultado = await api.estoque.deletarVinculo(id)
+ const resultado = await api.estoque.excluirVinculo(id)
  if (resultado?.erro) { alert('Erro ao apagar.'); return }
  carregarEstoqueGeral()
  }

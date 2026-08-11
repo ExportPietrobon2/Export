@@ -303,7 +303,7 @@ app.patch('/api/pedidos/:id/embarque', autenticar(['admin', 'gerente_producao'])
  const [[pi]] = await pool.query('SELECT numero_pi, cliente, destino FROM pedidos WHERE id = ?', [req.params.id])
  if (pi) {
  const dataFmt = data_embarque ? new Date(data_embarque + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
- enviarPush(`Data de embarque — PI ${pi.numero_pi}`, `${pi.cliente || ''} · ${dataFmt}`, '/HTML/producao/embarques.html', `embarque_def_${pi.numero_pi}`).catch(() => {})
+ enviarPush(`Data de embarque — PI ${pi.numero_pi}`, `${pi.cliente || ''} · ${dataFmt}`, '/HTML/estoque/embarques.html', `embarque_def_${pi.numero_pi}`).catch(() => {})
  enviarEmail(
  `Data de embarque definida — PI ${pi.numero_pi}`,
  `<h2 style="color:#1565C0;margin:0 0 16px">Data de Embarque Definida</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:160px">PI</td><td style="padding:8px 0;font-weight:600">${pi.numero_pi}</td></tr>
@@ -325,7 +325,7 @@ app.patch('/api/pedidos/:id/comentario-embarque', autenticar(['admin']), async (
  )
  const [[pi]] = await pool.query('SELECT numero_pi, cliente FROM pedidos WHERE id = ?', [req.params.id])
  if (pi && comentario && comentario.trim()) {
- enviarPush(`Comentário na PI ${pi.numero_pi}`, `${nomeUsuario}: ${comentario.slice(0, 80)}`, '/HTML/producao/embarques.html', `comentario_emb_${pi.numero_pi}`).catch(() => {})
+ enviarPush(`Comentário na PI ${pi.numero_pi}`, `${nomeUsuario}: ${comentario.slice(0, 80)}`, '/HTML/estoque/embarques.html', `comentario_emb_${pi.numero_pi}`).catch(() => {})
  enviarEmail(
  `Cobrança de embarque — PI ${pi.numero_pi}`,
  `<h2 style="color:#1565C0;margin:0 0 16px">Comentário do Admin — Data de Embarque</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:140px">PI</td><td style="padding:8px 0;font-weight:600">${pi.numero_pi}</td></tr>
@@ -393,6 +393,7 @@ app.get('/api/produtos/:produtoId/insumos', autenticar(TODOS), async (req, res) 
 })
 
 app.patch('/api/produtos/:produtoId/insumos', autenticar(['admin', 'almoxarifado']), async (req, res) => {
+  try {
  const { insumos, rotulos, observacoes, quantidade } = req.body
 
  const [antesInsumos] = await pool.query('SELECT tipo, confirmado FROM insumos_produto WHERE produto_id = ?', [req.params.produtoId])
@@ -411,7 +412,7 @@ app.patch('/api/produtos/:produtoId/insumos', autenticar(['admin', 'almoxarifado
  }
  await pool.query(
  'UPDATE insumos_produto SET sobra = ?, quantidade_por_pacote = ?, confirmado = ? WHERE produto_id = ? AND tipo = ?',
- [insumo.sobra, insumo.quantidade_por_pacote || 0, confirmado, req.params.produtoId, insumo.tipo]
+        [parseFloat(insumo.sobra) || 0, parseFloat(insumo.quantidade_por_pacote) || 0, confirmado, req.params.produtoId, insumo.tipo]
  )
  }
 
@@ -468,7 +469,11 @@ app.patch('/api/produtos/:produtoId/insumos', autenticar(['admin', 'almoxarifado
  }
  }
 
- res.json({ ok: true })
+  res.json({ ok: true })
+  } catch (e) {
+    console.error('Erro ao salvar insumos:', e.message)
+    if (!res.headersSent) res.status(500).json({ erro: 'Erro ao salvar. Tente novamente.' })
+  }
 })
 
 app.get('/api/recebimentos/pendentes', autenticar(TODOS), async (req, res) => {
@@ -750,7 +755,7 @@ async function verificarAlertasEmbarque() {
  return `<tr><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;font-weight:700">PI ${pi.numero_pi}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${pi.cliente || '—'}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;color:#ED3237;font-weight:700">${dataFmt} (${quando})</td></tr>`
  }).join('')
 
- enviarPush(`⚠️ ${alertas.length} PI(s) em risco de embarque`, alertas.map((p) => `PI ${p.numero_pi}`).join(', '), '/HTML/producao/embarques.html', 'alertas_embarque').catch(() => {})
+ enviarPush(`⚠️ ${alertas.length} PI(s) em risco de embarque`, alertas.map((p) => `PI ${p.numero_pi}`).join(', '), '/HTML/estoque/embarques.html', 'alertas_embarque').catch(() => {})
  enviarEmail(
  `ALERTA: ${alertas.length} PI(s) perto do embarque e SEM estar pronta`,
  `<h2 style="color:#ED3237;margin:0 0 16px">PIs em Risco de Embarque</h2><p style="margin:0 0 12px;color:#8a6a6a">As PIs abaixo têm embarque em até 7 dias (ou já vencido) e ainda possuem itens pendentes no almoxarifado:</p><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">PI</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Cliente</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Embarque</th></tr></thead><tbody>${linhas}</tbody></table>`,
@@ -879,7 +884,7 @@ app.patch('/api/compras/:id/receber', autenticar(['admin', 'compras', 'compras_a
  await pool.query(`UPDATE compras SET status = 'recebido', recebido_em = NOW() WHERE id = ?`, [req.params.id])
  const [[c]] = await pool.query(`SELECT c.*, p.numero_pi FROM compras c LEFT JOIN pedidos p ON p.id = c.pi_id WHERE c.id = ?`, [req.params.id])
  if (c) {
- enviarPush(`📦 Compra recebida — lançar no B2`, `${c.descricao}${c.numero_pi ? ' · PI ' + c.numero_pi : ''}`, '/HTML/estoque/deposito.html', `compra_recebida_${c.id}`).catch(() => {})
+ enviarPush(`📦 Compra recebida — lançar no B2`, `${c.descricao}${c.numero_pi ? ' · PI ' + c.numero_pi : ''}`, '/HTML/estoque/recebimento.html', `compra_recebida_${c.id}`).catch(() => {})
  enviarEmail(
  `Compra recebida — lançar no estoque B2 (${c.descricao})`,
  `<h2 style="color:#2E7D32;margin:0 0 16px">Compra Recebida</h2><p style="margin:0 0 12px;color:#8a6a6a">O setor de compras marcou este item como recebido. Depósito/almoxarifado: confiram e lancem no estoque B2.</p><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:160px">Item</td><td style="padding:8px 0;font-weight:600">${c.descricao}</td></tr><tr><td style="padding:8px 0;color:#8a6a6a">Tipo</td><td style="padding:8px 0;font-weight:600">${tipoLabelCompra[c.tipo] || 'Outro'}</td></tr>
@@ -975,7 +980,7 @@ async function verificarEmbarquesPendentes() {
  if (!rows.length) return
  if (!(await podeEnviarHoje('embarques_pendentes'))) return
  const linhas = rows.map((p) => `<tr><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;font-weight:700">PI ${p.numero_pi}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${p.cliente || '—'}</td></tr>`).join('')
- enviarPush(`🚢 ${rows.length} PI(s) prontas sem data de embarque`, rows.map((p) => `PI ${p.numero_pi}`).join(', '), '/HTML/producao/embarques.html', 'embarques_pendentes').catch(() => {})
+ enviarPush(`🚢 ${rows.length} PI(s) prontas sem data de embarque`, rows.map((p) => `PI ${p.numero_pi}`).join(', '), '/HTML/estoque/embarques.html', 'embarques_pendentes').catch(() => {})
  enviarEmail(
  `${rows.length} PI(s) pronta(s) aguardando data de embarque`,
  `<h2 style="color:#1565C0;margin:0 0 16px">PIs prontas sem data de embarque</h2><p style="margin:0 0 12px;color:#8a6a6a">As PIs abaixo já estão liberadas para produção, mas ainda não têm data de embarque definida. Gerente: por favor, declare o embarque.</p><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #1565C0">PI</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #1565C0">Cliente</th></tr></thead><tbody>${linhas}</tbody></table>`,

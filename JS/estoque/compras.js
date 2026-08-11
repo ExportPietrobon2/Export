@@ -37,6 +37,7 @@ async function carregarCompras() {
  container.innerHTML = lista.map((c) => {
  const atraso = diasAtraso(c)
  const alerta = atraso ? ' card-alerta-embarque' : ''
+    const classeOk = c.status === 'recebido' ? ' opacity-50' : ''
  const opcoesStatus = Object.keys(statusLabel).map((s) => `<option value="${s}" ${c.status === s ? 'selected' : ''}>${statusLabel[s]}</option>`).join('')
  return `
  <div class="card border-0 shadow-sm mb-2${alerta}${classeOk}" id="compra-${c.id}">

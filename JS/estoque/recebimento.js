@@ -41,7 +41,7 @@ async function carregarHistorico() {
 
 window.deletarEntrada = async function(id) {
  if (!confirm('Apagar esta entrada?')) return
- const resultado = await api.estoque.deletarEntrada(id)
+ const resultado = await api.estoque.excluirEntrada(id)
  if (resultado?.erro) { alert('Erro ao apagar.'); return }
  document.getElementById(`entrada-${id}`)?.remove()
 }
