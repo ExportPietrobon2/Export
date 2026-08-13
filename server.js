@@ -2377,12 +2377,6 @@ async function gerarExcelInvoice(inv, itens) {
     logRows.forEach(([l1,v1,l2,v2,l3,v3])=>{
       ws.getRow(r).height=15
       mc(ws,r,1,r,2); cx(ws,r,1,l1+(v1?' '+v1:''),{font:exFont(true,10)})
-      mc(ws,r,3,r,4); cx(ws,r,3,l3+(v3?' '+v3:''),{font:exFont(true,10)})
-      mc(ws,r,7,r,NCOLS)
-      cx(ws,r,7,l3&&l3!==t.loading?(l3+' '+v3):'',{font:exFont(v3?false:true,10),align:exAlign('right')})
-      // Reorganizar: col1=label1+val1, col3=label2, col7=label3+val3
-      cx(ws,r,1,l1+(v1?' '+v1:''),{font:exFont(true,10)})
-      cx(ws,r,3,'',{})
       if(l2) { mc(ws,r,3,r,4); cx(ws,r,3,l2,{font:exFont(true,10)}) }
       mc(ws,r,7,r,NCOLS); cx(ws,r,7,l3+(v3?' '+v3:''),{font:exFont(l3&&!v3,10),align:exAlign('right')})
       r++
