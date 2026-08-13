@@ -1,1072 +1,205 @@
+/* ============================================================
+   PIETROBON CONTROLE DE INSUMOS — Design System
+   Fonte: Inter | Paleta: Vermelho marca + Slate neutral
+   ============================================================ */
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
+/* ── 1. Tokens ─────────────────────────────────────────────── */
 :root {
-  --red: #ED3237;
-  --red-dark: #C6242A;
-  --orange: #F79733;
-  --green: #2E7D32;
-  --bg: #FDF1F1;
-  --bg-card: #ffffff;
-  --border: #f0d0d0;
-  --text: #2E2E33;
-  --muted: #8a6a6a;
-  --shadow: 0 2px 10px rgba(180,20,20,0.08);
-  --shadow-md: 0 4px 18px rgba(180,20,20,0.12);
+  /* Marca */
+  --red:        #E8313A;
+  --red-dark:   #C12028;
+  --red-light:  #fef2f2;
+  --orange:     #F59332;
+  --orange-bg:  #fff8f0;
+  --green:      #16a34a;
+  --green-bg:   #f0fdf4;
+  --green-ok:   #16a34a;
+
+  /* Neutros */
+  --bg:         #f7f8fb;
+  --bg-card:    #ffffff;
+  --border:     #e4e7ef;
+  --border-soft:#f0f2f7;
+  --text:       #1c2230;
+  --muted:      #64748b;
+  --muted-light:#94a3b8;
+  --slate:      #334155;
+
+  /* Sombras */
+  --shadow-xs:  0 1px 2px rgba(15,23,42,.04);
+  --shadow:     0 1px 3px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04);
+  --shadow-md:  0 4px 16px rgba(15,23,42,.09), 0 2px 4px rgba(15,23,42,.04);
+  --shadow-lg:  0 12px 32px rgba(15,23,42,.13), 0 4px 8px rgba(15,23,42,.06);
+
+  /* Radii */
+  --r-sm: 8px;
+  --r:    12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+
+  /* Marca – gradiente */
+  --brand-grad: linear-gradient(110deg, #E8313A 0%, #F0503A 100%);
 }
 
-*, *::before, *::after { box-sizing: border-box; }
+/* ── 2. Reset & Base ────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
 
 body {
-  background: var(--bg);
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
   color: var(--text);
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 900px 400px at 100% 0%, rgba(232,49,58,.06) 0%, transparent 60%),
+    radial-gradient(ellipse 700px 300px at 0% 100%, rgba(245,147,50,.04) 0%, transparent 55%);
+  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
 }
 
+/* ── 3. Navbar ──────────────────────────────────────────────── */
 .navbar-pietrobon {
-  background: linear-gradient(120deg, var(--red), var(--red-dark)) !important;
-  box-shadow: 0 2px 12px rgba(140,10,10,0.3);
-  padding: 10px 0;
-}
-.navbar-pietrobon .nav-link {
-  color: rgba(255,255,255,0.88) !important;
-  border-radius: 8px;
-  padding: 7px 14px !important;
-  font-weight: 500;
-  font-size: 0.92rem;
-  transition: background 0.15s;
-}
-.navbar-pietrobon .nav-link:hover,
-.navbar-pietrobon .nav-link.active {
-  background: rgba(255,255,255,0.18);
-  color: #fff !important;
-}
-.navbar-pietrobon .navbar-toggler {
-  border-color: rgba(255,255,255,0.45);
-  padding: 4px 8px;
-}
-.navbar-pietrobon .navbar-toggler-icon { filter: invert(1); }
-.nav-link-sair {
-  border: 1px solid rgba(255,255,255,0.5) !important;
-  margin-left: 6px;
+  background: var(--brand-grad) !important;
+  box-shadow: 0 1px 0 rgba(0,0,0,.08), 0 4px 20px rgba(193,32,40,.20);
+  border-bottom: 3px solid var(--orange);
+  padding: 8px 0;
+  position: sticky;
+  top: 0;
+  z-index: 1030;
 }
 
-.tela-login {
-  min-height: 100vh;
-  background: linear-gradient(135deg, var(--red) 0%, #8a1418 100%);
+.navbar-pietrobon .navbar-brand img {
+  height: 33px;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,.25));
+}
+
+.btn-menu-pietrobon {
+  background: rgba(255,255,255,.14) !important;
+  border: 1px solid rgba(255,255,255,.45) !important;
+  color: #fff !important;
+  font-weight: 600;
+  font-size: .875rem;
+  border-radius: var(--r-sm);
+  padding: 7px 18px;
+  letter-spacing: .01em;
+  transition: background .15s;
+}
+
+.btn-menu-pietrobon:hover,
+.btn-menu-pietrobon:focus,
+.btn-menu-pietrobon.show {
+  background: rgba(255,255,255,.26) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+/* Dropdown menu */
+#menu-principal {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 8px;
+  min-width: 260px;
+  background: #fff;
+}
+
+#menu-principal .dropdown-header {
+  font-size: .68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted-light);
+  padding: 10px 12px 4px;
+}
+
+#menu-principal .dropdown-item {
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  font-weight: 500;
+  font-size: .875rem;
+  color: var(--slate);
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-.login-box {
-  width: 100%;
-  max-width: 380px;
-  border-radius: 22px;
-  overflow: hidden;
-  box-shadow: 0 28px 64px rgba(0,0,0,0.38);
-}
-.login-topo {
-  background: linear-gradient(160deg, #b01f23, #6b0f12);
-  padding: 30px 24px 22px;
-  text-align: center;
-}
-.login-logo {
-  height: 68px;
-  object-fit: contain;
-  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4));
-}
-.login-subtitulo {
-  color: rgba(255,255,255,0.75);
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  margin: 10px 0 0;
-}
-.login-corpo {
-  background: #fff;
-  padding: 30px 28px 28px;
+  gap: 8px;
+  transition: background .12s, color .12s;
 }
 
+#menu-principal .dropdown-item::before {
+  font-size: .95rem;
+  flex-shrink: 0;
+}
+
+#menu-principal .dropdown-item:hover {
+  background: var(--red-light);
+  color: var(--red-dark);
+}
+
+#menu-principal .dropdown-item.active {
+  background: var(--red);
+  color: #fff;
+}
+
+#menu-principal .dropdown-divider {
+  margin: 6px 0;
+  border-color: var(--border-soft);
+}
+
+/* Ícones do menu por página */
+#menu-principal a[href$="admin.html"]::before        { content: "📊"; }
+#menu-principal a[href$="cadastro.html"]::before     { content: "📋"; }
+#menu-principal a[href$="almoxarifado.html"]::before { content: "📦"; }
+#menu-principal a[href$="recebimento.html"]::before  { content: "🚚"; }
+#menu-principal a[href$="referencia.html"]::before   { content: "📐"; }
+#menu-principal a[href$="embarques.html"]::before    { content: "🚢"; }
+#menu-principal a[href$="compras.html"]::before      { content: "🛒"; }
+#menu-principal a[href$="contabil.html"]::before     { content: "💰"; }
+#menu-principal a[href$="exp-contabil.html"]::before { content: "🌎"; }
+#menu-principal a[href$="financeiro.html"]::before   { content: "🏦"; }
+#menu-principal a[href$="checklist.html"]::before    { content: "✅"; }
+#menu-principal a[href$="ordem-producao.html"]::before { content: "🏭"; }
+#menu-principal a[href$="conferencia-nfse.html"]::before { content: "🔍"; }
+
+/* ── 4. Layout ──────────────────────────────────────────────── */
+.container { max-width: 1160px; }
+.container.py-4 {
+  padding-top: 24px !important;
+  padding-bottom: 32px !important;
+}
+
+/* ── 5. Cabeçalho de página ─────────────────────────────────── */
 .page-header {
   background: var(--bg-card);
-  border-radius: 14px;
   border: 1px solid var(--border);
+  border-radius: var(--r-lg);
   box-shadow: var(--shadow);
-  padding: 18px 20px 14px;
+  padding: 20px 24px;
   margin-bottom: 24px;
   display: flex;
   align-items: center;
   gap: 16px;
 }
+
 .page-header-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, var(--red), var(--red-dark));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.4rem;
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(180,20,20,0.25);
-}
-.page-header-texto { flex: 1; }
-.page-titulo {
-  font-size: 1.45rem;
-  font-weight: 800;
-  color: var(--red-dark);
-  border-left: 5px solid var(--orange);
-  padding-left: 12px;
-  margin-bottom: 2px;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
-}
-.page-subtitulo {
-  font-size: 0.85rem;
-  color: var(--muted);
-  padding-left: 17px;
-  margin-bottom: 0;
-}
-
-.card {
-  border: 1px solid var(--border) !important;
-  border-radius: 14px !important;
-  background: var(--bg-card) !important;
-  box-shadow: var(--shadow) !important;
-}
-.card-body { padding: 20px !important; }
-
-.card-recebimento {
-  border-left: 5px solid var(--orange) !important;
-  border-radius: 14px !important;
-}
-.card-pi-admin {
-  border-left: 5px solid var(--orange) !important;
-  border-radius: 12px !important;
-  overflow: hidden;
-}
-.pi-concluida { border-left-color: #ccc !important; opacity: 0.5; }
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  border-radius: 10px;
-  transition: all 0.15s ease;
-}
-.btn-pietrobon {
-  background: var(--red) !important;
-  border-color: var(--red) !important;
-  color: #fff !important;
-  padding: 10px 20px;
-}
-.btn-pietrobon:hover, .btn-pietrobon:focus, .btn-pietrobon:active {
-  background: var(--red-dark) !important;
-  border-color: var(--red-dark) !important;
-  color: #fff !important;
-  box-shadow: 0 4px 12px rgba(180,20,20,0.35) !important;
-}
-.btn-ok-grande {
-  background: var(--green) !important;
-  border: none !important;
-  color: #fff !important;
-  font-weight: 700;
-  font-size: 1rem;
-  border-radius: 12px;
-  padding: 15px 20px;
-  width: 100%;
-  letter-spacing: 0.02em;
-  touch-action: manipulation;
-  box-shadow: 0 4px 12px rgba(46,125,50,0.3);
-}
-.btn-ok-grande:hover, .btn-ok-grande:active {
-  background: #1b5e20 !important;
-  color: #fff !important;
-  box-shadow: 0 6px 16px rgba(46,125,50,0.4);
-}
-.btn-foto {
-  background: #fff;
-  border: 1.5px solid var(--border);
-  border-radius: 10px;
-  padding: 9px 14px;
-  font-size: 0.88rem;
-  font-weight: 600;
-  cursor: pointer;
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  touch-action: manipulation;
-  transition: all 0.15s ease;
-}
-.btn-foto:hover { border-color: var(--orange); background: #fffbf5; }
-.btn-foto-ok {
-  border-color: var(--green) !important;
-  color: var(--green) !important;
-  background: #f0faf0 !important;
-}
-.btn-remover-foto {
-  background: none;
-  border: none;
-  color: var(--red);
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 2px 0;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.btn-outline-danger {
-  border-radius: 20px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-.btn-success {
-  border-radius: 20px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-.btn-outline-secondary {
-  border-radius: 20px !important;
-}
-.btn-outline-danger.btn-sm,
-.btn-success.btn-sm,
-.btn-outline-secondary.btn-sm {
-  min-width: 100px;
-  text-align: center;
-}
-
-.form-control, .form-select {
-  border-color: var(--border) !important;
-  border-radius: 10px !important;
-}
-.form-control:focus, .form-select:focus {
-  border-color: var(--red) !important;
-  box-shadow: 0 0 0 3px rgba(237,50,55,0.12) !important;
-}
-
-.nav-tabs {
-  border-bottom: 2px solid var(--border) !important;
-  gap: 4px;
-}
-.nav-tabs .nav-link {
-  color: var(--muted) !important;
-  border: none !important;
-  border-bottom: 3px solid transparent !important;
-  margin-bottom: -2px;
-  font-weight: 600;
-  border-radius: 0 !important;
-  padding: 10px 16px !important;
-  transition: color 0.15s, border-color 0.15s;
-}
-.nav-tabs .nav-link.active {
-  color: var(--red) !important;
-  border-bottom-color: var(--red) !important;
-  background: transparent !important;
-}
-.nav-tabs .nav-link:hover:not(.active) {
-  color: var(--red-dark) !important;
-  border-bottom-color: rgba(237,50,55,0.3) !important;
-}
-
-.card-insumo-almox {
-  background: #fff8f8;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px;
-  height: 100%;
-}
-.card-insumo-almox h4 {
-  color: var(--orange);
-  font-size: 0.92rem;
-  font-weight: 700;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.linha-produto-almox {
-  background: var(--bg-card);
-  border-radius: 12px;
-  margin-bottom: 10px;
-  box-shadow: var(--shadow);
-  overflow: hidden;
-  border: 1px solid var(--border);
-}
-.linha-produto-topo {
-  padding: 14px 18px;
-}
-.formulario-produto-almox {
-  padding: 16px 18px 18px;
-  border-top: 1px solid var(--border);
-  background: #fff8f8;
-}
-
-.saldo-positivo, .saldo-negativo, .saldo-alerta {
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-weight: 700;
-  font-size: 0.84rem;
-  text-align: center;
-  margin-top: 8px;
-}
-.saldo-positivo { background: #e8f5e9; color: var(--green); }
-.saldo-negativo { background: #fdecea; color: var(--red); }
-.saldo-alerta { background: #fff8e1; color: #e65100; }
-
-.indicador-ok, .indicador-nok {
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.indicador-ok { background: #e8f5e9; color: var(--green); }
-.indicador-nok { background: #fdecea; color: var(--red); }
-
-.texto-ok { color: var(--green); font-weight: 600; }
-.texto-erro { color: var(--red); font-weight: 600; }
-.texto-alerta { color: #e65100; font-weight: 600; }
-
-.preview-foto {
-  width: 100%;
-  max-height: 180px;
-  object-fit: cover;
-  border-radius: 10px;
-  margin: 8px 0;
-  box-shadow: var(--shadow);
-}
-.foto-detalhe-img {
-  width: 100%;
-  max-width: 200px;
-  height: 140px;
-  object-fit: cover;
-  border-radius: 8px;
-  box-shadow: var(--shadow);
-  transition: transform 0.15s;
-}
-.foto-detalhe-img:hover { transform: scale(1.03); }
-.foto-detalhe-label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  display: block;
-  margin-bottom: 4px;
-}
-
-.tabela-insumos-admin {
-  border-radius: 8px;
-  overflow: hidden;
-}
-.tabela-insumos-admin thead th {
-  background: var(--red) !important;
-  color: #fff;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 9px 12px;
-  font-weight: 700;
-}
-.tabela-insumos-admin td {
-  padding: 8px 12px;
-  font-size: 0.88rem;
-  vertical-align: middle;
-}
-
-.form-check-input:checked { background-color: var(--red) !important; border-color: var(--red) !important; }
-
-.secao-titulo-card {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--red-dark);
-  border-left: 3px solid var(--orange);
-  padding-left: 10px;
-  margin-bottom: 16px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.badge { display: inline-flex; align-items: center; justify-content: center; font-weight: 600; }
-
-.text-muted { color: var(--muted) !important; }
-
-@media (max-width: 576px) {
-  .btn-ok-grande { font-size: 0.95rem; padding: 14px; }
-  .foto-detalhe-img { max-width: 100%; }
-  .page-titulo { font-size: 1.3rem; }
-  .card-body { padding: 16px !important; }
-}
-
-.resumo-card-icone {
-  font-size: 1.6rem;
-  margin-bottom: 4px;
-}
-
-.lista-pi-item {
-  border-left: 3px solid var(--orange);
-  background: var(--bg-card);
-  border-radius: 10px;
-  margin-bottom: 8px;
-  overflow: hidden;
-}
-
-.lista-pi-cabecalho {
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  background: #fff8f8;
-  border-bottom: 1px solid var(--border);
-}
-
-.pi-numero-destaque {
-  font-weight: 800;
-  color: var(--red-dark);
-  font-size: 0.95rem;
-}
-
-.pi-info-secundaria {
-  font-size: 0.82rem;
-  color: var(--muted);
-}
-
-.table thead th {
-  background: var(--red) !important;
-  color: #fff;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 10px 14px;
-  font-weight: 700;
-  border: none !important;
-}
-
-.table tbody td {
-  padding: 9px 14px;
-  font-size: 0.88rem;
-  vertical-align: middle;
-  border-color: var(--border);
-}
-
-.table-hover tbody tr:hover {
-  background: #fff8f8 !important;
-}
-
-.nav-link-destaque {
-  background: rgba(255,255,255,0.15) !important;
-  border-radius: 8px !important;
-  color: #fff !important;
-  font-weight: 700 !important;
-  padding: 6px 14px !important;
-}
-
-.nav-link-destaque:hover,
-.nav-link-destaque.active {
-  background: rgba(255,255,255,0.28) !important;
-}
-
-/* ===== Alerta máximo de embarque ===== */
-@keyframes pulseAlertaEmbarque {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(237,50,55,0.75); }
-  50% { box-shadow: 0 0 0 10px rgba(237,50,55,0); }
-}
-@keyframes piscarAlertaEmbarque {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
-}
-.card-alerta-embarque {
-  border: 3px solid #ED3237 !important;
-  animation: pulseAlertaEmbarque 1.3s infinite;
-}
-.banner-alerta-embarque {
-  background: #ED3237;
-  color: #fff;
-  font-weight: 800;
-  text-align: center;
-  padding: 11px 14px;
-  border-radius: 12px 12px 0 0;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  font-size: 0.86rem;
-  animation: piscarAlertaEmbarque 1.1s infinite;
-}
-.resumo-alerta-topo {
-  background: linear-gradient(120deg, #ED3237, #b91d22);
-  color: #fff;
-  border-radius: 14px;
-  padding: 16px 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 6px 18px rgba(237,50,55,0.35);
-  border: 2px solid #fff;
-  animation: pulseAlertaEmbarque 1.6s infinite;
-}
-.resumo-alerta-topo .pi-chip,
-.resumo-alerta-declaracao-topo .pi-chip {
-  display: inline-block;
-  background: rgba(255,255,255,0.22);
-  border: 1px solid rgba(255,255,255,0.5);
-  border-radius: 8px;
-  padding: 4px 10px;
-  margin: 3px;
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-
-@keyframes pulseAlertaDeclaracao {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(230,81,0,0.7); }
-  50% { box-shadow: 0 0 0 9px rgba(230,81,0,0); }
-}
-.card-alerta-declaracao {
-  border: 3px solid #E65100 !important;
-  animation: pulseAlertaDeclaracao 1.5s infinite;
-}
-.banner-alerta-declaracao {
-  background: #E65100;
-  color: #fff;
-  font-weight: 800;
-  text-align: center;
-  padding: 11px 14px;
-  border-radius: 12px 12px 0 0;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-  font-size: 0.84rem;
-  animation: piscarAlertaEmbarque 1.3s infinite;
-}
-.resumo-alerta-declaracao-topo {
-  background: linear-gradient(120deg, #E65100, #b34000);
-  color: #fff;
-  border-radius: 14px;
-  padding: 16px 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 6px 18px rgba(230,81,0,0.35);
-  border: 2px solid #fff;
-  animation: pulseAlertaDeclaracao 1.7s infinite;
-}
-.selo-prazo-declaracao {
-  display: inline-block;
-  background: #FFF3CD;
-  color: #7a5b00;
-  border: 1px solid #ffe08a;
-  border-radius: 8px;
-  padding: 2px 8px;
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-.selo-prazo-vencido {
-  display: inline-block;
-  background: #E65100;
-  color: #fff;
-  border-radius: 8px;
-  padding: 2px 8px;
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-/* ===== Refinamento visual (acabamento profissional) ===== */
-body { letter-spacing: 0.005em; }
-
-.container { max-width: 1140px; }
-
-/* Campos de formulário mais elegantes e com foco na cor da marca */
-.form-control, .form-select {
-  border-radius: 10px;
-  border: 1px solid #e7d3d3;
-  padding: 0.55rem 0.85rem;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-.form-control:focus, .form-select:focus {
-  border-color: var(--orange);
-  box-shadow: 0 0 0 0.2rem rgba(247,151,51,0.18);
-}
-.form-control::placeholder { color: #c9a9a9; }
-.form-label { color: var(--muted); margin-bottom: 0.25rem; }
-
-/* Botões: transição suave e leve elevação */
-.btn { border-radius: 10px; }
-.btn:not(.btn-link):hover { transform: translateY(-1px); }
-.btn:active { transform: translateY(0); }
-
-/* Cards com leve realce ao passar o mouse */
-.card { transition: box-shadow 0.18s ease, transform 0.18s ease; }
-.card-pi-admin:hover, .card-recebimento:hover { box-shadow: var(--shadow-md) !important; }
-
-/* Cabeçalhos de tabela na identidade da marca */
-.table > thead th {
-  background: #fbeaea;
-  color: var(--red-dark);
-  font-weight: 700;
-  font-size: 0.82rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  border-bottom: 2px solid var(--border);
-}
-.table td, .table th { vertical-align: middle; }
-
-/* Abas (nav-tabs) mais discretas e alinhadas à marca */
-.nav-tabs { border-bottom: 2px solid var(--border); gap: 2px; }
-.nav-tabs .nav-link {
-  border: none;
-  color: var(--muted);
-  font-weight: 600;
-  border-radius: 10px 10px 0 0;
-  padding: 9px 16px;
-}
-.nav-tabs .nav-link:hover { background: #fbeaea; color: var(--red-dark); }
-.nav-tabs .nav-link.active {
-  color: var(--red-dark);
-  background: transparent;
-  border-bottom: 3px solid var(--red);
-}
-
-/* Badges com melhor legibilidade */
-.badge { font-weight: 600; letter-spacing: 0.01em; padding: 0.4em 0.65em; }
-
-/* Título de seção dentro dos cards */
-.secao-titulo-card {
-  color: var(--red-dark);
-  font-weight: 700;
-  font-size: 0.95rem;
-  letter-spacing: 0.01em;
-}
-
-/* Cartões de resumo (contadores) com respiro */
-.resumo-card-icone { font-size: 1.6rem; margin-bottom: 2px; }
-
-/* =========================================================
-   COMPACTAÇÃO — layout mais enxuto e menos "pesado"
-   (aplicado por último para sobrepor os valores anteriores)
-   ========================================================= */
-
-/* Cabeçalho de página menor e mais discreto */
-.page-header { padding: 14px 16px; margin-bottom: 16px; gap: 12px; }
-.page-header-icon { width: 40px; height: 40px; font-size: 1.15rem; border-radius: 10px; }
-.page-titulo { font-size: 1.2rem; }
-.page-subtitulo { font-size: 0.8rem; }
-
-/* Cards com menos preenchimento e menos sombra */
-.card { box-shadow: 0 1px 4px rgba(120,20,20,0.06) !important; margin-bottom: 14px; }
-.card-body { padding: 16px !important; }
-
-/* Botão de envio verde: tamanho normal, não largura total gigante */
-.btn-ok-grande {
-  width: auto !important;
-  font-size: 0.92rem;
-  padding: 9px 22px;
-  border-radius: 10px;
-  box-shadow: 0 2px 6px rgba(46,125,50,0.22);
-}
-.btn-ok-grande:hover, .btn-ok-grande:active {
-  box-shadow: 0 3px 9px rgba(46,125,50,0.28);
-}
-
-/* Botões em geral um pouco mais compactos */
-.btn-pietrobon { padding: 8px 18px; }
-.btn { font-size: 0.9rem; }
-.btn-sm { font-size: 0.8rem; }
-
-/* Abas mais baixas */
-.nav-tabs .nav-link { padding: 8px 14px !important; font-size: 0.9rem; }
-
-/* Título de seção mais contido */
-.secao-titulo-card { margin-bottom: 12px; font-size: 0.9rem; }
-
-/* Espaçamento vertical padrão das páginas um pouco menor */
-.container.py-4 { padding-top: 1.25rem !important; padding-bottom: 1.25rem !important; }
-
-/* No celular, os botões de envio voltam a ocupar a largura para facilitar o toque */
-@media (max-width: 576px) {
-  .btn-ok-grande { width: 100% !important; padding: 12px; }
-}
-
-/* Menu suspenso no cabeçalho */
-.btn-menu-pietrobon {
-  background: rgba(255,255,255,0.16) !important;
-  border: 1px solid rgba(255,255,255,0.45) !important;
-  color: #fff !important;
-  font-weight: 700;
-  border-radius: 10px;
-  padding: 7px 16px;
-}
-.btn-menu-pietrobon:hover, .btn-menu-pietrobon:focus, .btn-menu-pietrobon.show {
-  background: rgba(255,255,255,0.28) !important;
-  color: #fff !important;
-}
-#menu-principal { border: 1px solid var(--border); border-radius: 12px; padding: 6px; min-width: 240px; }
-#menu-principal .dropdown-item {
-  border-radius: 8px; padding: 9px 12px; font-weight: 600; color: var(--text);
-  display: flex; align-items: center; justify-content: space-between;
-}
-#menu-principal .dropdown-item:hover { background: #fbeaea; color: var(--red-dark); }
-#menu-principal .dropdown-item.active { background: var(--red); color: #fff; }
-#menu-principal .item-contabil { color: #1b5e20; }
-#menu-principal .item-contabil:hover { background: #e8f5e9; color: #1b5e20; }
-
-/* Impressão (exportar PDF) da tela contábil */
-@media print {
-  #cabecalho, #chat-ia-botao, #chat-ia-painel, .no-print { display: none !important; }
-  body { background: #fff !important; }
-  .container { max-width: 100% !important; }
-  /* Modo de impressão dedicado (PDF colorido igual à planilha) */
-  body.imprimindo > *:not(#area-impressao) { display: none !important; }
-  #area-impressao { display: block !important; }
-  #area-impressao * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-}
-
-/* =========================================================
-   ABAS MAIS LEGÍVEIS (alto contraste)
-   ========================================================= */
-.nav-tabs {
-  border-bottom: 2px solid var(--border) !important;
-  gap: 6px !important;
-}
-.nav-tabs .nav-link,
-.nav-tabs .nav-link:link {
-  color: #4a2b2b !important;              /* texto escuro e nítido */
-  font-weight: 700 !important;
-  background: #f6e9e9 !important;         /* pílula clara */
-  border: 1px solid var(--border) !important;
-  border-bottom: none !important;
-  border-radius: 10px 10px 0 0 !important;
-  padding: 10px 18px !important;
-  opacity: 1 !important;
-  text-shadow: none !important;
-}
-.nav-tabs .nav-link:hover {
-  background: #f7d9d9 !important;
-  color: var(--red-dark) !important;
-}
-.nav-tabs .nav-link.active {
-  background: var(--red) !important;      /* aba ativa: vermelho sólido */
-  color: #fff !important;                 /* texto branco, bem legível */
-  border-color: var(--red) !important;
-  box-shadow: 0 2px 8px rgba(237,50,55,.30) !important;
-}
-
-/* Botões usados como abas (data-aba) também ficam legíveis */
-[data-aba], [data-aba-compra] {
-  color: #4a2b2b !important;
-  font-weight: 700 !important;
-}
-[data-aba].active, [data-aba-compra].active {
-  color: #fff !important;
-  background: var(--red) !important;
-}
-
-/* Cabeçalho de TODAS as tabelas: vermelho sólido + texto branco nítido */
-.table thead th,
-.table > thead th,
-.table thead tr th {
-  background: var(--red) !important;
-  color: #fff !important;
-  border-color: var(--red) !important;
-  font-weight: 700 !important;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  text-shadow: none !important;
-}
-/* Esconde caixas de ícone que ficaram vazias após remover emojis */
-.page-header-icon:empty { display: none; }
-.resumo-card-icone:empty { display: none; }
-
-/* ============================================================
-   TEMA PROFISSIONAL (aplicado por último — refina todo o site)
-   ============================================================ */
-:root {
-  --bg: #f3f4f6;
-  --bg-card: #ffffff;
-  --border: #e5e7eb;
-  --text: #1f2733;
-  --muted: #6b7280;
-  --ink-900: #111827;
-  --slate: #334155;
-  --shadow: 0 1px 2px rgba(17,24,39,.05), 0 1px 3px rgba(17,24,39,.08);
-  --shadow-md: 0 6px 20px rgba(17,24,39,.10);
-}
-
-body {
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  letter-spacing: 0;
-  -webkit-font-smoothing: antialiased;
-}
-
-/* Barra de navegação mais sóbria */
-.navbar-pietrobon {
-  background: linear-gradient(100deg, #ED3237, #C6242A) !important;
-  box-shadow: 0 1px 0 rgba(0,0,0,.05), 0 4px 16px rgba(198,36,42,.20);
-  padding: 12px 0;
-}
-
-/* Botão do menu no topo */
-.btn-menu-pietrobon {
-  background: rgba(255,255,255,0.14) !important;
-  border: 1px solid rgba(255,255,255,0.35) !important;
-  color: #fff !important;
-  font-weight: 600;
-  letter-spacing: .01em;
-  border-radius: 10px;
-  padding: 8px 18px;
-}
-
-/* Cabeçalho de página: limpo e elegante */
-.page-header {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  box-shadow: var(--shadow);
-  padding: 20px 24px;
-  margin-bottom: 22px;
-}
-.page-titulo {
-  color: var(--ink-900);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  border-left: 4px solid var(--red);
-  padding-left: 14px;
-  font-size: 1.35rem;
-}
-.page-subtitulo { color: var(--muted); padding-left: 18px; font-size: .85rem; }
-
-/* Cartões refinados */
-.card {
-  background: var(--bg-card) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 16px !important;
-  box-shadow: var(--shadow) !important;
-  transition: box-shadow .2s ease, transform .2s ease;
-}
-.card-body { padding: 20px !important; }
-
-/* Títulos de seção */
-.secao-titulo-card {
-  color: var(--ink-900);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  text-transform: none;
-  border-left: 3px solid var(--red);
-  padding-left: 10px;
-  font-size: .98rem;
-}
-
-/* Botões: profissionais, cantos suaves, foco de acessibilidade */
-.btn { font-weight: 600; border-radius: 10px; letter-spacing: .005em; }
-.btn-pietrobon {
-  background: var(--red) !important; border-color: var(--red) !important; color: #fff !important;
-  box-shadow: 0 1px 2px rgba(198,36,42,.25);
-}
-.btn-pietrobon:hover { background: var(--red-dark) !important; border-color: var(--red-dark) !important; }
-.btn-ok-grande {
-  background: #157347 !important; border: none !important; color: #fff !important;
-  font-weight: 600 !important; border-radius: 10px !important;
-  box-shadow: 0 1px 2px rgba(21,115,71,.25);
-}
-.btn-ok-grande:hover { background: #12633c !important; }
-.btn:not(.btn-link):hover { transform: translateY(-1px); }
-
-/* Campos de formulário */
-.form-control, .form-select {
-  border: 1px solid var(--border) !important;
-  border-radius: 10px !important;
-  color: var(--text);
-  padding: .55rem .8rem;
-}
-.form-control:focus, .form-select:focus {
-  border-color: var(--red) !important;
-  box-shadow: 0 0 0 3px rgba(237,50,55,.12) !important;
-}
-.form-label { color: var(--slate); font-weight: 500; }
-/* Reserva espaço para a seta do select (o padding acima apaga o do Bootstrap) */
-.form-select { padding-right: 2.4rem !important; background-position: right .75rem center !important; }
-
-/* Tabelas corporativas: cabeçalho claro, texto escuro, linhas com hover */
-.table { --bs-table-bg: transparent; }
-.table thead th, .table > thead th, .table thead tr th {
-  background: #f8fafc !important;
-  color: var(--slate) !important;
-  font-weight: 700 !important;
-  font-size: .74rem !important;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-  border-bottom: 2px solid var(--border) !important;
-  border-color: var(--border) !important;
-  text-shadow: none !important;
-  padding: 11px 12px !important;
-}
-.table tbody td { border-color: #f1f2f4; color: var(--text); }
-.table-hover tbody tr:hover { background: #f8fafc !important; }
-
-/* Abas: pílulas discretas e profissionais */
-.nav-tabs { border-bottom: 1px solid var(--border) !important; gap: 4px !important; }
-.nav-tabs .nav-link, .nav-tabs .nav-link:link {
-  background: transparent !important;
-  border: none !important;
-  color: var(--muted) !important;
-  font-weight: 600 !important;
-  border-radius: 8px !important;
-  padding: 9px 16px !important;
-  box-shadow: none !important;
-}
-.nav-tabs .nav-link:hover { background: #f1f2f4 !important; color: var(--slate) !important; }
-.nav-tabs .nav-link.active {
-  background: rgba(237,50,55,.08) !important;
-  color: var(--red-dark) !important;
-  box-shadow: inset 0 -2px 0 var(--red) !important;
-}
-[data-aba].active, [data-aba-compra].active { background: rgba(237,50,55,.08) !important; color: var(--red-dark) !important; }
-
-/* Badges mais discretas */
-.badge { font-weight: 600; letter-spacing: .01em; border-radius: 8px; padding: .38em .6em; }
-
-/* Menu suspenso refinado */
-#menu-principal { border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-md); padding: 8px; }
-#menu-principal .dropdown-item { border-radius: 8px; padding: 10px 12px; font-weight: 500; color: var(--text); }
-#menu-principal .dropdown-item:hover { background: #f3f4f6; color: var(--ink-900); }
-#menu-principal .dropdown-item.active { background: var(--red); color: #fff; }
-
-/* Indicadores de status: pílulas suaves */
-.indicador-ok { background: #e7f6ec !important; color: #157347 !important; }
-.indicador-nok { background: #fdecec !important; color: #b42318 !important; }
-.indicador-ok, .indicador-nok { border-radius: 999px; font-weight: 600; padding: 4px 12px; }
-
-/* Rótulos de cartão de insumo */
-.card-insumo-almox { background: #fafafa; border: 1px solid var(--border); border-radius: 12px; }
-.card-insumo-almox h4 { color: var(--slate); font-size: .8rem; letter-spacing: .03em; }
-
-/* ============================================================
-   COR + ÍCONES (camada final) — mais vivo, sem exagero
-   ============================================================ */
-:root {
-  --bg: #f5f6f8;
-  --brand-grad: linear-gradient(100deg, #ED3237, #F0603C);
-}
-body { background:
-  radial-gradient(1200px 500px at 100% -5%, #fdeef0 0%, rgba(253,238,240,0) 60%),
-  radial-gradient(900px 400px at -10% 0%, #eef3fb 0%, rgba(238,243,251,0) 55%),
-  var(--bg);
-}
-
-/* Cabeçalho de página com ícone colorido de volta */
-.page-header-icon, .page-header-icon:empty { display: inline-flex !important; }
-.page-header-icon {
-  width: 46px; height: 46px; border-radius: 12px;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--r);
   background: var(--brand-grad);
-  color: #fff; font-size: 1.35rem;
-  align-items: center; justify-content: center;
-  box-shadow: 0 6px 16px rgba(237,50,55,.28);
-}
-body[data-pagina="admin.html"]       .page-header-icon:empty::before { content: "📊"; }
-body[data-pagina="cadastro.html"]    .page-header-icon:empty::before { content: "📋"; }
-body[data-pagina="almoxarifado.html"].page-header-icon:empty::before { content: "📦"; }
-body[data-pagina="recebimento.html"] .page-header-icon:empty::before { content: "🚚"; }
-body[data-pagina="referencia.html"]  .page-header-icon:empty::before { content: "📐"; }
-body[data-pagina="embarques.html"]   .page-header-icon:empty::before { content: "🚢"; }
-body[data-pagina="compras.html"]     .page-header-icon:empty::before { content: "🛒"; }
-body[data-pagina="contabil.html"]    .page-header-icon:empty::before { content: "💰"; }
-
-/* Ícones nos itens do menu */
-#menu-principal a[href$="admin.html"]::before        { content: "📊"; margin-right: 8px; }
-#menu-principal a[href$="cadastro.html"]::before     { content: "📋"; margin-right: 8px; }
-#menu-principal a[href$="almoxarifado.html"]::before { content: "📦"; margin-right: 8px; }
-#menu-principal a[href$="recebimento.html"]::before  { content: "🚚"; margin-right: 8px; }
-#menu-principal a[href$="referencia.html"]::before   { content: "📐"; margin-right: 8px; }
-#menu-principal a[href$="embarques.html"]::before    { content: "🚢"; margin-right: 8px; }
-#menu-principal a[href$="compras.html"]::before      { content: "🛒"; margin-right: 8px; }
-#menu-principal a[href$="contabil.html"]::before     { content: "💰"; margin-right: 8px; }
-#menu-principal .dropdown-item { justify-content: flex-start; }
-
-/* Tabelas mais vivas: cabeçalho vermelho em degradê */
-.table thead th, .table > thead th, .table thead tr th {
-  background: var(--brand-grad) !important;
-  color: #fff !important;
-  border-bottom: none !important;
-  font-size: .74rem !important;
-  letter-spacing: .04em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(232,49,58,.28);
 }
 
-/* Título de seção com barra colorida */
-.secao-titulo-card { border-left: 4px solid transparent; border-image: linear-gradient(180deg, #ED3237, #F79733) 1; }
-
-/* Cards com leve topo colorido e hover animado */
-.card { position: relative; overflow: hidden; }
-.card:hover { box-shadow: var(--shadow-md) !important; transform: translateY(-2px); }
-
-/* Cartões de resumo/contadores mais coloridos */
-.resumo-card-icone { font-size: 1.7rem; }
-.card .fs-5.text-success, .text-success { color: #12805c !important; }
-
-/* Botões-ação com um toque de degradê */
-.btn-pietrobon { background: var(--brand-grad) !important; border: none !important; }
-.btn-pietrobon:hover { filter: brightness(.95); }
-.btn-ok-grande { background: linear-gradient(100deg, #157347, #1E9E63) !important; }
-
-/* Abas ativas coloridas */
-.nav-tabs .nav-link.active {
-  background: rgba(237,50,55,.10) !important;
-  color: var(--red-dark) !important;
-  box-shadow: inset 0 -3px 0 #ED3237 !important;
-}
-
-/* Faixa colorida no topo da navbar para dar vida */
-.navbar-pietrobon { background: linear-gradient(100deg, #ED3237 0%, #F0603C 55%, #F79733 140%) !important; }
-
-/* Badges de status com um pouco mais de vida */
-.indicador-ok  { background: #e4f7ec !important; color: #12805c !important; }
-.indicador-nok { background: #fde7e7 !important; color: #c62828 !important; }
-
-/* ============================================================
-   AJUSTE FINAL DA NAVBAR (mais sóbria e elegante)
-   ============================================================ */
-.navbar-pietrobon {
-  background: linear-gradient(90deg, #C6242A 0%, #ED3237 100%) !important;
-  box-shadow: 0 2px 10px rgba(140,10,10,.22) !important;
-  padding: 8px 0 !important;
-  border-bottom: 3px solid #F79733;
-}
-.navbar-pietrobon .navbar-brand img { height: 34px !important; }
-.btn-menu-pietrobon {
-  background: rgba(255,255,255,0.16) !important;
-  border: 1px solid rgba(255,255,255,0.55) !important;
-  color: #fff !important;
-  font-weight: 600;
-  border-radius: 10px;
-  padding: 7px 18px;
-}
-.btn-menu-pietrobon:hover, .btn-menu-pietrobon:focus, .btn-menu-pietrobon.show {
-  background: rgba(255,255,255,0.26) !important;
-  color: #fff !important;
-}
-
-/* ============================================================
-   AJUSTE FINAL DAS TABELAS — cabeçalho uniforme (sem manchas)
-   ============================================================ */
-.table thead th,
-.table > thead th,
-.table thead tr th {
-  background: #E23A34 !important;      /* vermelho sólido uniforme */
-  background-image: none !important;   /* remove o degradê por célula */
-  color: #fff !important;
-  border-bottom: none !important;
-  border-color: rgba(255,255,255,.18) !important;
-}
-.table thead tr { background: #E23A34; }
-
-/* ============================================================
-   CORREÇÃO — ícone do cabeçalho por página (seletor com espaço)
-   ============================================================ */
+/* Ícones por página */
 body[data-pagina="admin.html"] .page-header-icon::before        { content: "📊"; }
 body[data-pagina="cadastro.html"] .page-header-icon::before     { content: "📋"; }
 body[data-pagina="almoxarifado.html"] .page-header-icon::before { content: "📦"; }
@@ -1075,38 +208,725 @@ body[data-pagina="referencia.html"] .page-header-icon::before   { content: "📐
 body[data-pagina="embarques.html"] .page-header-icon::before    { content: "🚢"; }
 body[data-pagina="compras.html"] .page-header-icon::before      { content: "🛒"; }
 body[data-pagina="contabil.html"] .page-header-icon::before     { content: "💰"; }
-
-/* Ícones das telas contábeis + nova aba de exportação */
 body[data-pagina="exp-contabil.html"] .page-header-icon::before { content: "🌎"; }
-#menu-principal a[href$="contabil.html"]::before { content: "💰"; margin-right: 8px; }
-#menu-principal a[href$="exp-contabil.html"]::before { content: "🌎"; margin-right: 8px; }
-
-/* Ícone da aba Financeiro (Importações) */
-body[data-pagina="financeiro.html"] .page-header-icon::before { content: "🏦"; }
-#menu-principal a[href$="financeiro.html"]::before { content: "🏦"; margin-right: 8px; }
-
-/* Ícone da aba Comissões (Exportação) */
-body[data-pagina="comissoes.html"] .page-header-icon::before { content: "💰"; }
-#menu-principal a[href$="comissoes.html"]::before { content: "💰"; margin-right: 8px; }
-
-/* Ícone da aba Check-list de Expedição */
-body[data-pagina="checklist.html"] .page-header-icon::before { content: "📋"; }
-#menu-principal a[href$="checklist.html"]::before { content: "📋"; margin-right: 8px; }
-
-/* Ícone da aba Ordem de Produção */
+body[data-pagina="financeiro.html"] .page-header-icon::before   { content: "🏦"; }
+body[data-pagina="checklist.html"] .page-header-icon::before    { content: "✅"; }
 body[data-pagina="ordem-producao.html"] .page-header-icon::before { content: "🏭"; }
-#menu-principal a[href$="ordem-producao.html"]::before { content: "🏭"; margin-right: 8px; }
-.card-ok {
-  background: #e9f7ef !important;
-  border: 1px solid #a8d5b5 !important;
-  box-shadow: 0 2px 8px rgba(25,135,84,.10) !important;
-}
-.linha-ok {
-  background: #e9f7ef !important;
-}
-
 body[data-pagina="conferencia-nfse.html"] .page-header-icon::before { content: "🔍"; }
-#menu-principal a[href$="conferencia-nfse.html"]::before { content: "🔍"; margin-right: 8px; }
 
-body[data-pagina="invoices.html"] .page-header-icon::before { content: "📋"; }
-#menu-principal a[href$="invoices.html"]::before { content: "📋"; margin-right: 8px; }
+.page-header-texto { flex: 1; min-width: 0; }
+
+.page-titulo {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -.025em;
+  line-height: 1.25;
+  border-left: 4px solid var(--red);
+  padding-left: 14px;
+  margin-bottom: 2px;
+}
+
+.page-subtitulo {
+  font-size: .82rem;
+  color: var(--muted);
+  padding-left: 18px;
+  margin-bottom: 0;
+  line-height: 1.4;
+}
+
+/* ── 6. Cards ───────────────────────────────────────────────── */
+.card {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--r-lg) !important;
+  box-shadow: var(--shadow) !important;
+  transition: box-shadow .2s ease, transform .2s ease;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md) !important;
+}
+
+.card-body {
+  padding: 20px !important;
+}
+
+/* Card especial – destaque de PI */
+.card-pi-admin {
+  border-left: 4px solid var(--orange) !important;
+}
+
+.card-pi-admin:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md) !important;
+}
+
+.card-recebimento {
+  border-left: 4px solid var(--orange) !important;
+}
+
+.pi-concluida {
+  border-left-color: var(--border) !important;
+  opacity: .55;
+}
+
+/* ── 7. Botões ──────────────────────────────────────────────── */
+.btn {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: .875rem;
+  border-radius: var(--r-sm);
+  letter-spacing: .01em;
+  transition: all .15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1.4;
+}
+
+.btn:not(.btn-link):not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0) !important;
+}
+
+.btn-pietrobon {
+  background: var(--brand-grad) !important;
+  border: none !important;
+  color: #fff !important;
+  box-shadow: 0 1px 3px rgba(193,32,40,.30);
+  padding: 9px 20px;
+}
+
+.btn-pietrobon:hover,
+.btn-pietrobon:focus {
+  filter: brightness(.93);
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(193,32,40,.35);
+}
+
+.btn-ok-grande {
+  background: linear-gradient(110deg, #16a34a, #15803d) !important;
+  border: none !important;
+  color: #fff !important;
+  font-weight: 700;
+  font-size: .92rem;
+  border-radius: var(--r-sm);
+  padding: 10px 24px;
+  box-shadow: 0 1px 3px rgba(22,163,74,.30);
+}
+
+.btn-ok-grande:hover {
+  filter: brightness(.93);
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(22,163,74,.35);
+}
+
+.btn-outline-danger {
+  border-radius: var(--r-sm) !important;
+}
+
+.btn-outline-secondary {
+  border-radius: var(--r-sm) !important;
+}
+
+.btn-outline-primary {
+  border-radius: var(--r-sm) !important;
+}
+
+@media (max-width: 576px) {
+  .btn-ok-grande { width: 100%; padding: 13px; }
+}
+
+/* ── 8. Formulários ─────────────────────────────────────────── */
+.form-control,
+.form-select {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: .875rem;
+  color: var(--text);
+  background-color: #fff;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--r-sm) !important;
+  padding: .55rem .8rem;
+  transition: border-color .15s, box-shadow .15s;
+  line-height: 1.5;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--red) !important;
+  box-shadow: 0 0 0 3px rgba(232,49,58,.12) !important;
+  outline: none;
+  background-color: #fff;
+}
+
+.form-control::placeholder {
+  color: var(--muted-light);
+  font-weight: 400;
+}
+
+.form-label {
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--slate);
+  margin-bottom: .35rem;
+}
+
+.form-select {
+  padding-right: 2.4rem !important;
+  background-position: right .75rem center !important;
+}
+
+.form-check-input:checked {
+  background-color: var(--red) !important;
+  border-color: var(--red) !important;
+}
+
+.form-check-input:focus {
+  box-shadow: 0 0 0 3px rgba(232,49,58,.15) !important;
+}
+
+/* ── 9. Tabelas ─────────────────────────────────────────────── */
+.table {
+  --bs-table-bg: transparent;
+  font-size: .875rem;
+}
+
+.table thead th,
+.table > thead th,
+.table thead tr th {
+  background: #f8fafd !important;
+  color: var(--slate) !important;
+  font-size: .72rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  border-bottom: 2px solid var(--border) !important;
+  border-color: var(--border) !important;
+  padding: 11px 14px !important;
+  white-space: nowrap;
+  text-shadow: none !important;
+  background-image: none !important;
+}
+
+.table thead tr {
+  background: #f8fafd;
+}
+
+.table tbody td {
+  border-color: var(--border-soft);
+  padding: 10px 14px;
+  vertical-align: middle;
+  color: var(--text);
+}
+
+.table-hover tbody tr {
+  transition: background .12s;
+}
+
+.table-hover tbody tr:hover {
+  background-color: var(--red-light) !important;
+}
+
+.table tbody tr:nth-child(even) {
+  background-color: #fafbfd;
+}
+
+/* ── 10. Abas (nav-tabs) ────────────────────────────────────── */
+.nav-tabs {
+  border-bottom: 1px solid var(--border) !important;
+  gap: 4px !important;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.nav-tabs .nav-link,
+.nav-tabs .nav-link:link {
+  background: transparent !important;
+  border: none !important;
+  border-radius: var(--r-sm) !important;
+  color: var(--muted) !important;
+  font-weight: 600 !important;
+  font-size: .875rem;
+  padding: 9px 16px !important;
+  box-shadow: none !important;
+  transition: background .12s, color .12s;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent !important;
+}
+
+.nav-tabs .nav-link:hover {
+  background: var(--red-light) !important;
+  color: var(--red-dark) !important;
+}
+
+.nav-tabs .nav-link.active {
+  background: transparent !important;
+  color: var(--red) !important;
+  border-bottom: 2px solid var(--red) !important;
+  box-shadow: none !important;
+}
+
+/* Botões usados como abas (data-aba, data-aba-compra) */
+.btn.active[data-aba],
+.btn.active[data-aba-compra],
+[data-aba].active,
+[data-aba-compra].active {
+  background: var(--red) !important;
+  border-color: var(--red) !important;
+  color: #fff !important;
+}
+
+/* ── 11. Badges ─────────────────────────────────────────────── */
+.badge {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: .72rem;
+  letter-spacing: .02em;
+  border-radius: 6px;
+  padding: .35em .65em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── 12. Login ──────────────────────────────────────────────── */
+.tela-login {
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--red) 0%, #7a1218 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.login-box {
+  width: 100%;
+  max-width: 380px;
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  box-shadow: 0 28px 64px rgba(0,0,0,.40);
+}
+
+.login-topo {
+  background: linear-gradient(160deg, #b01f23, #6b0f12);
+  padding: 32px 24px 24px;
+  text-align: center;
+}
+
+.login-logo {
+  height: 68px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,.40));
+}
+
+.login-subtitulo {
+  color: rgba(255,255,255,.75);
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin: 10px 0 0;
+}
+
+.login-corpo {
+  background: #fff;
+  padding: 32px 28px 28px;
+}
+
+/* ── 13. Almoxarifado ───────────────────────────────────────── */
+.card-insumo-almox {
+  background: #fafbfd;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px;
+  height: 100%;
+  transition: border-color .15s;
+}
+
+.card-insumo-almox:focus-within {
+  border-color: var(--red);
+}
+
+.card-insumo-almox h4 {
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 10px;
+}
+
+.linha-produto-almox {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  margin-bottom: 10px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  transition: box-shadow .18s;
+}
+
+.linha-produto-almox:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.linha-produto-topo {
+  padding: 14px 18px;
+}
+
+.formulario-produto-almox {
+  padding: 18px 18px 20px;
+  border-top: 1px solid var(--border-soft);
+  background: #fafbfd;
+}
+
+/* Saldos */
+.saldo-positivo, .saldo-negativo, .saldo-alerta {
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+  font-weight: 700;
+  font-size: .8rem;
+  text-align: center;
+  margin-top: 8px;
+}
+
+.saldo-positivo { background: var(--green-bg); color: var(--green); }
+.saldo-negativo { background: var(--red-light); color: var(--red-dark); }
+.saldo-alerta   { background: #fffbeb; color: #b45309; }
+
+/* Indicadores */
+.indicador-ok, .indicador-nok {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.indicador-ok  { background: var(--green-bg); color: var(--green); }
+.indicador-nok { background: var(--red-light); color: var(--red-dark); }
+
+/* ── 14. Status / helpers ───────────────────────────────────── */
+.texto-ok     { color: var(--green);    font-weight: 600; }
+.texto-erro   { color: var(--red);      font-weight: 600; }
+.texto-alerta { color: #b45309;         font-weight: 600; }
+
+.text-muted { color: var(--muted) !important; }
+
+.secao-titulo-card {
+  font-size: .92rem;
+  font-weight: 700;
+  color: var(--text);
+  border-left: 3px solid var(--red);
+  padding-left: 10px;
+  margin-bottom: 14px;
+  letter-spacing: -.01em;
+}
+
+/* ── 15. Fotos ──────────────────────────────────────────────── */
+.preview-foto {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  margin: 8px 0;
+  box-shadow: var(--shadow);
+}
+
+.foto-detalhe-img {
+  width: 100%;
+  max-width: 200px;
+  height: 140px;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow);
+  transition: transform .18s ease, box-shadow .18s ease;
+  cursor: pointer;
+}
+
+.foto-detalhe-img:hover {
+  transform: scale(1.05);
+  box-shadow: var(--shadow-md);
+}
+
+.foto-detalhe-label {
+  font-size: .7rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.btn-foto {
+  background: #fff;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 9px 14px;
+  font-size: .85rem;
+  font-weight: 600;
+  cursor: pointer;
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all .15s;
+}
+
+.btn-foto:hover   { border-color: var(--orange); background: var(--orange-bg); }
+.btn-foto-ok      { border-color: var(--green) !important; color: var(--green) !important; background: var(--green-bg) !important; }
+
+/* ── 16. Alertas de embarque e declaração ───────────────────── */
+@keyframes pulseRed {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(232,49,58,.6); }
+  50%      { box-shadow: 0 0 0 10px rgba(232,49,58,0); }
+}
+@keyframes pulseOrange {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245,147,50,.6); }
+  50%      { box-shadow: 0 0 0 9px rgba(245,147,50,0); }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .55; }
+}
+
+.card-alerta-embarque {
+  border: 2px solid var(--red) !important;
+  animation: pulseRed 1.4s ease-in-out infinite;
+}
+
+.banner-alerta-embarque {
+  background: var(--red);
+  color: #fff;
+  font-weight: 800;
+  text-align: center;
+  padding: 10px 14px;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  font-size: .82rem;
+  animation: blink 1.1s ease-in-out infinite;
+}
+
+.resumo-alerta-topo {
+  background: var(--brand-grad);
+  color: #fff;
+  border-radius: var(--r-lg);
+  padding: 18px 22px;
+  margin-bottom: 20px;
+  box-shadow: 0 6px 20px rgba(232,49,58,.30);
+  animation: pulseRed 1.8s ease-in-out infinite;
+}
+
+.card-alerta-declaracao {
+  border: 2px solid var(--orange) !important;
+  animation: pulseOrange 1.5s ease-in-out infinite;
+}
+
+.banner-alerta-declaracao {
+  background: var(--orange);
+  color: #fff;
+  font-weight: 800;
+  text-align: center;
+  padding: 10px 14px;
+  text-transform: uppercase;
+  font-size: .82rem;
+  animation: blink 1.3s ease-in-out infinite;
+}
+
+.resumo-alerta-declaracao-topo {
+  background: linear-gradient(110deg, #F59332, #d97706);
+  color: #fff;
+  border-radius: var(--r-lg);
+  padding: 18px 22px;
+  margin-bottom: 20px;
+  box-shadow: 0 6px 20px rgba(245,147,50,.30);
+  animation: pulseOrange 1.7s ease-in-out infinite;
+}
+
+.resumo-alerta-topo .pi-chip,
+.resumo-alerta-declaracao-topo .pi-chip {
+  display: inline-block;
+  background: rgba(255,255,255,.22);
+  border: 1px solid rgba(255,255,255,.45);
+  border-radius: 6px;
+  padding: 3px 10px;
+  margin: 3px;
+  font-size: .82rem;
+  font-weight: 700;
+}
+
+/* Selos de prazo */
+.selo-prazo-declaracao {
+  display: inline-block;
+  background: #fefce8;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: .72rem;
+  font-weight: 700;
+}
+
+.selo-prazo-vencido {
+  display: inline-block;
+  background: var(--red);
+  color: #fff;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: .72rem;
+  font-weight: 700;
+}
+
+/* ── 17. Skeleton Loading ───────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f0f2f5 25%, #e8eaed 50%, #f0f2f5 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+.skeleton-text  { height: 14px; margin-bottom: 8px; }
+.skeleton-title { height: 20px; width: 60%; margin-bottom: 12px; }
+.skeleton-card  { height: 80px; border-radius: var(--r-lg); margin-bottom: 14px; }
+
+/* Texto "Carregando..." estilizado */
+p.loading, p.vazio, p.text-muted:only-child {
+  color: var(--muted);
+  font-size: .875rem;
+  padding: 20px 0;
+}
+
+/* ── 18. Tabelas especiais (almox/admin) ────────────────────── */
+.tabela-insumos-admin {
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.tabela-insumos-admin thead th {
+  background: #f8fafd !important;
+  color: var(--slate) !important;
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding: 10px 12px;
+  font-weight: 700;
+  border-bottom: 2px solid var(--border);
+}
+
+.tabela-insumos-admin td {
+  padding: 9px 12px;
+  font-size: .875rem;
+  vertical-align: middle;
+  border-color: var(--border-soft);
+}
+
+/* ── 19. Listas de PI ───────────────────────────────────────── */
+.lista-pi-item {
+  border-left: 4px solid var(--orange);
+  background: var(--bg-card);
+  border-radius: var(--r);
+  margin-bottom: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  transition: box-shadow .18s;
+}
+
+.lista-pi-item:hover { box-shadow: var(--shadow-md); }
+
+.lista-pi-cabecalho {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: #fafbfd;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.pi-numero-destaque {
+  font-weight: 800;
+  color: var(--red-dark);
+  font-size: .92rem;
+  letter-spacing: -.01em;
+}
+
+.pi-info-secundaria {
+  font-size: .8rem;
+  color: var(--muted);
+}
+
+/* ── 20. Status cards especiais ─────────────────────────────── */
+.card-ok {
+  background: var(--green-bg) !important;
+  border: 1px solid #bbf7d0 !important;
+  box-shadow: 0 2px 8px rgba(22,163,74,.10) !important;
+}
+
+.linha-ok { background: var(--green-bg) !important; }
+
+/* ── 21. Impressão / PDF ────────────────────────────────────── */
+@media print {
+  #cabecalho, #chat-ia-botao, #chat-ia-painel, .no-print { display: none !important; }
+  body { background: #fff !important; }
+  .container { max-width: 100% !important; }
+  body.imprimindo > *:not(#area-impressao) { display: none !important; }
+  #area-impressao { display: block !important; }
+  #area-impressao * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+}
+
+/* ── 22. Scrollbar personalizada (webkit) ───────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ── 23. Responsivo ─────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .page-header { padding: 16px 18px; gap: 12px; }
+  .page-titulo { font-size: 1.15rem; }
+  .card-body   { padding: 16px !important; }
+  .container.py-4 { padding-top: 16px !important; }
+}
+
+@media (max-width: 576px) {
+  .page-header-icon { width: 40px; height: 40px; font-size: 1.1rem; }
+  .page-titulo { font-size: 1.1rem; }
+  .foto-detalhe-img { max-width: 100%; height: 120px; }
+  .nav-tabs .nav-link { padding: 8px 12px !important; font-size: .82rem; }
+}
+
+/* ── 24. Micro-animação de entrada ──────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.container > .card,
+.container > .page-header {
+  animation: fadeInUp .25s ease both;
+}
+
+/* Respeita preferência de movimento reduzido */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}
