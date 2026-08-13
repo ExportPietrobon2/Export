@@ -1,6 +1,7 @@
 import { sair, getPerfil } from '/JS/core/auth.js'
 import { api } from '/JS/core/api.js'
 import { iniciarChat } from '/JS/core/chat.js'
+import { iniciarToast } from '/JS/core/toast.js'
 
 const EMAILS_FINANCEIRO = [
   'export2@pietrobon.com.br',
@@ -82,6 +83,8 @@ async function atualizarBotaoNotificacao(btn) {
 }
 
 export function montarCabecalho(papel) {
+  iniciarToast()
+
   const paginaAtual = document.body.dataset.pagina
   const perfil = getPerfil()
   const emailAtual = perfil ? (perfil.email || '').toLowerCase() : ''
