@@ -9,10 +9,10 @@ const EMAILS_TAREFAS = [
 ]
 
 const NOMES = {
-  'export@pietrobon.com.br':      { nome: 'Export',    iniciais: 'EX' },
-  'export2@pietrobon.com.br':     { nome: 'Export 2',  iniciais: 'E2' },
-  'joaoantonio@pietrobon.com.br': { nome: 'João',      iniciais: 'JA' },
-  'auxiliarexp@pietrobon.com.br': { nome: 'Auxiliar',  iniciais: 'AX' }
+  'export@pietrobon.com.br':      { nome: 'Diego Diniz',    iniciais: 'EX' },
+  'export2@pietrobon.com.br':     { nome: 'Kauã Mello',  iniciais: 'E2' },
+  'joaoantonio@pietrobon.com.br': { nome: 'João Antonio',      iniciais: 'JA' },
+  'auxiliarexp@pietrobon.com.br': { nome: 'Wesley',  iniciais: 'AX' }
 }
 
 const COLUNAS    = ['a_fazer', 'em_progresso', 'concluido']
