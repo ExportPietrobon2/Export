@@ -2062,7 +2062,7 @@ function autenticarTarefas() {
     const token = (req.headers.authorization || '').split(' ')[1]
     if (!token) return res.status(401).json({ erro: 'Não autenticado.' })
     try {
-      const decoded = jwt.verify(token, JWT_SECRET)
+      const decoded = require('jsonwebtoken').verify(token, process.env.JWT_SECRET)
       if (!EMAILS_TAREFAS.includes((decoded.email || '').toLowerCase())) {
         return res.status(403).json({ erro: 'Acesso restrito a Tarefas Exportação.' })
       }
@@ -2089,13 +2089,25 @@ async function inicializarTarefas() {
       criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`)
-    const hash = await bcrypt.hash('exp123', 10)
-    await pool.query(
-      'INSERT IGNORE INTO usuarios (email, senha, nome, papel) VALUES (?, ?, ?, ?)',
-      ['auxiliarexp@pietrobon.com.br', hash, 'Auxiliar Exportação', 'auxiliar']
-    )
   } catch (e) {
-    console.error('Erro ao inicializar Tarefas:', e.message)
+    console.error('Erro ao criar tabela tarefas:', e.message)
+  }
+
+  try {
+    const [[existe]] = await pool.query(
+      'SELECT id FROM usuarios WHERE email = ?',
+      ['auxiliarexp@pietrobon.com.br']
+    )
+    if (!existe) {
+      const hash = await bcrypt.hash('exp123', 10)
+      await pool.query(
+        'INSERT INTO usuarios (nome, email, senha, papel) VALUES (?, ?, ?, ?)',
+        ['Auxiliar Exportação', 'auxiliarexp@pietrobon.com.br', hash, 'auxiliar']
+      )
+      console.log('Usuário auxiliarexp criado com sucesso.')
+    }
+  } catch (e) {
+    console.error('Erro ao criar usuário auxiliar:', e.message)
   }
 }
 setTimeout(inicializarTarefas, 3000)
