@@ -849,21 +849,20 @@ app.get('/api/pendencias', autenticar(TODOS), async (req, res) => {
  const [emb] = await pool.query(SQL_EMBARQUES_PENDENTES)
  const [[ped]] = await pool.query(`SELECT COUNT(*) as n FROM demandas WHERE status = 'pendente'`)
  const [[atr]] = await pool.query(`SELECT COUNT(*) as n FROM compras WHERE status <> 'recebido' AND data_prevista IS NOT NULL AND data_prevista < CURDATE()`)
+ const emailUsuario = (req.usuario.email || '').toLowerCase()
+ const EMAILS_T = ['export@pietrobon.com.br','export2@pietrobon.com.br','joaoantonio@pietrobon.com.br','auxiliarexp@pietrobon.com.br']
+ let tarefasPendentes = 0
+ if (EMAILS_T.includes(emailUsuario)) {
+  const [[tp]] = await pool.query("SELECT COUNT(*) as n FROM tarefas WHERE responsavel = ? AND coluna IN ('a_fazer','em_progresso')", [emailUsuario])
+  tarefasPendentes = tp.n
+ }
  res.json({
-    const emailUsuario = (req.usuario.email || '').toLowerCase()
-    const EMAILS_T = ['export@pietrobon.com.br','export2@pietrobon.com.br','joaoantonio@pietrobon.com.br','auxiliarexp@pietrobon.com.br']
-    let tarefasPendentes = 0
-    if (EMAILS_T.includes(emailUsuario)) {
-      const [[tp]] = await pool.query("SELECT COUNT(*) as n FROM tarefas WHERE responsavel = ? AND coluna IN ('a_fazer','em_progresso')", [emailUsuario])
-      tarefasPendentes = tp.n
-    }
-    res.json({
-      estoqueNaoDeclarado: decl.length,
-      embarquesPendentes: emb.length,
-      pedidosCompra: ped.n,
-      comprasAtrasadas: atr.n,
-      tarefasPendentes
-    })
+  estoqueNaoDeclarado: decl.length,
+  embarquesPendentes: emb.length,
+  pedidosCompra: ped.n,
+  comprasAtrasadas: atr.n,
+  tarefasPendentes
+ })
  } catch (e) {
  res.json({ estoqueNaoDeclarado: 0, embarquesPendentes: 0, pedidosCompra: 0, comprasAtrasadas: 0 })
  }
