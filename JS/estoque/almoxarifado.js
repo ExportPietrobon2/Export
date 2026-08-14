@@ -9,8 +9,9 @@ import { iniciarPedidosCompra } from '/JS/core/demandas.js'
 let podeCriarPedido = false
 let podeResponderPedido = false
 
-const selectPi = document.getElementById('select-pi')
 const containerConteudo = document.getElementById('conteudo-pi')
+let todosPedidosList = []
+let piSelecionadaId = null
 
 function calcularLiberado(insumos, rotulos, quantidade) {
  const emb = Number(insumos.embalagem && insumos.embalagem.sobra || 0)
@@ -53,14 +54,57 @@ function rotuloRowHtml(produtoId, r) {
 }
 
 async function carregarPedidos() {
- const pedidos = await api.pedidos.listar()
- if (!pedidos) return
- pedidos.forEach((pedido) => {
- const opcao = document.createElement('option')
- opcao.value = pedido.id
- opcao.textContent = `PI ${pedido.numero_pi}${pedido.cliente ? ' — ' + pedido.cliente : ''}`
- selectPi.appendChild(opcao)
- })
+  const pedidos = await api.pedidos.listar()
+  if (!pedidos) return
+  todosPedidosList = pedidos
+  renderizarSeletorPi(pedidos, '')
+}
+
+function renderizarSeletorPi(pedidos, busca) {
+  const container = document.getElementById('lista-pi-chips')
+  if (!container) return
+  const filtrados = busca
+    ? pedidos.filter(p =>
+        String(p.numero_pi).toLowerCase().includes(busca) ||
+        (p.cliente || '').toLowerCase().includes(busca) ||
+        (p.destino || '').toLowerCase().includes(busca))
+    : pedidos
+  if (!filtrados.length) {
+    container.innerHTML = '<p class="text-muted small py-2">Nenhuma PI encontrada.</p>'
+    return
+  }
+  const grupos = {}
+  filtrados.forEach(p => {
+    const pais = (p.destino || 'Sem destino').trim()
+    if (!grupos[pais]) grupos[pais] = []
+    grupos[pais].push(p)
+  })
+  const paises = Object.keys(grupos).sort((a, b) => {
+    if (a === 'Sem destino') return 1; if (b === 'Sem destino') return -1
+    return a.localeCompare(b, 'pt-BR')
+  })
+  container.innerHTML = paises.map(pais => `
+    <div class="pi-grupo-chips">
+      <div class="pi-grupo-label">${pais}</div>
+      <div class="pi-chips-row">
+        ${grupos[pais].map(p => `
+          <button class="pi-chip${p.id == piSelecionadaId ? ' pi-chip-ativo' : ''}"
+            onclick="selecionarPi(${p.id})"
+            data-pi-id="${p.id}">
+            <span class="pi-chip-numero">PI ${p.numero_pi}</span>
+            ${p.cliente ? `<span class="pi-chip-cliente">${p.cliente}</span>` : ''}
+          </button>`).join('')}
+      </div>
+    </div>`).join('')
+}
+
+window.selecionarPi = function(id) {
+  piSelecionadaId = id
+  renderizarSeletorPi(todosPedidosList, (document.getElementById('busca-pi')?.value || '').toLowerCase())
+  const p = todosPedidosList.find(x => x.id == id)
+  const badge = document.getElementById('pi-selecionada-badge')
+  if (badge && p) badge.innerHTML = `PI ${p.numero_pi}${p.cliente ? ' · ' + p.cliente : ''}${p.destino ? ' · ' + p.destino : ''}`
+  carregarPi(id)
 }
 
 async function carregarPi(piId) {
@@ -273,8 +317,7 @@ function atualizarResultado(input) {
 }
 
 function atualizarIndicador(produtoId) {
-  const btnSalvar = containerConteudo.querySelector(`.btn-salvar-produto[data-produto="${produtoId}"]`)
-  const quantidade = Number(btnSalvar?.dataset.quantidade) || 0
+ const quantidade = Number(btn?.dataset.quantidade) || 0
  const insumosAtuais = {}
  ;['embalagem', 'caixa'].forEach((chave) => {
  const inputSobra = containerConteudo.querySelector(`input[data-produto="${produtoId}"][data-campo="sobra"][data-tipo="${chave}"]`)
@@ -324,7 +367,6 @@ async function salvarProduto(produtoId, quantidade) {
  const form = document.getElementById(`form-produto-${produtoId}`)
  const btnExpandir = containerConteudo.querySelector(`.btn-expandir-produto[data-id="${produtoId}"]`)
 
- if (btn) btn.disabled = false
  btn.textContent = 'Salvo!'
  btn.style.background = 'var(--green-ok)'
  setTimeout(() => {
@@ -335,7 +377,7 @@ async function salvarProduto(produtoId, quantidade) {
  }, 1500)
 }
 
-selectPi.addEventListener('change', () => carregarPi(selectPi.value))
+document.getElementById('busca-pi')?.addEventListener('input', e => renderizarSeletorPi(todosPedidosList, e.target.value.toLowerCase()))
 
 async function carregarRecebimentos() {
  const container = document.getElementById('conteudo-recebimentos')
