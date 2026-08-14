@@ -233,9 +233,11 @@ async function carregar() {
  const prontas = pedidos.filter((p) => prontaParaProduzir(p) && !p.concluida).length
  const naoProntas = pedidos.filter((p) => !prontaParaProduzir(p) && !p.concluida).length
  const comEmbarque = pedidos.filter((p) => p.data_embarque && !p.concluida).length
+  const semEmbarque = pedidos.filter((p) => !p.data_embarque && !p.concluida).length
  document.getElementById('numero-prontas').textContent = prontas
  document.getElementById('numero-nao-prontas').textContent = naoProntas
  document.getElementById('numero-com-embarque').textContent = comEmbarque
+  document.getElementById('numero-sem-embarque').textContent = semEmbarque
 
  let lista = pedidos
  if (toggleSoProntas.checked) lista = lista.filter((p) => prontaParaProduzir(p))

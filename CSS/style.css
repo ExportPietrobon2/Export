@@ -165,6 +165,7 @@ body {
 #menu-principal a[href$="checklist.html"]::before    { content: "✅"; }
 #menu-principal a[href$="ordem-producao.html"]::before { content: "🏭"; }
 #menu-principal a[href$="conferencia-nfse.html"]::before { content: "🔍"; }
+#menu-principal a[href$="tarefas.html"]::before          { content: "✅"; }
 
 /* ── 4. Layout ──────────────────────────────────────────────── */
 .container { max-width: 1160px; }
@@ -213,6 +214,7 @@ body[data-pagina="financeiro.html"] .page-header-icon::before   { content: "🏦
 body[data-pagina="checklist.html"] .page-header-icon::before    { content: "✅"; }
 body[data-pagina="ordem-producao.html"] .page-header-icon::before { content: "🏭"; }
 body[data-pagina="conferencia-nfse.html"] .page-header-icon::before { content: "🔍"; }
+body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "✅"; }
 
 .page-header-texto { flex: 1; min-width: 0; }
 
