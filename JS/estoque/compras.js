@@ -192,7 +192,7 @@ async function iniciar() {
  const perfil = exigirPapel('todos')
  if (!perfil) return
  podeComprar = ['admin', 'compras', 'compras_aromas'].includes(perfil.papel)
- podeCriarDemanda = ['admin', 'almoxarifado'].includes(perfil.papel)
+ podeCriarDemanda = ['admin', 'almoxarifado', 'auxiliar'].includes(perfil.papel)
  if (perfil.papel === 'admin') responderCategorias = ['gerais', 'aromas']
  else if (perfil.papel === 'compras') responderCategorias = ['gerais']
  else if (perfil.papel === 'compras_aromas') responderCategorias = ['aromas']

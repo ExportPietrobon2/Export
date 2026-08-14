@@ -1045,7 +1045,7 @@ app.get('/api/demandas', autenticar(TODOS), async (req, res) => {
  res.json(rows)
 })
 
-app.post('/api/demandas', autenticar(['admin', 'almoxarifado']), async (req, res) => {
+app.post('/api/demandas', autenticar(['admin', 'almoxarifado', 'auxiliar']), async (req, res) => {
  const { descricao, quantidade, unidade, pi_id, observacoes } = req.body
  const categoria = req.body.categoria === 'aromas' ? 'aromas' : 'gerais'
  if (!descricao) return res.status(400).json({ erro: 'Informe o que está faltando.' })
@@ -1096,7 +1096,7 @@ app.patch('/api/demandas/:id/status', autenticar(['admin', 'compras', 'compras_a
  res.json({ ok: true })
 })
 
-app.delete('/api/demandas/:id', autenticar(['admin', 'almoxarifado']), async (req, res) => {
+app.delete('/api/demandas/:id', autenticar(['admin', 'almoxarifado', 'auxiliar']), async (req, res) => {
  await pool.query('DELETE FROM demandas WHERE id = ?', [req.params.id])
  res.json({ ok: true })
 })
