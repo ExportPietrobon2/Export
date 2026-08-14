@@ -40,6 +40,7 @@ async function carregarBadgesPendencias() {
       (pendencias.pedidosCompra || 0) + (pendencias.comprasAtrasadas || 0),
       'bg-danger'
     )
+    adicionarBadge('/HTML/tarefas/tarefas.html', pendencias.tarefasPendentes, 'bg-primary')
   } catch (_) {}
 }
 

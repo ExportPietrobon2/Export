@@ -66,6 +66,36 @@ async function enviarPush(titulo, corpo, url, chave) {
   } catch (e) { console.error('Erro enviarPush:', e.message) }
 }
 
+async function enviarPushParaUsuario(usuarioId, titulo, corpo, url) {
+  if (!usuarioId) return
+  try {
+    await garantirTabelaPush()
+    const [subs] = await pool.query(
+      'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE usuario_id = ?', [usuarioId]
+    )
+    if (!subs.length) return
+    const payload = JSON.stringify({ titulo, corpo, url: url || '/' })
+    await Promise.allSettled(subs.map(async (s) => {
+      try {
+        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload)
+      } catch (e) {
+        if (e.statusCode === 410 || e.statusCode === 404) {
+          await pool.query('DELETE FROM push_subscriptions WHERE endpoint = ?', [s.endpoint])
+        }
+      }
+    }))
+  } catch (e) { console.error('Erro enviarPushParaUsuario:', e.message) }
+}
+
+async function enviarPushParaEmail(email, titulo, corpo, url) {
+  if (!email) return
+  try {
+    const [[u]] = await pool.query('SELECT id FROM usuarios WHERE email = ?', [email])
+    if (u) await enviarPushParaUsuario(u.id, titulo, corpo, url)
+  } catch (e) { console.error('Erro enviarPushParaEmail:', e.message) }
+}
+
+
 const EMAIL_TESTE = process.env.EMAIL_TESTE || 'pietrobonexport2@gmail.com'
 const MODO_TESTE = process.env.MODO_TESTE !== 'false'
 
@@ -820,11 +850,20 @@ app.get('/api/pendencias', autenticar(TODOS), async (req, res) => {
  const [[ped]] = await pool.query(`SELECT COUNT(*) as n FROM demandas WHERE status = 'pendente'`)
  const [[atr]] = await pool.query(`SELECT COUNT(*) as n FROM compras WHERE status <> 'recebido' AND data_prevista IS NOT NULL AND data_prevista < CURDATE()`)
  res.json({
- estoqueNaoDeclarado: decl.length,
- embarquesPendentes: emb.length,
- pedidosCompra: ped.n,
- comprasAtrasadas: atr.n
- })
+    const emailUsuario = (req.usuario.email || '').toLowerCase()
+    const EMAILS_T = ['export@pietrobon.com.br','export2@pietrobon.com.br','joaoantonio@pietrobon.com.br','auxiliarexp@pietrobon.com.br']
+    let tarefasPendentes = 0
+    if (EMAILS_T.includes(emailUsuario)) {
+      const [[tp]] = await pool.query("SELECT COUNT(*) as n FROM tarefas WHERE responsavel = ? AND coluna IN ('a_fazer','em_progresso')", [emailUsuario])
+      tarefasPendentes = tp.n
+    }
+    res.json({
+      estoqueNaoDeclarado: decl.length,
+      embarquesPendentes: emb.length,
+      pedidosCompra: ped.n,
+      comprasAtrasadas: atr.n,
+      tarefasPendentes
+    })
  } catch (e) {
  res.json({ estoqueNaoDeclarado: 0, embarquesPendentes: 0, pedidosCompra: 0, comprasAtrasadas: 0 })
  }
@@ -2089,25 +2128,13 @@ async function inicializarTarefas() {
       criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`)
-  } catch (e) {
-    console.error('Erro ao criar tabela tarefas:', e.message)
-  }
-
-  try {
-    const [[existe]] = await pool.query(
-      'SELECT id FROM usuarios WHERE email = ?',
-      ['auxiliarexp@pietrobon.com.br']
+    const hash = await bcrypt.hash('exp123', 10)
+    await pool.query(
+      'INSERT IGNORE INTO usuarios (email, senha, nome, papel) VALUES (?, ?, ?, ?)',
+      ['auxiliarexp@pietrobon.com.br', hash, 'Auxiliar Exportação', 'auxiliar']
     )
-    if (!existe) {
-      const hash = await bcrypt.hash('exp123', 10)
-      await pool.query(
-        'INSERT INTO usuarios (nome, email, senha, papel) VALUES (?, ?, ?, ?)',
-        ['Auxiliar Exportação', 'auxiliarexp@pietrobon.com.br', hash, 'auxiliar']
-      )
-      console.log('Usuário auxiliarexp criado com sucesso.')
-    }
   } catch (e) {
-    console.error('Erro ao criar usuário auxiliar:', e.message)
+    console.error('Erro ao inicializar Tarefas:', e.message)
   }
 }
 setTimeout(inicializarTarefas, 3000)
@@ -2130,6 +2157,9 @@ app.post('/api/tarefas', autenticarTarefas(), async (req, res) => {
       [titulo, descricao || null, coluna || 'a_fazer', prioridade || 'normal', responsavel || null, prazo || null, req.usuario.email]
     )
     const [[nova]] = await pool.query('SELECT * FROM tarefas WHERE id = ?', [r.insertId])
+    if (responsavel) {
+      enviarPushParaEmail(responsavel, '📋 Nova tarefa atribuída a você', titulo, '/HTML/tarefas/tarefas.html').catch(() => {})
+    }
     res.json(nova)
   } catch (e) {
     res.status(500).json({ erro: e.message })
@@ -2138,6 +2168,7 @@ app.post('/api/tarefas', autenticarTarefas(), async (req, res) => {
 
 app.patch('/api/tarefas/:id', autenticarTarefas(), async (req, res) => {
   try {
+    const [[antes]] = await pool.query('SELECT responsavel, titulo FROM tarefas WHERE id = ?', [req.params.id])
     const { titulo, descricao, coluna, prioridade, responsavel, prazo, ordem } = req.body
     const campos = []
     const vals = []
@@ -2152,6 +2183,10 @@ app.patch('/api/tarefas/:id', autenticarTarefas(), async (req, res) => {
     vals.push(req.params.id)
     await pool.query(`UPDATE tarefas SET ${campos.join(', ')} WHERE id = ?`, vals)
     const [[atualizada]] = await pool.query('SELECT * FROM tarefas WHERE id = ?', [req.params.id])
+    if (responsavel !== undefined && responsavel && antes && responsavel !== antes.responsavel) {
+      const nomeTarefa = titulo || (antes && antes.titulo) || 'Tarefa'
+      enviarPushParaEmail(responsavel, '📋 Tarefa atribuída a você', nomeTarefa, '/HTML/tarefas/tarefas.html').catch(() => {})
+    }
     res.json(atualizada)
   } catch (e) {
     res.status(500).json({ erro: e.message })
@@ -2166,6 +2201,27 @@ app.delete('/api/tarefas/:id', autenticarTarefas(), async (req, res) => {
     res.status(500).json({ erro: e.message })
   }
 })
+
+
+async function verificarPrazosTarefas() {
+  try {
+    const hoje  = new Date().toISOString().slice(0, 10)
+    const amanha = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+    const [rows] = await pool.query(
+      "SELECT id, titulo, prazo, responsavel FROM tarefas WHERE prazo IN (?,?) AND coluna != 'concluido' AND responsavel IS NOT NULL AND responsavel != ''",
+      [hoje, amanha]
+    )
+    for (const t of rows) {
+      const prazoStr = String(t.prazo).slice(0, 10)
+      const chave = `tarefa_prazo_${t.id}_${prazoStr}`
+      if (!(await podeEnviarHoje(chave))) continue
+      const label = prazoStr === hoje ? 'vence hoje!' : 'vence amanhã'
+      await enviarPushParaEmail(t.responsavel, `⏰ Tarefa ${label}`, t.titulo, '/HTML/tarefas/tarefas.html')
+    }
+  } catch (e) { console.error('Erro verificarPrazosTarefas:', e.message) }
+}
+setInterval(verificarPrazosTarefas, 60 * 60 * 1000)
+setTimeout(verificarPrazosTarefas, 20000)
 
 
 app.get('*', (req, res) => {
