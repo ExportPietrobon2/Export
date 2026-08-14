@@ -8,23 +8,46 @@ import {
   seloPrazoDeclaracaoPiHtml, seloPrazoDeclaracaoHtml
 } from '/JS/core/alertas.js'
 
-const containerPis = document.getElementById('container-pis')
+const containerPis   = document.getElementById('container-pis')
 const toggleConcluidas = document.getElementById('toggle-concluidas')
-const pisExpandidas = new Set()
+const pisExpandidas  = new Set()
+const paisesAbertos  = new Set()
+const anosAbertos    = new Set()
+let pedidosCache     = []
+let primeiraVez      = true
 
-const ROTULO_INSUMO = {
-  embalagem: 'Embalagem',
-  rotulo: 'Rótulo',
-  caixa: 'Caixa',
-  etiqueta: 'Etiqueta'
+// ── Agrupamento ────────────────────────────────────────────────
+function extrarAno(d) { if (!d) return 'Sem data'; return String(new Date(String(d).slice(0,10)+'T00:00:00').getFullYear()) }
+function agruparPorPaisEAno(pedidos) {
+  const g = {}
+  for (const p of pedidos) {
+    const pais = (p.destino||'').trim()||'Sem destino'
+    const ano  = extrarAno(p.data_cadastro)
+    if (!g[pais]) g[pais] = {}
+    if (!g[pais][ano]) g[pais][ano] = []
+    g[pais][ano].push(p)
+  }
+  return g
+}
+function inicGrupos(grupos) {
+  if (!primeiraVez) return
+  primeiraVez = false
+  const anoAtual = String(new Date().getFullYear())
+  Object.entries(grupos).forEach(([pais, anos]) => {
+    paisesAbertos.add(pais)
+    const lista = Object.keys(anos).sort((a,b)=>Number(b)-Number(a))
+    const abrir = lista.includes(anoAtual) ? anoAtual : lista[0]
+    if (abrir) anosAbertos.add(pais+'|||'+abrir)
+  })
 }
 
-function calcularStatusGeral(pedido) {
-  const produtos = pedido.produtos_pi || []
-  if (produtos.length === 0) return 'SEM PRODUTOS'
-  return produtos.some((p) => calcularStatusProduto(p.insumos_produto || []) === 'NÃO PRODUZ')
-    ? 'NÃO PRODUZ'
-    : 'LIBERADO'
+window.toggleGrupoPais = function(pais) {
+  if (paisesAbertos.has(pais)) paisesAbertos.delete(pais); else paisesAbertos.add(pais)
+  renderizarPis(pedidosCache)
+}
+window.toggleGrupoAno = function(chave) {
+  if (anosAbertos.has(chave)) anosAbertos.delete(chave); else anosAbertos.add(chave)
+  renderizarPis(pedidosCache)
 }
 
 async function concluirPi(piId, jaConcluida, btn) {
@@ -34,6 +57,147 @@ async function concluirPi(piId, jaConcluida, btn) {
   await api.pedidos.concluir(piId, !jaConcluida)
   carregar()
 }
+
+
+function construirCard(pedido) {
+  const status = calcularStatusGeral(pedido)
+  const liberado = status === 'LIBERADO'
+  const naoProducao = status === 'NÃO PRODUZ'
+  const totalRecebimentos = (pedido.recebimentos_b2 || []).length
+  const qtdRecebidos = (pedido.recebimentos_b2 || []).filter((r) => r.status_recebimento === 'recebido').length
+  const qtdVinculos = (pedido.vinculos_estoque || []).length
+
+  const emAlerta = piEmAlerta(pedido)
+  const naoDeclarada = piNaoDeclarada(pedido)
+  const expandido = pisExpandidas.has(String(pedido.id))
+
+  const card = document.createElement('div')
+  card.className = [
+    'card card-pi-admin mb-3',
+    pedido.concluida ? 'pi-concluida' : '',
+    (!pedido.concluida && liberado) ? 'card-ok' : '',
+    emAlerta ? 'card-alerta-embarque' : '',
+    naoDeclarada ? 'card-alerta-declaracao' : ''
+  ].filter(Boolean).join(' ')
+
+  if (emAlerta) {
+    const banner = document.createElement('div')
+    banner.innerHTML = bannerAlertaHtml(pedido)
+    card.appendChild(banner.firstElementChild)
+  }
+
+  if (naoDeclarada) {
+    const banner = document.createElement('div')
+    banner.innerHTML = bannerDeclaracaoHtml(pedido)
+    card.appendChild(banner.firstElementChild)
+  }
+
+  const cabecalho = document.createElement('div')
+  cabecalho.className = 'card-body d-flex justify-content-between align-items-start flex-wrap gap-2'
+  cabecalho.innerHTML = `
+    <div>
+      <div class="fw-bold fs-6">PI ${pedido.numero_pi}</div>
+      <div class="text-muted small">
+        ${pedido.cliente || ''}
+        ${pedido.destino ? '· ' + pedido.destino : ''}
+        ${pedido.data_cadastro ? '· Cadastro ' + new Date(String(pedido.data_cadastro).slice(0, 10) + 'T00:00:00').toLocaleDateString('pt-BR') : ''}
+        ${pedido.data_embarque ? '· Embarque ' + new Date(String(pedido.data_embarque).slice(0, 10) + 'T00:00:00').toLocaleDateString('pt-BR') : ''}
+      </div>
+      <div class="mt-1 d-flex align-items-center gap-2 flex-wrap">
+        <span class="badge ${liberado ? 'bg-success' : naoProducao ? 'bg-danger' : 'bg-secondary'}">${status}</span>
+        ${seloPrazoDeclaracaoPiHtml(pedido)}
+        ${totalRecebimentos > 0 ? `<span class="small text-muted">Receb. PI: ${qtdRecebidos}/${totalRecebimentos}</span>` : ''}
+        ${qtdVinculos > 0 ? `<span class="small text-muted">${qtdVinculos} vínculo(s)</span>` : ''}
+      </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <button class="btn btn-sm btn-outline-danger btn-expandir" data-id="${pedido.id}">
+        ${expandido ? 'Fechar ▴' : 'Ver detalhes ▾'}
+      </button>
+      ${!window._somente_leitura ? `
+        <button class="btn btn-sm ${pedido.concluida ? 'btn-outline-warning' : 'btn-outline-success'} btn-concluir"
+          data-id="${pedido.id}" data-concluida="${pedido.concluida ? 'true' : 'false'}">
+          ${pedido.concluida ? 'Reabrir' : 'Concluir'}
+        </button>` : ''}
+    </div>`
+
+  const detalhe = document.createElement('div')
+  detalhe.id = `detalhe-${pedido.id}`
+  detalhe.style.display = expandido ? 'block' : 'none'
+  detalhe.className = 'border-top px-3 pb-3'
+
+  const secaoAlmox = document.createElement('div')
+  secaoAlmox.className = 'mt-3'
+  secaoAlmox.innerHTML = `
+    <div class="secao-titulo-card mb-2">Insumos por Produto (Almoxarifado)</div>
+    ${gerarHtmlInsumosProduto(pedido.produtos_pi)}`
+
+  const secaoEstoque = document.createElement('div')
+  secaoEstoque.className = 'mt-3'
+  secaoEstoque.innerHTML = `
+    <div class="secao-titulo-card mb-2">Estoque Geral Vinculado</div>
+    ${gerarHtmlVinculosEstoque(pedido.vinculos_estoque)}`
+
+  const secaoB2 = document.createElement('div')
+  secaoB2.className = 'mt-3'
+  secaoB2.innerHTML = `
+    <div class="secao-titulo-card mb-2">Recebimentos B2 por PI</div>
+    ${gerarHtmlRecebimentosB2(pedido.recebimentos_b2)}`
+
+  if (!window._somente_leitura) {
+    const secaoComentario = document.createElement('div')
+    secaoComentario.className = 'mt-3'
+    secaoComentario.innerHTML = `
+      <div class="secao-titulo-card mb-2">Cobrar data de embarque</div>
+      <div class="input-group input-group-sm">
+        <input type="text" class="form-control campo-cobranca-embarque" data-id="${pedido.id}"
+          placeholder="Ex.: Favor informar a data de embarque desta PI"
+          value="${(pedido.comentario_embarque || '').replace(/"/g, '&quot;')}">
+        <button class="btn btn-outline-primary" onclick="salvarCobrancaEmbarque(${pedido.id})">Enviar</button>
+      </div>
+      ${pedido.comentario_embarque ? `
+        <div class="alert alert-primary mt-2 mb-0 py-2 small">
+          <strong>Comentário de:</strong> ${pedido.comentario_usuario || 'Admin'}<br>
+          ${pedido.comentario_embarque}
+        </div>` : ''}`
+    detalhe.appendChild(secaoComentario)
+  }
+
+  detalhe.appendChild(secaoAlmox)
+  detalhe.appendChild(secaoEstoque)
+  detalhe.appendChild(secaoB2)
+
+  card.appendChild(cabecalho)
+  card.appendChild(detalhe)
+  return card
+}
+
+window.salvarCobrancaEmbarque = async function (id) {
+  const input = document.querySelector(`.campo-cobranca-embarque[data-id="${id}"]`)
+  if (!input) return
+
+  const btn = input.nextElementSibling
+  const texto = input.value.trim()
+  const textoOriginal = btn.textContent
+
+  btn.disabled = true
+  btn.textContent = '...'
+
+  const resultado = await api.pedidos.comentarioEmbarque(id, texto)
+
+  btn.disabled = false
+
+  if (resultado?.erro) {
+    btn.textContent = textoOriginal
+    alert('Erro ao enviar o comentário.')
+    return
+  }
+
+  btn.textContent = 'Enviado'
+  setTimeout(() => { btn.textContent = textoOriginal }, 2000)
+}
+
+
 
 function gerarHtmlInsumosProduto(produtos) {
   if (!produtos || produtos.length === 0) {
@@ -338,6 +502,87 @@ window.salvarCobrancaEmbarque = async function (id) {
   setTimeout(() => { btn.textContent = textoOriginal }, 2000)
 }
 
+
+
+// ── Renderização com agrupamento ───────────────────────────────
+function renderizarPis(pedidos) {
+  containerPis.innerHTML = ''
+
+  const alertaEmbarque = resumoAlertasHtml(pedidos)
+  if (alertaEmbarque) containerPis.insertAdjacentHTML('beforeend', alertaEmbarque)
+  const alertaDeclaracao = resumoDeclaracaoHtml(pedidos)
+  if (alertaDeclaracao) containerPis.insertAdjacentHTML('beforeend', alertaDeclaracao)
+
+  if (!pedidos.length) {
+    const vazio = document.createElement('p')
+    vazio.className = 'text-muted fst-italic'; vazio.textContent = 'Nenhuma PI cadastrada.'
+    containerPis.appendChild(vazio); return
+  }
+
+  const grupos = agruparPorPaisEAno(pedidos)
+  inicGrupos(grupos)
+
+  const wrap = document.createElement('div')
+  wrap.className = 'pi-grupos-wrap'
+
+  const paises = Object.keys(grupos).sort((a,b) => {
+    if (a === 'Sem destino') return 1; if (b === 'Sem destino') return -1
+    return a.localeCompare(b, 'pt-BR')
+  })
+
+  for (const pais of paises) {
+    const anosGrupo = grupos[pais]
+    const totalPais = Object.values(anosGrupo).flat().length
+    const abertoPais = paisesAbertos.has(pais)
+
+    const paisDiv = document.createElement('div')
+    paisDiv.className = 'pais-grupo' + (abertoPais ? ' pais-aberto' : '')
+
+    const btn = document.createElement('button')
+    btn.className = 'pais-cabecalho'
+    btn.onclick = () => window.toggleGrupoPais(pais)
+    btn.innerHTML = `<span class="pais-chevron">${abertoPais ? '▼' : '▶'}</span>
+      <span class="pais-nome">${pais}</span>
+      <div class="pais-badges"><span class="pais-qtd">${totalPais} PI${totalPais>1?'s':''}</span></div>`
+    paisDiv.appendChild(btn)
+
+    if (abertoPais) {
+      const paisCorpo = document.createElement('div')
+      paisCorpo.className = 'pais-corpo'
+
+      const anos = Object.keys(anosGrupo).sort((a,b) => Number(b)-Number(a))
+      for (const ano of anos) {
+        const chave = pais + '|||' + ano
+        const aberto = anosAbertos.has(chave)
+        const pisDdoAno = anosGrupo[ano]
+
+        const anoDiv = document.createElement('div')
+        anoDiv.className = 'ano-grupo' + (aberto ? ' ano-aberto' : '')
+
+        const anoBtn = document.createElement('button')
+        anoBtn.className = 'ano-cabecalho'
+        anoBtn.onclick = () => window.toggleGrupoAno(chave)
+        anoBtn.innerHTML = `<span class="ano-chevron">${aberto ? '▼' : '▶'}</span>
+          <span class="ano-label">${ano}</span>
+          <span class="ano-qtd">${pisDdoAno.length} PI${pisDdoAno.length>1?'s':''}</span>`
+        anoDiv.appendChild(anoBtn)
+
+        if (aberto) {
+          const anoCorpo = document.createElement('div')
+          anoCorpo.className = 'ano-corpo'
+          pisDdoAno.forEach(p => anoCorpo.appendChild(construirCard(p)))
+          anoDiv.appendChild(anoCorpo)
+        }
+        paisCorpo.appendChild(anoDiv)
+      }
+      paisDiv.appendChild(paisCorpo)
+    }
+    wrap.appendChild(paisDiv)
+  }
+  containerPis.appendChild(wrap)
+}
+
+// ── Carregamento de dados ──────────────────────────────────────
 async function carregar() {
   const incluirConcluidas = toggleConcluidas.checked
   containerPis.innerHTML = '<p class="text-muted">Carregando...</p>'
@@ -350,43 +595,23 @@ async function carregar() {
 
   const ativas = pedidos.filter((p) => !p.concluida).length
   const concluidas = pedidos.filter((p) => p.concluida).length
-
-  document.getElementById('numero-liberados').textContent =
-    pedidos.filter((p) => calcularStatusGeral(p) === 'LIBERADO' && !p.concluida).length
-  document.getElementById('numero-bloqueados').textContent =
-    pedidos.filter((p) => calcularStatusGeral(p) === 'NÃO PRODUZ' && !p.concluida).length
+  document.getElementById('numero-liberados').textContent = pedidos.filter((p) => calcularStatusGeral(p) === 'LIBERADO' && !p.concluida).length
+  document.getElementById('numero-bloqueados').textContent = pedidos.filter((p) => calcularStatusGeral(p) === 'NÃO PRODUZ' && !p.concluida).length
   document.getElementById('numero-total').textContent = ativas
   document.getElementById('numero-concluidas').textContent = concluidas
 
-  containerPis.innerHTML = ''
-
-  const alertaEmbarque = resumoAlertasHtml(pedidos)
-  if (alertaEmbarque) containerPis.insertAdjacentHTML('beforeend', alertaEmbarque)
-
-  const alertaDeclaracao = resumoDeclaracaoHtml(pedidos)
-  if (alertaDeclaracao) containerPis.insertAdjacentHTML('beforeend', alertaDeclaracao)
+  pedidosCache = pedidos
 
   const entradas = await api.estoque.historico()
+  containerPis.innerHTML = ''
   if (entradas && entradas.length) {
     const cardEntradas = document.createElement('div')
     cardEntradas.className = 'card border-0 shadow-sm mb-4'
-    cardEntradas.innerHTML = `
-      <div class="card-body">
-        <div class="secao-titulo-card mb-3">Entradas no Depósito B2</div>
-        ${gerarHtmlEntradasB2(entradas)}
-      </div>`
+    cardEntradas.innerHTML = `<div class="card-body"><div class="secao-titulo-card mb-3">Entradas no Depósito B2</div>${gerarHtmlEntradasB2(entradas)}</div>`
     containerPis.appendChild(cardEntradas)
   }
 
-  if (!pedidos.length) {
-    const vazio = document.createElement('p')
-    vazio.className = 'text-muted fst-italic'
-    vazio.textContent = 'Nenhuma PI cadastrada.'
-    containerPis.appendChild(vazio)
-    return
-  }
-
-  pedidos.forEach((pedido) => containerPis.appendChild(construirCard(pedido)))
+  renderizarPis(pedidos)
 }
 
 containerPis.addEventListener('click', (e) => {
@@ -395,29 +620,19 @@ containerPis.addEventListener('click', (e) => {
     const id = btnExpandir.dataset.id
     const detalhe = document.getElementById(`detalhe-${id}`)
     if (!detalhe) return
-
     const expandido = detalhe.style.display !== 'none'
     detalhe.style.display = expandido ? 'none' : 'block'
     btnExpandir.textContent = expandido ? 'Ver detalhes ▾' : 'Fechar ▴'
-
-    if (expandido) pisExpandidas.delete(String(id))
-    else pisExpandidas.add(String(id))
+    if (expandido) pisExpandidas.delete(String(id)); else pisExpandidas.add(String(id))
     return
   }
-
   const btnConcluir = e.target.closest('.btn-concluir')
-  if (btnConcluir) {
-    concluirPi(btnConcluir.dataset.id, btnConcluir.dataset.concluida === 'true', btnConcluir)
-  }
+  if (btnConcluir) concluirPi(btnConcluir.dataset.id, btnConcluir.dataset.concluida === 'true', btnConcluir)
 })
 
 toggleConcluidas.addEventListener('change', carregar)
-
 setInterval(carregar, 5 * 60 * 1000)
-
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') carregar()
-})
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') carregar() })
 
 async function iniciar() {
   const perfil = exigirPapel('todos')
