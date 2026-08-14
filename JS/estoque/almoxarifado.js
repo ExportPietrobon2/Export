@@ -12,6 +12,8 @@ let podeResponderPedido = false
 const containerConteudo = document.getElementById('conteudo-pi')
 let todosPedidosList = []
 let piSelecionadaId = null
+const paisesAbertosSel = new Set()
+const anosAbertosSel   = new Set()
 
 function calcularLiberado(insumos, rotulos, quantidade) {
  const emb = Number(insumos.embalagem && insumos.embalagem.sobra || 0)
@@ -60,42 +62,91 @@ async function carregarPedidos() {
   renderizarSeletorPi(pedidos, '')
 }
 
+function extrarAnoSel(d) {
+  if (!d) return 'Sem data'
+  return String(new Date(String(d).slice(0, 10) + 'T00:00:00').getFullYear())
+}
+
+window.toggleSelPais = function(pais) {
+  if (paisesAbertosSel.has(pais)) paisesAbertosSel.delete(pais)
+  else paisesAbertosSel.add(pais)
+  renderizarSeletorPi(todosPedidosList, (document.getElementById('busca-pi')?.value || '').toLowerCase())
+}
+
+window.toggleSelAno = function(chave) {
+  if (anosAbertosSel.has(chave)) anosAbertosSel.delete(chave)
+  else anosAbertosSel.add(chave)
+  renderizarSeletorPi(todosPedidosList, (document.getElementById('busca-pi')?.value || '').toLowerCase())
+}
+
 function renderizarSeletorPi(pedidos, busca) {
   const container = document.getElementById('lista-pi-chips')
   if (!container) return
+
   const filtrados = busca
     ? pedidos.filter(p =>
         String(p.numero_pi).toLowerCase().includes(busca) ||
         (p.cliente || '').toLowerCase().includes(busca) ||
         (p.destino || '').toLowerCase().includes(busca))
     : pedidos
+
   if (!filtrados.length) {
     container.innerHTML = '<p class="text-muted small py-2">Nenhuma PI encontrada.</p>'
     return
   }
+
   const grupos = {}
   filtrados.forEach(p => {
     const pais = (p.destino || 'Sem destino').trim()
-    if (!grupos[pais]) grupos[pais] = []
-    grupos[pais].push(p)
+    const ano  = extrarAnoSel(p.data_cadastro)
+    if (!grupos[pais]) grupos[pais] = {}
+    if (!grupos[pais][ano]) grupos[pais][ano] = []
+    grupos[pais][ano].push(p)
   })
+
   const paises = Object.keys(grupos).sort((a, b) => {
     if (a === 'Sem destino') return 1; if (b === 'Sem destino') return -1
     return a.localeCompare(b, 'pt-BR')
   })
-  container.innerHTML = paises.map(pais => `
-    <div class="pi-grupo-chips">
-      <div class="pi-grupo-label">${pais}</div>
-      <div class="pi-chips-row">
-        ${grupos[pais].map(p => `
-          <button class="pi-chip${p.id == piSelecionadaId ? ' pi-chip-ativo' : ''}"
-            onclick="selecionarPi(${p.id})"
-            data-pi-id="${p.id}">
-            <span class="pi-chip-numero">PI ${p.numero_pi}</span>
-            ${p.cliente ? `<span class="pi-chip-cliente">${p.cliente}</span>` : ''}
-          </button>`).join('')}
-      </div>
-    </div>`).join('')
+
+  container.innerHTML = paises.map(pais => {
+    const abertoPais = paisesAbertosSel.has(pais)
+    const totalPais  = Object.values(grupos[pais]).flat().length
+
+    const anos = Object.keys(grupos[pais]).sort((a, b) => Number(b) - Number(a))
+    const anosHtml = anos.map(ano => {
+      const chave = pais + '|||' + ano
+      const abertoAno = anosAbertosSel.has(chave)
+      const pisDdoAno = grupos[pais][ano]
+
+      const chipsHtml = pisDdoAno.map(p => `
+        <button class="pi-chip${p.id == piSelecionadaId ? ' pi-chip-ativo' : ''}"
+          onclick="selecionarPi(${p.id})" data-pi-id="${p.id}">
+          <span class="pi-chip-numero">PI ${p.numero_pi}</span>
+          ${p.cliente ? `<span class="pi-chip-cliente">${p.cliente}</span>` : ''}
+        </button>`).join('')
+
+      return `
+        <div class="sel-ano-grupo">
+          <button class="sel-ano-header" onclick="toggleSelAno('${chave.replace(/'/g, "\'")}')">
+            <span class="sel-chevron">${abertoAno ? '▼' : '▶'}</span>
+            <span class="sel-ano-label">${ano}</span>
+            <span class="sel-ano-qtd">${pisDdoAno.length} PI${pisDdoAno.length > 1 ? 's' : ''}</span>
+          </button>
+          ${abertoAno ? `<div class="pi-chips-row">${chipsHtml}</div>` : ''}
+        </div>`
+    }).join('')
+
+    return `
+      <div class="pi-grupo-chips">
+        <button class="sel-pais-header" onclick="toggleSelPais('${pais.replace(/'/g, "\'")}')">
+          <span class="sel-chevron">${abertoPais ? '▼' : '▶'}</span>
+          <span class="pi-grupo-label mb-0">${pais}</span>
+          <span class="sel-ano-qtd">${totalPais} PI${totalPais > 1 ? 's' : ''}</span>
+        </button>
+        ${abertoPais ? `<div class="sel-pais-corpo">${anosHtml}</div>` : ''}
+      </div>`
+  }).join('')
 }
 
 window.selecionarPi = function(id) {
