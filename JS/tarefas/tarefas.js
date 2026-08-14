@@ -19,6 +19,7 @@ const COLUNAS = ['a_fazer', 'em_progresso', 'concluido']
 
 let tarefas = []
 let modalBS = null
+let emailAtual = ''
 
 async function requisitar(metodo, rota, corpo) {
   const token = sessionStorage.getItem('token') || localStorage.getItem('token_deposito')
@@ -45,6 +46,39 @@ async function carregarTarefas() {
   }
 }
 
+function agruparPorUsuario(items) {
+  const filtroAtivo = document.getElementById('filtro-responsavel')?.value || ''
+  if (filtroAtivo) return [{ email: filtroAtivo, items }]
+
+  const grupos = []
+  const ordem = [emailAtual, ...EMAILS_TAREFAS.filter(e => e !== emailAtual)]
+
+  for (const email of ordem) {
+    const doUsuario = items.filter(t => (t.responsavel || '').toLowerCase() === email)
+    if (doUsuario.length) grupos.push({ email, items: doUsuario })
+  }
+
+  const semDono = items.filter(t => !t.responsavel || !NOMES[t.responsavel])
+  if (semDono.length) grupos.push({ email: null, items: semDono })
+
+  return grupos
+}
+
+function cabecalhoGrupoHtml(email) {
+  if (!email) {
+    return `<div class="grupo-header"><span class="grupo-avatar" style="background:#94a3b8">—</span><span class="grupo-nome">Sem responsável</span></div>`
+  }
+  const u = NOMES[email]
+  if (!u) return ''
+  const isVoce = email === emailAtual
+  const label = isVoce ? `${u.nome} <span class="grupo-voce">você</span>` : u.nome
+  const corAvatar = isVoce ? 'linear-gradient(110deg,#E8313A,#F0503A)' : '#64748b'
+  return `<div class="grupo-header${isVoce ? ' grupo-header-voce' : ''}">
+    <span class="grupo-avatar" style="background:${corAvatar}">${u.iniciais}</span>
+    <span class="grupo-nome">${label}</span>
+  </div>`
+}
+
 window.renderizarBoard = function() {
   const busca = (document.getElementById('busca')?.value || '').toLowerCase()
   const filtroResp = document.getElementById('filtro-responsavel')?.value || ''
@@ -62,6 +96,7 @@ window.renderizarBoard = function() {
     const badge = document.getElementById(`badge-${col}`)
     const items = filtradas.filter((t) => t.coluna === col)
     badge.textContent = items.length
+
     if (!items.length) {
       cont.innerHTML = `<div class="empty-coluna">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 12h8M12 8v8"/></svg>
@@ -69,7 +104,17 @@ window.renderizarBoard = function() {
       </div>`
       return
     }
-    cont.innerHTML = items.map(cardHtml).join('')
+
+    const grupos = agruparPorUsuario(items)
+    const mostrarCabecalho = grupos.length > 1 || !filtroResp
+
+    cont.innerHTML = grupos.map(g => `
+      <div class="grupo-section">
+        ${mostrarCabecalho ? cabecalhoGrupoHtml(g.email) : ''}
+        <div class="grupo-cards">${g.items.map(cardHtml).join('')}</div>
+      </div>
+    `).join('')
+
     items.forEach((t) => setupCardDrag(t.id))
   })
 
@@ -77,9 +122,7 @@ window.renderizarBoard = function() {
 }
 
 function cardHtml(t) {
-  const u = NOMES[t.responsavel]
   const prazoHtml = t.prazo ? chipPrazo(t.prazo) : ''
-  const chipResp = u ? `<span class="chip-usuario"><span class="avatar-mini">${u.iniciais}</span>${u.nome}</span>` : ''
   const concluida = t.coluna === 'concluido' ? 'concluida' : ''
   const setasHtml = setas(t)
 
@@ -96,7 +139,6 @@ function cardHtml(t) {
     <div class="card-rodape">
       <div class="card-meta">
         <span class="chip-prioridade chip-${t.prioridade}">${labelPrioridade(t.prioridade)}</span>
-        ${chipResp}
         ${prazoHtml}
       </div>
       <div style="display:flex;gap:4px;">${setasHtml}</div>
@@ -117,7 +159,6 @@ function setas(t) {
 
 function chipPrazo(prazoStr) {
   const hoje = new Date().toISOString().slice(0, 10)
-  const amanha = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
   let cls = 'chip-prazo'
   if (prazoStr < hoje) cls += ' vencido'
   else if (prazoStr === hoje) cls += ' hoje'
@@ -134,7 +175,7 @@ function labelColuna(c) {
 }
 
 function escHtml(str) {
-  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
 function setupCardDrag(id) {
@@ -210,7 +251,6 @@ window.salvarTarefa = async function() {
 
   btn.disabled = false
   btn.textContent = 'Salvar'
-
   if (res?.erro) { alert(res.erro); return }
 
   modalBS?.hide()
@@ -234,6 +274,7 @@ async function iniciar() {
     document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:Inter,sans-serif;color:#64748b;">Acesso restrito.</div>'
     return
   }
+  emailAtual = (perfil.email || '').toLowerCase()
   montarCabecalho(perfil.papel)
   document.getElementById('modal-tarefa').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') salvarTarefa()
