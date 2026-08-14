@@ -13,6 +13,111 @@ const anosAbertos   = new Set()
 let pedidosCache    = []
 let primeiraVez     = true
 
+function prontaParaProduzir(pedido) {
+ const produtos = pedido.produtos_pi || []
+ if (produtos.length === 0) return false
+ return produtos.every((p) => calcularStatusProduto(p.insumos_produto || []) === 'LIBERADO')
+}
+
+function dataParaInput(valor) {
+ if (!valor) return ''
+ return String(valor).slice(0, 10)
+}
+
+let podeEditarEmbarque = false
+
+
+function renderAlmoxarifado(produtos) {
+ if (!produtos || produtos.length === 0) {
+ return '<p class="text-muted fst-italic small">Nenhum produto cadastrado.</p>'
+ }
+ return produtos.map((produto) => {
+ const insumos = produto.insumos_produto || []
+ const status = calcularStatusProduto(insumos)
+ const liberado = status === 'LIBERADO'
+
+ const linhasInsumos = insumos.map((insumo) => {
+ let detalhes = ''
+ if (insumo.tipo === 'caixa') {
+ const sobra = Number(insumo.sobra) || 0
+ const necessario = Number(produto.quantidade) || 0
+ const suf = sobra >= necessario
+ detalhes = `Sobra: ${sobra} cx · ${suf
+ ? `<span class="texto-ok">✔ Suficiente (+${sobra - necessario} cx)</span>`
+ : `<span class="texto-erro">✗ Faltam ${necessario - sobra} cx</span>`}`
+ } else if (insumo.tipo === 'etiqueta') {
+ const sobra = Number(insumo.sobra) || 0
+ detalhes = sobra === 0
+ ? '<span class="texto-erro">✗ Sem estoque</span>'
+ : sobra < 100 ? `<span class="texto-alerta">⚠ Baixo (${sobra} un)</span>`
+ : `${sobra} unidades`
+ } else {
+ const sobra = Number(insumo.sobra) || 0
+ const pacotes = Number(insumo.quantidade_por_pacote) || 0
+ detalhes = `Sobra: ${sobra} kg${pacotes > 0 ? ` · ${pacotes} pacotes` : ''}`
+ }
+ const nomeInsumo = insumo.tipo === 'rotulo' ? ('Rótulo' + (insumo.nome ? ' – ' + insumo.nome : '')) : (rotuloInsumo[insumo.tipo] || insumo.tipo)
+ return `<tr><td>${nomeInsumo}</td><td>${insumo.confirmado ? '✔' : '✗'}</td><td>${detalhes}</td></tr>`
+ }).join('')
+
+ return `
+ <div class="card border-0 bg-light rounded-3 p-3 mb-2"><div class="d-flex align-items-center gap-2 flex-wrap mb-2"><strong>${produto.produto}</strong><span class="badge bg-secondary">${formatarQuantidade(produto.quantidade)}</span><span class="badge ${liberado ? 'bg-success' : 'bg-danger'}">${status}</span></div>
+ ${insumos.length > 0
+ ? `<table class="table table-sm table-bordered mb-0 tabela-insumos-admin"><thead><tr><th>Insumo</th><th>OK</th><th>Estoque</th></tr></thead><tbody>${linhasInsumos}</tbody></table>`
+ : '<p class="text-muted small mb-0 fst-italic">Sem dados do almoxarifado.</p>'}
+ ${produto.observacoes ? `<div class="small text-muted mt-2">${produto.observacoes}</div>` : ''}
+ </div>`
+ }).join('')
+}
+
+function renderVinculosEstoque(vinculos) {
+ if (!vinculos || vinculos.length === 0) {
+ return '<p class="text-muted fst-italic small">Nenhum insumo do estoque geral vinculado a esta PI.</p>'
+ }
+ return vinculos.map((v) => {
+ const dataEntrada = new Date(v.entrada_data).toLocaleString('pt-BR')
+ const dataVinculo = new Date(v.criado_em).toLocaleString('pt-BR')
+ return `
+ <div class="border rounded-3 p-3 mb-2 bg-light"><div class="d-flex justify-content-between flex-wrap gap-1 mb-1">
+ ${v.produto_entrada ? `<span class="fw-semibold small">${v.produto_entrada}</span>` : '<span class="text-muted small">Produto não informado</span>'}
+ <span class="small text-muted">Vinculado em ${dataVinculo}</span></div><div class="d-flex gap-2 flex-wrap mb-1">
+ ${v.embalagem_kg > 0 ? `<span class="badge bg-primary">${v.embalagem_kg} kg emb.</span>` : ''}
+ ${v.rotulo_kg > 0 ? `<span class="badge bg-info text-dark">${v.rotulo_kg} kg rót.</span>` : ''}
+ ${v.pallet_caixas > 0 ? `<span class="badge bg-secondary">${v.pallet_caixas} pallet(s)</span>` : ''}
+ </div>
+ ${v.entrada_localizacao ? `<div class="small mb-1"><span class="fw-semibold">${v.entrada_localizacao}</span></div>` : ''}
+ <div class="small text-muted">Entrada do B2: ${dataEntrada}</div></div>`
+ }).join('')
+}
+
+function renderRecebimentosB2(recebimentos) {
+ if (!recebimentos || recebimentos.length === 0) {
+ return '<p class="text-muted small fst-italic">Nenhum recebimento por PI registrado.</p>'
+ }
+ const porProduto = {}
+ recebimentos.forEach((r) => {
+ const chave = r.nome_produto || 'Geral'
+ if (!porProduto[chave]) porProduto[chave] = []
+ porProduto[chave].push(r)
+ })
+ return Object.entries(porProduto).map(([nomeProduto, itens]) => {
+ const linhas = itens.map((r) => {
+ const recebido = r.status_recebimento === 'recebido'
+ const fotos = [
+ r.foto_url ? `<a href="${r.foto_url}" target="_blank"><img src="${r.foto_url}" class="foto-detalhe-img rounded-2 me-1"></a>` : '',
+ r.foto_nota_url ? `<a href="${r.foto_nota_url}" target="_blank"><img src="${r.foto_nota_url}" class="foto-detalhe-img rounded-2"></a>` : ''
+ ].filter(Boolean).join('')
+ return `<div class="d-flex align-items-start gap-2 flex-wrap mb-1"><span class="badge ${recebido ? 'bg-success' : 'bg-danger'}" style="min-width:90px;text-align:center">${rotuloInsumo[r.tipo] || r.tipo}</span>
+ ${recebido && r.quantidade_recebida ? `<span class="badge bg-light text-dark border">${r.quantidade_recebida}</span>` : ''}
+ ${!recebido ? '<span class="text-muted small">Pendente</span>' : ''}
+ ${fotos ? `<div class="d-flex">${fotos}</div>` : ''}
+ </div>`
+ }).join('')
+ return `<div class="mb-2"><div class="small fw-bold text-secondary mb-1">• ${nomeProduto}</div><div class="ps-2">${linhas}</div></div>`
+ }).join('<hr class="my-2">')
+}
+
+
 // ── Agrupamento ────────────────────────────────────────────────
 function extrarAno(d) { if (!d) return 'Sem data'; return String(new Date(String(d).slice(0,10)+'T00:00:00').getFullYear()) }
 function agruparPorPaisEAno(pedidos) {
