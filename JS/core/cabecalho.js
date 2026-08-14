@@ -3,6 +3,14 @@ import { api } from '/JS/core/api.js'
 import { iniciarChat } from '/JS/core/chat.js'
 import { iniciarToast } from '/JS/core/toast.js'
 
+
+const EMAILS_TAREFAS = [
+  'export@pietrobon.com.br',
+  'export2@pietrobon.com.br',
+  'joaoantonio@pietrobon.com.br',
+  'auxiliarexp@pietrobon.com.br'
+]
+
 const EMAILS_FINANCEIRO = [
   'export2@pietrobon.com.br',
   'export@pietrobon.com.br',
@@ -89,6 +97,7 @@ export function montarCabecalho(papel) {
   const perfil = getPerfil()
   const emailAtual = perfil ? (perfil.email || '').toLowerCase() : ''
   const temAcessoFinanceiro = EMAILS_FINANCEIRO.includes(emailAtual)
+  const temAcessoTarefas = EMAILS_TAREFAS.includes(emailAtual)
   const temAcessoChecklist = [
     'export2@pietrobon.com.br',
     'export@pietrobon.com.br'
@@ -122,6 +131,14 @@ export function montarCabecalho(papel) {
         { href: '/HTML/financeiro/exp-contabil.html', texto: 'Fechamento Contabil' },
         { href: '/HTML/financeiro/financeiro.html', texto: 'Importações' },
         { href: '/HTML/financeiro/conferencia-nfse.html', texto: 'Conferência NFS-e', quando: temAcessoFinanceiro },
+      ]
+    }
+    ,
+    {
+      titulo: 'Tarefas Exportação',
+      quando: temAcessoTarefas,
+      itens: [
+        { href: '/HTML/tarefas/tarefas.html', texto: 'Quadro de Tarefas' }
       ]
     }
   ]

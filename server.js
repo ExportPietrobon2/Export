@@ -185,7 +185,7 @@ function autenticar(papeis) {
  }
 }
 
-const TODOS = ['admin', 'almoxarifado', 'deposito', 'convidado', 'gerente_producao', 'compras', 'compras_aromas']
+const TODOS = ['admin', 'almoxarifado', 'deposito', 'convidado', 'gerente_producao', 'compras', 'compras_aromas', 'auxiliar']
 
 
 app.get('/api/push/vapid-public', (req, res) => res.json({ key: VAPID_PUBLIC }))
@@ -2048,6 +2048,112 @@ ${textoNfse.slice(0, 4000)}`
 })
 
 
+
+
+const EMAILS_TAREFAS = [
+  'export@pietrobon.com.br',
+  'export2@pietrobon.com.br',
+  'joaoantonio@pietrobon.com.br',
+  'auxiliarexp@pietrobon.com.br'
+]
+
+function autenticarTarefas() {
+  return (req, res, next) => {
+    const token = (req.headers.authorization || '').split(' ')[1]
+    if (!token) return res.status(401).json({ erro: 'Não autenticado.' })
+    try {
+      const decoded = require('jsonwebtoken').verify(token, process.env.JWT_SECRET)
+      if (!EMAILS_TAREFAS.includes((decoded.email || '').toLowerCase())) {
+        return res.status(403).json({ erro: 'Acesso restrito a Tarefas Exportação.' })
+      }
+      req.usuario = decoded
+      next()
+    } catch {
+      return res.status(401).json({ erro: 'Token inválido.' })
+    }
+  }
+}
+
+async function inicializarTarefas() {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS tarefas (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      titulo VARCHAR(255) NOT NULL,
+      descricao TEXT,
+      coluna ENUM('a_fazer','em_progresso','concluido') DEFAULT 'a_fazer',
+      prioridade ENUM('baixa','normal','alta','urgente') DEFAULT 'normal',
+      responsavel VARCHAR(100),
+      criado_por VARCHAR(100),
+      prazo DATE,
+      ordem INT DEFAULT 0,
+      criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`)
+    const hash = await bcrypt.hash('exp123', 10)
+    await pool.query(
+      'INSERT IGNORE INTO usuarios (email, senha, nome, papel) VALUES (?, ?, ?, ?)',
+      ['auxiliarexp@pietrobon.com.br', hash, 'Auxiliar Exportação', 'auxiliar']
+    )
+  } catch (e) {
+    console.error('Erro ao inicializar Tarefas:', e.message)
+  }
+}
+setTimeout(inicializarTarefas, 3000)
+
+app.get('/api/tarefas', autenticarTarefas(), async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM tarefas ORDER BY coluna, ordem, criado_em DESC')
+    res.json(rows)
+  } catch (e) {
+    res.status(500).json({ erro: e.message })
+  }
+})
+
+app.post('/api/tarefas', autenticarTarefas(), async (req, res) => {
+  try {
+    const { titulo, descricao, coluna, prioridade, responsavel, prazo } = req.body
+    if (!titulo) return res.status(400).json({ erro: 'Título obrigatório.' })
+    const [r] = await pool.query(
+      'INSERT INTO tarefas (titulo, descricao, coluna, prioridade, responsavel, prazo, criado_por) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [titulo, descricao || null, coluna || 'a_fazer', prioridade || 'normal', responsavel || null, prazo || null, req.usuario.email]
+    )
+    const [[nova]] = await pool.query('SELECT * FROM tarefas WHERE id = ?', [r.insertId])
+    res.json(nova)
+  } catch (e) {
+    res.status(500).json({ erro: e.message })
+  }
+})
+
+app.patch('/api/tarefas/:id', autenticarTarefas(), async (req, res) => {
+  try {
+    const { titulo, descricao, coluna, prioridade, responsavel, prazo, ordem } = req.body
+    const campos = []
+    const vals = []
+    if (titulo !== undefined)      { campos.push('titulo = ?');      vals.push(titulo) }
+    if (descricao !== undefined)   { campos.push('descricao = ?');   vals.push(descricao) }
+    if (coluna !== undefined)      { campos.push('coluna = ?');      vals.push(coluna) }
+    if (prioridade !== undefined)  { campos.push('prioridade = ?');  vals.push(prioridade) }
+    if (responsavel !== undefined) { campos.push('responsavel = ?'); vals.push(responsavel) }
+    if (prazo !== undefined)       { campos.push('prazo = ?');       vals.push(prazo || null) }
+    if (ordem !== undefined)       { campos.push('ordem = ?');       vals.push(ordem) }
+    if (!campos.length) return res.status(400).json({ erro: 'Nada para atualizar.' })
+    vals.push(req.params.id)
+    await pool.query(`UPDATE tarefas SET ${campos.join(', ')} WHERE id = ?`, vals)
+    const [[atualizada]] = await pool.query('SELECT * FROM tarefas WHERE id = ?', [req.params.id])
+    res.json(atualizada)
+  } catch (e) {
+    res.status(500).json({ erro: e.message })
+  }
+})
+
+app.delete('/api/tarefas/:id', autenticarTarefas(), async (req, res) => {
+  try {
+    await pool.query('DELETE FROM tarefas WHERE id = ?', [req.params.id])
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(500).json({ erro: e.message })
+  }
+})
 
 
 app.get('*', (req, res) => {

@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pietrobon - Tarefas Exportação</title>
+  <link rel="manifest" href="/manifest.json">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/CSS/style.css">
+  <style>
+    /* ── Board layout ─────────────────────── */
+    .board-wrap {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .board-wrap { grid-template-columns: 1fr; }
+    }
+
+    /* ── Coluna ───────────────────────────── */
+    .col-kanban {
+      background: #f0f2f7;
+      border-radius: 16px;
+      padding: 0 0 12px 0;
+      min-height: 200px;
+    }
+    .col-kanban.drag-over {
+      outline: 2px dashed var(--red);
+      outline-offset: -2px;
+    }
+    .col-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 10px;
+      border-radius: 16px 16px 0 0;
+    }
+    .col-header-a_fazer     { background: #e2e8f0; }
+    .col-header-em_progresso{ background: #dbeafe; }
+    .col-header-concluido   { background: #dcfce7; }
+
+    .col-titulo {
+      font-size: .82rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .col-titulo-a_fazer     { color: #475569; }
+    .col-titulo-em_progresso{ color: #1d4ed8; }
+    .col-titulo-concluido   { color: #15803d; }
+
+    .col-badge {
+      font-size: .72rem;
+      font-weight: 700;
+      border-radius: 999px;
+      padding: 2px 9px;
+    }
+    .col-badge-a_fazer     { background: #cbd5e1; color: #334155; }
+    .col-badge-em_progresso{ background: #bfdbfe; color: #1e40af; }
+    .col-badge-concluido   { background: #bbf7d0; color: #166534; }
+
+    .col-cards {
+      padding: 10px 10px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn-nova-tarefa {
+      margin: 10px 10px 0;
+      width: calc(100% - 20px);
+      background: rgba(255,255,255,.7);
+      border: 1.5px dashed #c0cad8;
+      border-radius: 10px;
+      padding: 9px;
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn-nova-tarefa:hover {
+      background: #fff;
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    /* ── Card ─────────────────────────────── */
+    .tarefa-card {
+      background: #fff;
+      border: 1px solid #e4e7ef;
+      border-radius: 12px;
+      padding: 13px 14px 11px;
+      box-shadow: 0 1px 3px rgba(15,23,42,.06);
+      cursor: grab;
+      transition: box-shadow .18s, transform .18s;
+      border-left: 4px solid #cbd5e1;
+      position: relative;
+      user-select: none;
+    }
+    .tarefa-card:hover { box-shadow: 0 4px 16px rgba(15,23,42,.10); transform: translateY(-1px); }
+    .tarefa-card.dragging { opacity: .45; cursor: grabbing; }
+    .tarefa-card.concluida { opacity: .65; }
+    .tarefa-card.concluida .card-titulo { text-decoration: line-through; color: var(--muted); }
+
+    .prioridade-baixa   { border-left-color: #3b82f6; }
+    .prioridade-normal  { border-left-color: #94a3b8; }
+    .prioridade-alta    { border-left-color: #f59332; }
+    .prioridade-urgente { border-left-color: #E8313A; }
+
+    .card-topo {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .card-titulo {
+      font-size: .875rem;
+      font-weight: 700;
+      color: #1c2230;
+      line-height: 1.4;
+      flex: 1;
+    }
+
+    .card-desc {
+      font-size: .78rem;
+      color: #64748b;
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .card-rodape {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .chip-prioridade {
+      font-size: .68rem;
+      font-weight: 700;
+      border-radius: 999px;
+      padding: 2px 8px;
+    }
+    .chip-baixa   { background: #eff6ff; color: #1d4ed8; }
+    .chip-normal  { background: #f1f5f9; color: #475569; }
+    .chip-alta    { background: #fff8f0; color: #c2680a; }
+    .chip-urgente { background: #fef2f2; color: #b91c1c; }
+
+    .chip-usuario {
+      font-size: .72rem;
+      font-weight: 700;
+      background: #f1f5f9;
+      color: #475569;
+      border-radius: 999px;
+      padding: 3px 9px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .avatar-mini {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--brand-grad);
+      color: #fff;
+      font-size: .6rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .chip-prazo {
+      font-size: .72rem;
+      font-weight: 600;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .chip-prazo.vencido { color: #b91c1c; font-weight: 700; }
+    .chip-prazo.hoje    { color: #c2680a; font-weight: 700; }
+
+    .card-acoes {
+      display: flex;
+      gap: 4px;
+      opacity: 0;
+      transition: opacity .15s;
+    }
+    .tarefa-card:hover .card-acoes { opacity: 1; }
+
+    .btn-card {
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 7px;
+      background: #f1f5f9;
+      color: #64748b;
+      font-size: .8rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .12s;
+    }
+    .btn-card:hover { background: #e2e8f0; color: #1c2230; }
+    .btn-card.excluir:hover { background: #fef2f2; color: #b91c1c; }
+
+    /* ── Filtros ──────────────────────────── */
+    .filtros-bar {
+      background: #fff;
+      border: 1px solid #e4e7ef;
+      border-radius: 14px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      box-shadow: 0 1px 3px rgba(15,23,42,.05);
+    }
+
+    .input-busca {
+      flex: 1;
+      min-width: 180px;
+      border: 1px solid #e4e7ef;
+      border-radius: 9px;
+      padding: 7px 12px;
+      font-size: .875rem;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+      font-family: 'Inter', system-ui, sans-serif;
+      color: #1c2230;
+    }
+    .input-busca:focus {
+      border-color: var(--red);
+      box-shadow: 0 0 0 3px rgba(232,49,58,.10);
+    }
+
+    .filtro-select {
+      border: 1px solid #e4e7ef;
+      border-radius: 9px;
+      padding: 7px 30px 7px 10px;
+      font-size: .82rem;
+      font-weight: 600;
+      color: #475569;
+      background: #f8fafc;
+      outline: none;
+      cursor: pointer;
+      font-family: 'Inter', system-ui, sans-serif;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2394a3b8'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      transition: border-color .15s;
+    }
+    .filtro-select:focus { border-color: var(--red); }
+
+    /* ── Modal ────────────────────────────── */
+    .modal-content {
+      border: none;
+      border-radius: 18px;
+      box-shadow: 0 20px 60px rgba(15,23,42,.18);
+    }
+    .modal-header {
+      border-bottom: 1px solid #f0f2f7;
+      padding: 20px 24px 14px;
+    }
+    .modal-body  { padding: 20px 24px; }
+    .modal-footer {
+      border-top: 1px solid #f0f2f7;
+      padding: 14px 24px 20px;
+    }
+
+    /* ── Empty state ──────────────────────── */
+    .empty-coluna {
+      text-align: center;
+      padding: 28px 16px;
+      color: #94a3b8;
+      font-size: .8rem;
+    }
+    .empty-coluna svg { opacity: .35; margin-bottom: 8px; }
+  </style>
+</head>
+<body data-pagina="tarefas.html">
+  <div id="cabecalho"></div>
+
+  <div class="container py-4">
+    <div class="page-header">
+      <div class="page-header-icon"></div>
+      <div class="page-header-texto">
+        <h1 class="page-titulo">Tarefas Exportação</h1>
+        <p class="page-subtitulo">Quadro de tarefas da equipe de exportação</p>
+      </div>
+      <button class="btn btn-pietrobon ms-auto" onclick="abrirModal()">+ Nova Tarefa</button>
+    </div>
+
+    <div class="filtros-bar">
+      <input class="input-busca" type="text" id="busca" placeholder="🔍  Buscar tarefa..." oninput="renderizarBoard()">
+      <select class="filtro-select" id="filtro-responsavel" onchange="renderizarBoard()">
+        <option value="">Todos os responsáveis</option>
+        <option value="export@pietrobon.com.br">Export</option>
+        <option value="export2@pietrobon.com.br">Export 2</option>
+        <option value="joaoantonio@pietrobon.com.br">João</option>
+        <option value="auxiliarexp@pietrobon.com.br">Auxiliar</option>
+      </select>
+      <select class="filtro-select" id="filtro-prioridade" onchange="renderizarBoard()">
+        <option value="">Todas as prioridades</option>
+        <option value="urgente">Urgente</option>
+        <option value="alta">Alta</option>
+        <option value="normal">Normal</option>
+        <option value="baixa">Baixa</option>
+      </select>
+    </div>
+
+    <div class="board-wrap" id="board">
+      <div class="col-kanban" id="col-a_fazer" data-coluna="a_fazer">
+        <div class="col-header col-header-a_fazer">
+          <span class="col-titulo col-titulo-a_fazer">A Fazer</span>
+          <span class="col-badge col-badge-a_fazer" id="badge-a_fazer">0</span>
+        </div>
+        <div class="col-cards" id="cards-a_fazer"></div>
+        <button class="btn-nova-tarefa" onclick="abrirModal(null,'a_fazer')">＋ Adicionar tarefa</button>
+      </div>
+
+      <div class="col-kanban" id="col-em_progresso" data-coluna="em_progresso">
+        <div class="col-header col-header-em_progresso">
+          <span class="col-titulo col-titulo-em_progresso">Em Progresso</span>
+          <span class="col-badge col-badge-em_progresso" id="badge-em_progresso">0</span>
+        </div>
+        <div class="col-cards" id="cards-em_progresso"></div>
+        <button class="btn-nova-tarefa" onclick="abrirModal(null,'em_progresso')">＋ Adicionar tarefa</button>
+      </div>
+
+      <div class="col-kanban" id="col-concluido" data-coluna="concluido">
+        <div class="col-header col-header-concluido">
+          <span class="col-titulo col-titulo-concluido">Concluído</span>
+          <span class="col-badge col-badge-concluido" id="badge-concluido">0</span>
+        </div>
+        <div class="col-cards" id="cards-concluido"></div>
+        <button class="btn-nova-tarefa" onclick="abrirModal(null,'concluido')">＋ Adicionar tarefa</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal criar/editar -->
+  <div class="modal fade" id="modal-tarefa" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-800" id="modal-titulo-label">Nova Tarefa</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="modal-id">
+          <div class="mb-3">
+            <label class="form-label">Título <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="modal-titulo" placeholder="O que precisa ser feito?">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Descrição</label>
+            <textarea class="form-control" id="modal-descricao" rows="3" placeholder="Detalhes opcionais..."></textarea>
+          </div>
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label">Prioridade</label>
+              <select class="form-select" id="modal-prioridade">
+                <option value="baixa">🔵 Baixa</option>
+                <option value="normal" selected>⚪ Normal</option>
+                <option value="alta">🟠 Alta</option>
+                <option value="urgente">🔴 Urgente</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Coluna</label>
+              <select class="form-select" id="modal-coluna">
+                <option value="a_fazer">A Fazer</option>
+                <option value="em_progresso">Em Progresso</option>
+                <option value="concluido">Concluído</option>
+              </select>
+            </div>
+          </div>
+          <div class="row g-3 mt-0">
+            <div class="col-6">
+              <label class="form-label">Responsável</label>
+              <select class="form-select" id="modal-responsavel">
+                <option value="">Sem responsável</option>
+                <option value="export@pietrobon.com.br">Export</option>
+                <option value="export2@pietrobon.com.br">Export 2</option>
+                <option value="joaoantonio@pietrobon.com.br">João</option>
+                <option value="auxiliarexp@pietrobon.com.br">Auxiliar</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Prazo</label>
+              <input type="date" class="form-control" id="modal-prazo">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-pietrobon" id="btn-salvar-tarefa" onclick="salvarTarefa()">Salvar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script type="module" src="/JS/tarefas/tarefas.js"></script>
+</body>
+</html>
