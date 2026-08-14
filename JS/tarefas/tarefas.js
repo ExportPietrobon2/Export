@@ -1,5 +1,5 @@
 import { montarCabecalho } from '/JS/core/cabecalho.js'
-import { getPerfil, verificarLogin } from '/JS/core/auth.js'
+import { getPerfil, exigirPapel } from '/JS/core/auth.js'
 
 const EMAILS_TAREFAS = [
   'export@pietrobon.com.br',
@@ -21,7 +21,7 @@ let tarefas = []
 let modalBS = null
 
 async function requisitar(metodo, rota, corpo) {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+  const token = sessionStorage.getItem('token') || localStorage.getItem('token_deposito')
   const opts = {
     method: metodo,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
@@ -228,9 +228,9 @@ window.excluirTarefa = async function(id) {
 }
 
 async function iniciar() {
-  verificarLogin()
-  const perfil = getPerfil()
-  if (!perfil || !EMAILS_TAREFAS.includes((perfil.email || '').toLowerCase())) {
+  const perfil = exigirPapel('todos')
+  if (!perfil) return
+  if (!EMAILS_TAREFAS.includes((perfil.email || '').toLowerCase())) {
     document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:Inter,sans-serif;color:#64748b;">Acesso restrito.</div>'
     return
   }

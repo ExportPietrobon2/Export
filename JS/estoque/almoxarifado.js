@@ -273,7 +273,8 @@ function atualizarResultado(input) {
 }
 
 function atualizarIndicador(produtoId) {
- const quantidade = Number(btn?.dataset.quantidade) || 0
+  const btnSalvar = containerConteudo.querySelector(`.btn-salvar-produto[data-produto="${produtoId}"]`)
+  const quantidade = Number(btnSalvar?.dataset.quantidade) || 0
  const insumosAtuais = {}
  ;['embalagem', 'caixa'].forEach((chave) => {
  const inputSobra = containerConteudo.querySelector(`input[data-produto="${produtoId}"][data-campo="sobra"][data-tipo="${chave}"]`)
@@ -323,6 +324,7 @@ async function salvarProduto(produtoId, quantidade) {
  const form = document.getElementById(`form-produto-${produtoId}`)
  const btnExpandir = containerConteudo.querySelector(`.btn-expandir-produto[data-id="${produtoId}"]`)
 
+ if (btn) btn.disabled = false
  btn.textContent = 'Salvo!'
  btn.style.background = 'var(--green-ok)'
  setTimeout(() => {

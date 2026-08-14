@@ -2062,7 +2062,7 @@ function autenticarTarefas() {
     const token = (req.headers.authorization || '').split(' ')[1]
     if (!token) return res.status(401).json({ erro: 'Não autenticado.' })
     try {
-      const decoded = require('jsonwebtoken').verify(token, process.env.JWT_SECRET)
+      const decoded = jwt.verify(token, JWT_SECRET)
       if (!EMAILS_TAREFAS.includes((decoded.email || '').toLowerCase())) {
         return res.status(403).json({ erro: 'Acesso restrito a Tarefas Exportação.' })
       }

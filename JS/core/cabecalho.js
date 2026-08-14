@@ -60,7 +60,7 @@ async function registrarNotificacaoPush() {
       applicationServerKey: chaveVapid
     })
 
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token_deposito')
     await fetch('/api/push/subscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
