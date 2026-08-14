@@ -8,7 +8,8 @@ const paginaPorPapel = {
   convidado: '/HTML/producao/admin.html',
   gerente_producao: '/HTML/estoque/embarques.html',
   compras: '/HTML/estoque/compras.html',
-  compras_aromas: '/HTML/estoque/compras.html'
+  compras_aromas: '/HTML/estoque/compras.html',
+  auxiliar: '/HTML/tarefas/tarefas.html'
 }
 
 function redirecionarSeJaLogado() {
