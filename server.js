@@ -1192,7 +1192,6 @@ app.post('/api/chat', autenticar(TODOS), async (req, res) => {
  const historico = Array.isArray(req.body.historico) ? req.body.historico.slice(-10) : []
  if (!mensagem.trim()) return res.json({ resposta: 'Digite uma mensagem.' })
 
- const instrucao = PAPEL_INSTRUCOES[papel] || PAPEL_INSTRUCOES.convidado
   const instrucao = PAPEL_INSTRUCOES[papel] || PAPEL_INSTRUCOES.convidado
   const emailUsuario = req.usuario.email || ''
   const contexto = await montarContexto(papel, emailUsuario)
