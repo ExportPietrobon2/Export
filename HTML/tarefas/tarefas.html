@@ -10,85 +10,110 @@
   <style>
     /* ── Board layout ─────────────────────── */
     .board-wrap {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      display: flex;
+      flex-direction: row;
       gap: 18px;
-      align-items: start;
-    }
-    @media (max-width: 900px) {
-      .board-wrap { grid-template-columns: 1fr; }
+      align-items: flex-start;
+      overflow-x: auto;
+      padding-bottom: 16px;
+      min-height: 400px;
     }
 
-    /* ── Coluna ───────────────────────────── */
-    .col-kanban {
+    /* ── Coluna por usuário ───────────────── */
+    .col-usuario {
+      flex: 0 0 280px;
       background: #f0f2f7;
       border-radius: 16px;
-      padding: 0 0 12px 0;
-      min-height: 200px;
+      display: flex;
+      flex-direction: column;
+      min-height: 180px;
     }
-    .col-kanban.drag-over {
+    .col-usuario.drag-over {
       outline: 2px dashed var(--red);
       outline-offset: -2px;
     }
-    .col-header {
+
+    .col-usuario-header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 10px;
       padding: 14px 16px 10px;
       border-radius: 16px 16px 0 0;
+      background: #e2e8f0;
     }
-    .col-header-a_fazer     { background: #e2e8f0; }
-    .col-header-em_progresso{ background: #dbeafe; }
-    .col-header-concluido   { background: #dcfce7; }
+    .col-header-voce { background: #fde8e8; }
 
-    .col-titulo {
-      font-size: .82rem;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-    }
-    .col-titulo-a_fazer     { color: #475569; }
-    .col-titulo-em_progresso{ color: #1d4ed8; }
-    .col-titulo-concluido   { color: #15803d; }
-
-    .col-badge {
+    .col-usuario-avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      color: #fff;
       font-size: .72rem;
-      font-weight: 700;
-      border-radius: 999px;
-      padding: 2px 9px;
-    }
-    .col-badge-a_fazer     { background: #cbd5e1; color: #334155; }
-    .col-badge-em_progresso{ background: #bfdbfe; color: #1e40af; }
-    .col-badge-concluido   { background: #bbf7d0; color: #166534; }
-
-    .col-cards {
-      padding: 10px 10px 0;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .btn-nova-tarefa {
-      margin: 10px 10px 0;
-      width: calc(100% - 20px);
-      background: rgba(255,255,255,.7);
-      border: 1.5px dashed #c0cad8;
-      border-radius: 10px;
-      padding: 9px;
-      font-size: .82rem;
-      font-weight: 600;
-      color: var(--muted);
-      cursor: pointer;
-      transition: all .15s;
+      font-weight: 800;
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .col-usuario-nome {
+      flex: 1;
+      font-size: .82rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: #334155;
+      display: flex;
+      align-items: center;
       gap: 6px;
     }
-    .btn-nova-tarefa:hover {
-      background: #fff;
-      border-color: var(--red);
-      color: var(--red);
+
+    .col-usuario-badge {
+      font-size: .72rem;
+      font-weight: 700;
+      background: rgba(0,0,0,.12);
+      color: #334155;
+      border-radius: 999px;
+      padding: 2px 9px;
+      min-width: 24px;
+      text-align: center;
+    }
+
+    .col-usuario-body {
+      padding: 10px 10px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      flex: 1;
+    }
+
+    /* ── Grupos de status dentro da coluna ── */
+    .status-grupo { margin-bottom: 8px; }
+
+    .status-divider {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: .7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      padding: 6px 2px 4px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .status-count {
+      margin-left: auto;
+      background: rgba(0,0,0,.08);
+      border-radius: 999px;
+      padding: 1px 7px;
+      font-size: .65rem;
     }
 
     /* ── Card ─────────────────────────────── */
@@ -101,7 +126,7 @@
       cursor: grab;
       transition: box-shadow .18s, transform .18s;
       border-left: 4px solid #cbd5e1;
-      position: relative;
+      margin-bottom: 8px;
       user-select: none;
     }
     .tarefa-card:hover { box-shadow: 0 4px 16px rgba(15,23,42,.10); transform: translateY(-1px); }
@@ -121,7 +146,6 @@
       gap: 8px;
       margin-bottom: 6px;
     }
-
     .card-titulo {
       font-size: .875rem;
       font-weight: 700;
@@ -129,7 +153,6 @@
       line-height: 1.4;
       flex: 1;
     }
-
     .card-desc {
       font-size: .78rem;
       color: #64748b;
@@ -140,7 +163,6 @@
       overflow: hidden;
       margin-bottom: 10px;
     }
-
     .card-rodape {
       display: flex;
       align-items: center;
@@ -148,86 +170,48 @@
       gap: 8px;
       flex-wrap: wrap;
     }
+    .card-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
-    .card-meta {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-
-    .chip-prioridade {
-      font-size: .68rem;
-      font-weight: 700;
-      border-radius: 999px;
-      padding: 2px 8px;
-    }
+    .chip-prioridade { font-size: .68rem; font-weight: 700; border-radius: 999px; padding: 2px 8px; }
     .chip-baixa   { background: #eff6ff; color: #1d4ed8; }
     .chip-normal  { background: #f1f5f9; color: #475569; }
     .chip-alta    { background: #fff8f0; color: #c2680a; }
     .chip-urgente { background: #fef2f2; color: #b91c1c; }
 
-    .chip-usuario {
-      font-size: .72rem;
-      font-weight: 700;
-      background: #f1f5f9;
-      color: #475569;
-      border-radius: 999px;
-      padding: 3px 9px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .avatar-mini {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: var(--brand-grad);
-      color: #fff;
-      font-size: .6rem;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .chip-prazo {
-      font-size: .72rem;
-      font-weight: 600;
-      color: #64748b;
-      display: flex;
-      align-items: center;
-      gap: 3px;
-    }
+    .chip-prazo { font-size: .72rem; font-weight: 600; color: #64748b; }
     .chip-prazo.vencido { color: #b91c1c; font-weight: 700; }
     .chip-prazo.hoje    { color: #c2680a; font-weight: 700; }
 
-    .card-acoes {
-      display: flex;
-      gap: 4px;
-      opacity: 0;
-      transition: opacity .15s;
-    }
+    .card-acoes { display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
     .tarefa-card:hover .card-acoes { opacity: 1; }
-
     .btn-card {
-      width: 28px;
-      height: 28px;
-      border: none;
-      border-radius: 7px;
-      background: #f1f5f9;
-      color: #64748b;
-      font-size: .8rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      width: 28px; height: 28px; border: none; border-radius: 7px;
+      background: #f1f5f9; color: #64748b; font-size: .8rem;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
       transition: all .12s;
     }
     .btn-card:hover { background: #e2e8f0; color: #1c2230; }
     .btn-card.excluir:hover { background: #fef2f2; color: #b91c1c; }
+
+    /* ── Botão adicionar ──────────────────── */
+    .btn-nova-tarefa {
+      margin: 6px 0 10px;
+      width: 100%;
+      background: rgba(255,255,255,.7);
+      border: 1.5px dashed #c0cad8;
+      border-radius: 10px;
+      padding: 9px;
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn-nova-tarefa:hover { background: #fff; border-color: var(--red); color: var(--red); }
 
     /* ── Filtros ──────────────────────────── */
     .filtros-bar {
@@ -242,144 +226,49 @@
       flex-wrap: wrap;
       box-shadow: 0 1px 3px rgba(15,23,42,.05);
     }
-
     .input-busca {
-      flex: 1;
-      min-width: 180px;
-      border: 1px solid #e4e7ef;
-      border-radius: 9px;
-      padding: 7px 12px;
-      font-size: .875rem;
-      outline: none;
+      flex: 1; min-width: 180px;
+      border: 1px solid #e4e7ef; border-radius: 9px;
+      padding: 7px 12px; font-size: .875rem; outline: none;
       transition: border-color .15s, box-shadow .15s;
-      font-family: 'Inter', system-ui, sans-serif;
-      color: #1c2230;
+      font-family: 'Inter', system-ui, sans-serif; color: #1c2230;
     }
-    .input-busca:focus {
-      border-color: var(--red);
-      box-shadow: 0 0 0 3px rgba(232,49,58,.10);
-    }
-
+    .input-busca:focus { border-color: var(--red); box-shadow: 0 0 0 3px rgba(232,49,58,.10); }
     .filtro-select {
-      border: 1px solid #e4e7ef;
-      border-radius: 9px;
-      padding: 7px 30px 7px 10px;
-      font-size: .82rem;
-      font-weight: 600;
-      color: #475569;
-      background: #f8fafc;
-      outline: none;
-      cursor: pointer;
-      font-family: 'Inter', system-ui, sans-serif;
-      appearance: none;
+      border: 1px solid #e4e7ef; border-radius: 9px;
+      padding: 7px 30px 7px 10px; font-size: .82rem; font-weight: 600;
+      color: #475569; background: #f8fafc; outline: none; cursor: pointer;
+      font-family: 'Inter', system-ui, sans-serif; appearance: none;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2394a3b8'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 10px center;
+      background-repeat: no-repeat; background-position: right 10px center;
       transition: border-color .15s;
     }
     .filtro-select:focus { border-color: var(--red); }
 
-    /* ── Modal ────────────────────────────── */
-    .modal-content {
-      border: none;
-      border-radius: 18px;
-      box-shadow: 0 20px 60px rgba(15,23,42,.18);
-    }
-    .modal-header {
-      border-bottom: 1px solid #f0f2f7;
-      padding: 20px 24px 14px;
-    }
-    .modal-body  { padding: 20px 24px; }
-    .modal-footer {
-      border-top: 1px solid #f0f2f7;
-      padding: 14px 24px 20px;
-    }
-
-    /* ── Empty state ──────────────────────── */
-    .empty-coluna {
-      text-align: center;
-      padding: 28px 16px;
-      color: #94a3b8;
-      font-size: .8rem;
-    }
-    .empty-coluna svg { opacity: .35; margin-bottom: 8px; }
-
-    /* ── Seções por usuário ───────────────── */
-    .grupo-section {
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-    }
-
-    .grupo-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 4px 6px;
-      margin-top: 4px;
-    }
-
-    .grupo-header:first-child {
-      margin-top: 0;
-      padding-top: 4px;
-    }
-
-    .grupo-header + .grupo-section .grupo-header {
-      border-top: 1px solid #e4e7ef;
-    }
-
-    .grupo-avatar {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      color: #fff;
-      font-size: .65rem;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .grupo-nome {
-      font-size: .75rem;
-      font-weight: 700;
-      color: #64748b;
-      text-transform: uppercase;
-      letter-spacing: .05em;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
+    /* ── Auxiliares ───────────────────────── */
     .grupo-voce {
-      font-size: .65rem;
-      background: rgba(232,49,58,.12);
-      color: #E8313A;
-      border-radius: 999px;
-      padding: 1px 7px;
-      font-weight: 700;
-      text-transform: none;
-      letter-spacing: 0;
+      font-size: .65rem; background: rgba(232,49,58,.12); color: #E8313A;
+      border-radius: 999px; padding: 1px 7px; font-weight: 700;
+      text-transform: none; letter-spacing: 0;
     }
-
-    .grupo-header-voce .grupo-nome {
-      color: #334155;
+    .empty-coluna {
+      text-align: center; padding: 28px 16px;
+      color: #94a3b8; font-size: .8rem;
     }
+    .empty-coluna svg { opacity: .35; margin-bottom: 8px; display: block; margin-inline: auto; }
 
-    .grupo-cards {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      padding-bottom: 6px;
-      border-bottom: 1px dashed #e4e7ef;
+    /* ── Modal ────────────────────────────── */
+    .modal-content { border: none; border-radius: 18px; box-shadow: 0 20px 60px rgba(15,23,42,.18); }
+    .modal-header  { border-bottom: 1px solid #f0f2f7; padding: 20px 24px 14px; }
+    .modal-body    { padding: 20px 24px; }
+    .modal-footer  { border-top: 1px solid #f0f2f7; padding: 14px 24px 20px; }
+
+    @media (max-width: 768px) {
+      .board-wrap { flex-direction: column; overflow-x: unset; }
+      .col-usuario { flex: 1 1 auto; width: 100%; }
     }
-
-    .grupo-section:last-child .grupo-cards {
-      border-bottom: none;
-    }
-
   </style>
+
 </head>
 <body data-pagina="tarefas.html">
   <div id="cabecalho"></div>
@@ -412,37 +301,9 @@
       </select>
     </div>
 
-    <div class="board-wrap" id="board">
-      <div class="col-kanban" id="col-a_fazer" data-coluna="a_fazer">
-        <div class="col-header col-header-a_fazer">
-          <span class="col-titulo col-titulo-a_fazer">A Fazer</span>
-          <span class="col-badge col-badge-a_fazer" id="badge-a_fazer">0</span>
-        </div>
-        <div class="col-cards" id="cards-a_fazer"></div>
-        <button class="btn-nova-tarefa" onclick="abrirModal(null,'a_fazer')">＋ Adicionar tarefa</button>
-      </div>
+    <div class="board-wrap" id="board"></div>
 
-      <div class="col-kanban" id="col-em_progresso" data-coluna="em_progresso">
-        <div class="col-header col-header-em_progresso">
-          <span class="col-titulo col-titulo-em_progresso">Em Progresso</span>
-          <span class="col-badge col-badge-em_progresso" id="badge-em_progresso">0</span>
-        </div>
-        <div class="col-cards" id="cards-em_progresso"></div>
-        <button class="btn-nova-tarefa" onclick="abrirModal(null,'em_progresso')">＋ Adicionar tarefa</button>
-      </div>
-
-      <div class="col-kanban" id="col-concluido" data-coluna="concluido">
-        <div class="col-header col-header-concluido">
-          <span class="col-titulo col-titulo-concluido">Concluído</span>
-          <span class="col-badge col-badge-concluido" id="badge-concluido">0</span>
-        </div>
-        <div class="col-cards" id="cards-concluido"></div>
-        <button class="btn-nova-tarefa" onclick="abrirModal(null,'concluido')">＋ Adicionar tarefa</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal criar/editar -->
+    <!-- Modal criar/editar -->
   <div class="modal fade" id="modal-tarefa" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
