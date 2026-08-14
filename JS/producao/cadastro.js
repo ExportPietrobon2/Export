@@ -27,13 +27,6 @@ function agruparPorPaisEAno(pedidos) {
 function inicGrupos(grupos) {
   if (!primeiraVez) return
   primeiraVez = false
-  const anoAtual = String(new Date().getFullYear())
-  Object.entries(grupos).forEach(([pais, anos]) => {
-    paisesAbertos.add(pais)
-    const lista = Object.keys(anos).sort((a,b)=>Number(b)-Number(a))
-    const abrir = lista.includes(anoAtual) ? anoAtual : lista[0]
-    if (abrir) anosAbertos.add(pais+'|||'+abrir)
-  })
 }
 window.toggleGrupoPais = function(pais) {
   if (paisesAbertos.has(pais)) paisesAbertos.delete(pais); else paisesAbertos.add(pais)
