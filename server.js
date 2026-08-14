@@ -66,36 +66,6 @@ async function enviarPush(titulo, corpo, url, chave) {
   } catch (e) { console.error('Erro enviarPush:', e.message) }
 }
 
-async function enviarPushParaUsuario(usuarioId, titulo, corpo, url) {
-  if (!usuarioId) return
-  try {
-    await garantirTabelaPush()
-    const [subs] = await pool.query(
-      'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE usuario_id = ?', [usuarioId]
-    )
-    if (!subs.length) return
-    const payload = JSON.stringify({ titulo, corpo, url: url || '/' })
-    await Promise.allSettled(subs.map(async (s) => {
-      try {
-        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload)
-      } catch (e) {
-        if (e.statusCode === 410 || e.statusCode === 404) {
-          await pool.query('DELETE FROM push_subscriptions WHERE endpoint = ?', [s.endpoint])
-        }
-      }
-    }))
-  } catch (e) { console.error('Erro enviarPushParaUsuario:', e.message) }
-}
-
-async function enviarPushParaEmail(email, titulo, corpo, url) {
-  if (!email) return
-  try {
-    const [[u]] = await pool.query('SELECT id FROM usuarios WHERE email = ?', [email])
-    if (u) await enviarPushParaUsuario(u.id, titulo, corpo, url)
-  } catch (e) { console.error('Erro enviarPushParaEmail:', e.message) }
-}
-
-
 const EMAIL_TESTE = process.env.EMAIL_TESTE || 'pietrobonexport2@gmail.com'
 const MODO_TESTE = process.env.MODO_TESTE !== 'false'
 
@@ -849,19 +819,11 @@ app.get('/api/pendencias', autenticar(TODOS), async (req, res) => {
  const [emb] = await pool.query(SQL_EMBARQUES_PENDENTES)
  const [[ped]] = await pool.query(`SELECT COUNT(*) as n FROM demandas WHERE status = 'pendente'`)
  const [[atr]] = await pool.query(`SELECT COUNT(*) as n FROM compras WHERE status <> 'recebido' AND data_prevista IS NOT NULL AND data_prevista < CURDATE()`)
- const emailUsuario = (req.usuario.email || '').toLowerCase()
- const EMAILS_T = ['export@pietrobon.com.br','export2@pietrobon.com.br','joaoantonio@pietrobon.com.br','auxiliarexp@pietrobon.com.br']
- let tarefasPendentes = 0
- if (EMAILS_T.includes(emailUsuario)) {
-  const [[tp]] = await pool.query("SELECT COUNT(*) as n FROM tarefas WHERE responsavel = ? AND coluna IN ('a_fazer','em_progresso')", [emailUsuario])
-  tarefasPendentes = tp.n
- }
  res.json({
-  estoqueNaoDeclarado: decl.length,
-  embarquesPendentes: emb.length,
-  pedidosCompra: ped.n,
-  comprasAtrasadas: atr.n,
-  tarefasPendentes
+ estoqueNaoDeclarado: decl.length,
+ embarquesPendentes: emb.length,
+ pedidosCompra: ped.n,
+ comprasAtrasadas: atr.n
  })
  } catch (e) {
  res.json({ estoqueNaoDeclarado: 0, embarquesPendentes: 0, pedidosCompra: 0, comprasAtrasadas: 0 })
@@ -1045,7 +1007,7 @@ app.get('/api/demandas', autenticar(TODOS), async (req, res) => {
  res.json(rows)
 })
 
-app.post('/api/demandas', autenticar(['admin', 'almoxarifado', 'auxiliar']), async (req, res) => {
+app.post('/api/demandas', autenticar(['admin', 'almoxarifado']), async (req, res) => {
  const { descricao, quantidade, unidade, pi_id, observacoes } = req.body
  const categoria = req.body.categoria === 'aromas' ? 'aromas' : 'gerais'
  if (!descricao) return res.status(400).json({ erro: 'Informe o que está faltando.' })
@@ -1096,7 +1058,7 @@ app.patch('/api/demandas/:id/status', autenticar(['admin', 'compras', 'compras_a
  res.json({ ok: true })
 })
 
-app.delete('/api/demandas/:id', autenticar(['admin', 'almoxarifado', 'auxiliar']), async (req, res) => {
+app.delete('/api/demandas/:id', autenticar(['admin', 'almoxarifado']), async (req, res) => {
  await pool.query('DELETE FROM demandas WHERE id = ?', [req.params.id])
  res.json({ ok: true })
 })
@@ -1106,60 +1068,118 @@ app.delete('/api/demandas/:id', autenticar(['admin', 'almoxarifado', 'auxiliar']
 // =============================================
 
 const PAPEL_INSTRUCOES = {
- admin: 'Você é o assistente geral do sistema "Pietrobon Controle de Insumos". Tem visão de todos os setores (almoxarifado, compras, aromas, produção/embarques e depósito B2). Ajude a entender pendências, cobrar prazos e resumir a situação.',
- almoxarifado: 'Você é o assistente do ALMOXARIFADO. Sua função é ajudar a declarar o estoque de insumos por PI (item por item), acompanhar o que ainda falta declarar e criar pedidos ao setor de compras quando faltar material.',
- compras: 'Você é o assistente do setor de COMPRAS (embalagens, caixas e rótulos). Ajude a acompanhar os pedidos do almoxarifado, os prazos de entrega das compras e o que está atrasado.',
- compras_aromas: 'Você é o assistente do comprador de AROMAS. Ajude a acompanhar os pedidos de aroma feitos pelo almoxarifado e o andamento das compras de aromas.',
- gerente_producao: 'Você é o assistente da PRODUÇÃO/EMBARQUES. Ajude a acompanhar as datas de embarque das PIs e as PIs que já estão prontas mas ainda sem data de embarque declarada.',
- deposito: 'Você é o assistente do DEPÓSITO B2. Ajude a acompanhar recebimentos e lançamentos de entrada no estoque B2.',
- convidado: 'Você é um assistente de consulta do sistema Pietrobon. Responda dúvidas gerais sobre os dados visíveis.'
+  admin: 'Você tem acesso total ao sistema — todos os setores, dados e funcionalidades.',
+  almoxarifado: 'Você é o assistente do almoxarifado com visão completa do sistema.',
+  compras: 'Você é o assistente de compras com visão completa do sistema.',
+  compras_aromas: 'Você é o assistente de aromas com visão completa do sistema.',
+  gerente_producao: 'Você é o assistente de produção/embarques com visão completa do sistema.',
+  deposito: 'Você é o assistente do depósito B2 com visão completa do sistema.',
+  auxiliar: 'Você é o assistente auxiliar de exportação com visão das tarefas e operações gerais.',
+  convidado: 'Você é um assistente de consulta do sistema Pietrobon.'
 }
 
-async function montarContexto(papel) {
- const partes = []
- try {
- // Visão geral das PIs abertas — disponível para todos os papéis
- const [pis] = await pool.query(`
- SELECT numero_pi, cliente, destino, data_cadastro, data_embarque
- FROM pedidos WHERE concluida = 0 ORDER BY numero_pi DESC LIMIT 60`)
- partes.push(`PIs ABERTAS (${pis.length}):\n` +
- (pis.length ? pis.map((p) => `- PI ${p.numero_pi} | ${p.cliente || 'sem cliente'} | ${p.destino || 'sem destino'}` +
- `${p.data_embarque ? ` | embarque ${new Date(p.data_embarque).toLocaleDateString('pt-BR')}` : ' | sem data de embarque'}`).join('\n') : 'Nenhuma PI aberta.'))
+async function montarContexto(papel, emailUsuario) {
+  const partes = []
+  try {
+    // 1. PIs abertas — todas as telas
+    const [pis] = await pool.query(`
+      SELECT p.numero_pi, p.cliente, p.destino, p.data_cadastro, p.data_embarque, p.concluida,
+        COUNT(DISTINCT pp.id) as qtd_produtos
+      FROM pedidos p
+      LEFT JOIN produtos_pi pp ON pp.pi_id = p.id
+      GROUP BY p.id ORDER BY p.numero_pi DESC LIMIT 80`)
+    const abertas   = pis.filter(p => !p.concluida)
+    const concluidas = pis.filter(p => p.concluida).length
+    partes.push(`PIs ABERTAS (${abertas.length}) | Concluídas: ${concluidas}:\n` +
+      (abertas.length ? abertas.map(p =>
+        `- PI ${p.numero_pi} | ${p.cliente||'sem cliente'} | ${p.destino||'sem destino'} | ${p.qtd_produtos} produto(s)` +
+        (p.data_embarque ? ` | embarque ${new Date(p.data_embarque).toLocaleDateString('pt-BR')}` : ' | sem data de embarque')
+      ).join('\n') : 'Nenhuma PI aberta.'))
 
- if (['admin', 'almoxarifado'].includes(papel)) {
- const [decl] = await pool.query(SQL_DECLARACAO_PENDENTE)
- partes.push(`ESTOQUE AINDA NÃO DECLARADO PELO ALMOXARIFADO (${decl.length} produto(s)):\n` +
- (decl.length ? decl.map((d) => `- PI ${d.numero_pi} (${d.cliente || 'sem cliente'}): ${d.produto}`).join('\n') : 'Nenhum pendente.'))
- }
- if (['admin', 'gerente_producao'].includes(papel)) {
- const [emb] = await pool.query(SQL_EMBARQUES_PENDENTES)
- partes.push(`PIs PRONTAS SEM DATA DE EMBARQUE (${emb.length}):\n` +
- (emb.length ? emb.map((e) => `- PI ${e.numero_pi} (${e.cliente || 'sem cliente'})`).join('\n') : 'Nenhuma pendente.'))
- }
- if (['admin', 'compras', 'compras_aromas'].includes(papel)) {
- let filtroCat = ''
- if (papel === 'compras') filtroCat = " AND categoria = 'gerais'"
- else if (papel === 'compras_aromas') filtroCat = " AND categoria = 'aromas'"
- const [dem] = await pool.query(
- `SELECT d.descricao, d.quantidade, d.unidade, d.categoria, d.status, p.numero_pi
- FROM demandas d LEFT JOIN pedidos p ON p.id = d.pi_id
- WHERE d.status = 'pendente'${filtroCat} ORDER BY d.criado_em DESC LIMIT 50`)
- partes.push(`PEDIDOS AO COMPRAS PENDENTES (${dem.length}):\n` +
- (dem.length ? dem.map((d) => `- [${d.categoria}] ${d.descricao}${d.quantidade > 0 ? ` (${d.quantidade} ${d.unidade || ''})` : ''}${d.numero_pi ? ` — PI ${d.numero_pi}` : ''}`).join('\n') : 'Nenhum pendente.'))
+    // 2. Estoque não declarado
+    const [decl] = await pool.query(SQL_DECLARACAO_PENDENTE)
+    partes.push(`ESTOQUE NÃO DECLARADO (${decl.length} produto(s)):\n` +
+      (decl.length ? decl.map(d => `- PI ${d.numero_pi} (${d.cliente||'sem cliente'}): ${d.produto}`).join('\n') : 'Nenhum pendente.'))
 
- const [atr] = await pool.query(
- `SELECT c.descricao, c.fornecedor, c.data_prevista, c.status, p.numero_pi
- FROM compras c LEFT JOIN pedidos p ON p.id = c.pi_id
- WHERE c.status <> 'recebido' AND c.data_prevista IS NOT NULL AND c.data_prevista < CURDATE()
- ORDER BY c.data_prevista ASC LIMIT 50`)
- partes.push(`COMPRAS ATRASADAS (${atr.length}):\n` +
- (atr.length ? atr.map((c) => `- ${c.descricao}${c.fornecedor ? ` (${c.fornecedor})` : ''} — prevista para ${new Date(c.data_prevista).toLocaleDateString('pt-BR')}`).join('\n') : 'Nenhuma atrasada.'))
- }
- } catch (e) {
- console.error('Erro ao montar contexto do chat:', e.message)
- }
- return partes.join('\n\n')
+    // 3. Embarques pendentes
+    const [emb] = await pool.query(SQL_EMBARQUES_PENDENTES)
+    partes.push(`PIs PRONTAS SEM EMBARQUE (${emb.length}):\n` +
+      (emb.length ? emb.map(e => `- PI ${e.numero_pi} (${e.cliente||'sem cliente'})`).join('\n') : 'Nenhuma pendente.'))
+
+    // 4. Demandas ao compras
+    const [dem] = await pool.query(`
+      SELECT d.descricao, d.quantidade, d.unidade, d.categoria, d.status, p.numero_pi
+      FROM demandas d LEFT JOIN pedidos p ON p.id = d.pi_id
+      WHERE d.status = 'pendente' ORDER BY d.criado_em DESC LIMIT 60`)
+    partes.push(`PEDIDOS AO COMPRAS PENDENTES (${dem.length}):\n` +
+      (dem.length ? dem.map(d =>
+        `- [${d.categoria}] ${d.descricao}${d.quantidade > 0 ? ` (${d.quantidade} ${d.unidade||''})` : ''}${d.numero_pi ? ` — PI ${d.numero_pi}` : ''}`
+      ).join('\n') : 'Nenhum.'))
+
+    // 5. Compras por status
+    const [compras] = await pool.query(`
+      SELECT c.descricao, c.fornecedor, c.data_prevista, c.status, p.numero_pi
+      FROM compras c LEFT JOIN pedidos p ON p.id = c.pi_id
+      ORDER BY c.data_prevista ASC LIMIT 60`)
+    const atrasadas = compras.filter(c => c.status !== 'recebido' && c.data_prevista && new Date(c.data_prevista) < new Date())
+    const emAberto  = compras.filter(c => c.status !== 'recebido')
+    partes.push(`COMPRAS (${compras.length} total | ${emAberto.length} em aberto | ${atrasadas.length} atrasadas):\n` +
+      compras.slice(0, 40).map(c =>
+        `- [${c.status}] ${c.descricao}${c.fornecedor ? ` (${c.fornecedor})` : ''}${c.data_prevista ? ` — prev. ${new Date(c.data_prevista).toLocaleDateString('pt-BR')}` : ''}${c.numero_pi ? ` — PI ${c.numero_pi}` : ''}`
+      ).join('\n'))
+
+    // 6. Entradas B2 recentes
+    const [b2] = await pool.query(`
+      SELECT r.produto, r.embalagem_kg, r.rotulo_kg, r.pallet_caixas, r.localizacao,
+        p.numero_pi, p.cliente, r.criado_em
+      FROM recebimentos_b2 r LEFT JOIN pedidos p ON p.id = r.pi_id
+      ORDER BY r.criado_em DESC LIMIT 20`)
+    partes.push(`ENTRADAS RECENTES NO B2 (${b2.length} mais recentes):\n` +
+      (b2.length ? b2.map(r =>
+        `- ${r.produto||'sem produto'} | PI ${r.numero_pi||'?'} | emb: ${r.embalagem_kg||0}kg, rót: ${r.rotulo_kg||0}kg, pallet: ${r.pallet_caixas||0} | ${r.localizacao||'sem local'}`
+      ).join('\n') : 'Nenhuma entrada.'))
+
+    // 7. Tarefas da equipe
+    const EMAILS_T = ['export@pietrobon.com.br','export2@pietrobon.com.br','joaoantonio@pietrobon.com.br','auxiliarexp@pietrobon.com.br']
+    if (EMAILS_T.includes((emailUsuario||'').toLowerCase()) || ['admin','auxiliar'].includes(papel)) {
+      try {
+        const [tarefas] = await pool.query(`SELECT titulo, descricao, coluna, prioridade, responsavel, prazo FROM tarefas ORDER BY criado_em DESC LIMIT 50`)
+        const abertas_t = tarefas.filter(t => t.coluna !== 'concluido')
+        partes.push(`TAREFAS DA EQUIPE (${tarefas.length} total | ${abertas_t.length} em aberto):\n` +
+          (tarefas.length ? tarefas.map(t =>
+            `- [${t.coluna}][${t.prioridade}] ${t.titulo}${t.responsavel ? ` → ${t.responsavel.split('@')[0]}` : ''}${t.prazo ? ` | prazo: ${new Date(String(t.prazo).slice(0,10)+'T00:00:00').toLocaleDateString('pt-BR')}` : ''}`
+          ).join('\n') : 'Nenhuma tarefa.'))
+      } catch (_) {}
+    }
+
+    // 8. Estoque geral (vinculos)
+    const [vins] = await pool.query(`
+      SELECT v.produto_entrada, v.embalagem_kg, v.rotulo_kg, v.pallet_caixas,
+        p.numero_pi, p.cliente
+      FROM vinculos_insumos v
+      LEFT JOIN estoque_insumos ei ON ei.id = v.entrada_id
+      LEFT JOIN pedidos p ON p.id = v.pi_id
+      ORDER BY v.criado_em DESC LIMIT 30`)
+    if (vins.length) {
+      partes.push(`ESTOQUE GERAL VINCULADO (${vins.length} vínculos recentes):\n` +
+        vins.map(v => `- ${v.produto_entrada||'sem produto'} → PI ${v.numero_pi||'?'} | emb: ${v.embalagem_kg||0}kg, rót: ${v.rotulo_kg||0}kg, pallet: ${v.pallet_caixas||0}`).join('\n'))
+    }
+
+    // 9. Faturamento do mês atual (contábil)
+    const hoje = new Date()
+    const [fat] = await pool.query(`
+      SELECT SUM(valor_nfe) as total_valor, SUM(peso) as total_peso, COUNT(*) as qtd_notas
+      FROM contabil WHERE ano = ? AND mes = ?`, [hoje.getFullYear(), hoje.getMonth()+1])
+    if (fat[0]?.qtd_notas > 0) {
+      partes.push(`FATURAMENTO ${hoje.toLocaleString('pt-BR',{month:'long'}).toUpperCase()}/${hoje.getFullYear()}: R$ ${Number(fat[0].total_valor||0).toLocaleString('pt-BR',{minimumFractionDigits:2})} | ${Number(fat[0].total_peso||0).toLocaleString('pt-BR',{minimumFractionDigits:2})} kg | ${fat[0].qtd_notas} notas`)
+    }
+
+  } catch (e) {
+    console.error('Erro ao montar contexto do chat:', e.message)
+  }
+  return partes.join('\n\n')
 }
+
 
 app.post('/api/chat', autenticar(TODOS), async (req, res) => {
  try {
@@ -1173,20 +1193,34 @@ app.post('/api/chat', autenticar(TODOS), async (req, res) => {
  if (!mensagem.trim()) return res.json({ resposta: 'Digite uma mensagem.' })
 
  const instrucao = PAPEL_INSTRUCOES[papel] || PAPEL_INSTRUCOES.convidado
- const contexto = await montarContexto(papel)
- const hoje = new Date().toLocaleDateString('pt-BR')
+  const instrucao = PAPEL_INSTRUCOES[papel] || PAPEL_INSTRUCOES.convidado
+  const emailUsuario = req.usuario.email || ''
+  const contexto = await montarContexto(papel, emailUsuario)
+  const hoje = new Date().toLocaleDateString('pt-BR', { weekday:'long', year:'numeric', month:'long', day:'numeric' })
 
- const system = `${instrucao}
+  const system = `Você é o Assistente IA da Pietrobon & CIA. LTDA., integrado ao sistema "Pietrobon Controle de Insumos".
+${instrucao}
 
-Você é um assistente completo e prestativo. Além de ajudar com o sistema Pietrobon, você pode responder QUALQUER pergunta ou pedido do usuário: dúvidas gerais, cálculos, redação de textos e e-mails, explicações, ideias, traduções, conselhos práticos, etc. Nunca recuse por achar que está "fora do escopo" — ajude no que for pedido.
+CAPACIDADES:
+- Responder perguntas sobre dados reais do sistema (PIs, almoxarifado, compras, embarques, estoque, tarefas, faturamento)
+- Analisar situações e sugerir ações práticas para a operação
+- Redigir e-mails, resumos, textos operacionais
+- Fazer cálculos e análises
+- Responder qualquer pergunta geral (não relacionada ao sistema)
+- Traduzir, explicar conceitos, ajudar com decisões
 
-Você está conversando com ${nome} (papel: ${papel}). Data de hoje: ${hoje}.
-Responda em português do Brasil, de forma clara, objetiva e prática. Quando a pergunta for sobre o sistema/operação da empresa, use os DADOS ATUAIS abaixo para responder com números reais e nunca invente dados do sistema que não estejam listados. Para perguntas gerais, responda normalmente com seu conhecimento.
+REGRAS:
+1. Use os dados reais fornecidos quando a pergunta for sobre o sistema
+2. Nunca invente dados que não estão no contexto abaixo
+3. Para perguntas gerais, responda com seu conhecimento normalmente
+4. Responda em português do Brasil, de forma clara e profissional
+5. Use markdown: **negrito**, listas com hífens, etc.
 
-===== DADOS ATUAIS DO SISTEMA (contexto do setor de ${papel}) =====
-${contexto || 'Sem dados carregados no momento.'}
-==================================================================`
+Conversando com: ${nome} (${papel}). Hoje: ${hoje}.
 
+════════════ DADOS ATUAIS DO SISTEMA ════════════
+${contexto || 'Dados não disponíveis.'}
+═════════════════════════════════════════════════`
  const contents = [
  ...historico
  .filter((m) => m && m.texto)
@@ -1202,7 +1236,7 @@ ${contexto || 'Sem dados carregados no momento.'}
  body: JSON.stringify({
  systemInstruction: { parts: [{ text: system }] },
  contents,
- generationConfig: { temperature: 0.6, maxOutputTokens: 1600 }
+ generationConfig: { temperature: 0.65, maxOutputTokens: 2400 }
  })
  }
  )
@@ -2156,9 +2190,6 @@ app.post('/api/tarefas', autenticarTarefas(), async (req, res) => {
       [titulo, descricao || null, coluna || 'a_fazer', prioridade || 'normal', responsavel || null, prazo || null, req.usuario.email]
     )
     const [[nova]] = await pool.query('SELECT * FROM tarefas WHERE id = ?', [r.insertId])
-    if (responsavel) {
-      enviarPushParaEmail(responsavel, '📋 Nova tarefa atribuída a você', titulo, '/HTML/tarefas/tarefas.html').catch(() => {})
-    }
     res.json(nova)
   } catch (e) {
     res.status(500).json({ erro: e.message })
@@ -2167,7 +2198,6 @@ app.post('/api/tarefas', autenticarTarefas(), async (req, res) => {
 
 app.patch('/api/tarefas/:id', autenticarTarefas(), async (req, res) => {
   try {
-    const [[antes]] = await pool.query('SELECT responsavel, titulo FROM tarefas WHERE id = ?', [req.params.id])
     const { titulo, descricao, coluna, prioridade, responsavel, prazo, ordem } = req.body
     const campos = []
     const vals = []
@@ -2182,10 +2212,6 @@ app.patch('/api/tarefas/:id', autenticarTarefas(), async (req, res) => {
     vals.push(req.params.id)
     await pool.query(`UPDATE tarefas SET ${campos.join(', ')} WHERE id = ?`, vals)
     const [[atualizada]] = await pool.query('SELECT * FROM tarefas WHERE id = ?', [req.params.id])
-    if (responsavel !== undefined && responsavel && antes && responsavel !== antes.responsavel) {
-      const nomeTarefa = titulo || (antes && antes.titulo) || 'Tarefa'
-      enviarPushParaEmail(responsavel, '📋 Tarefa atribuída a você', nomeTarefa, '/HTML/tarefas/tarefas.html').catch(() => {})
-    }
     res.json(atualizada)
   } catch (e) {
     res.status(500).json({ erro: e.message })
@@ -2200,27 +2226,6 @@ app.delete('/api/tarefas/:id', autenticarTarefas(), async (req, res) => {
     res.status(500).json({ erro: e.message })
   }
 })
-
-
-async function verificarPrazosTarefas() {
-  try {
-    const hoje  = new Date().toISOString().slice(0, 10)
-    const amanha = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
-    const [rows] = await pool.query(
-      "SELECT id, titulo, prazo, responsavel FROM tarefas WHERE prazo IN (?,?) AND coluna != 'concluido' AND responsavel IS NOT NULL AND responsavel != ''",
-      [hoje, amanha]
-    )
-    for (const t of rows) {
-      const prazoStr = String(t.prazo).slice(0, 10)
-      const chave = `tarefa_prazo_${t.id}_${prazoStr}`
-      if (!(await podeEnviarHoje(chave))) continue
-      const label = prazoStr === hoje ? 'vence hoje!' : 'vence amanhã'
-      await enviarPushParaEmail(t.responsavel, `⏰ Tarefa ${label}`, t.titulo, '/HTML/tarefas/tarefas.html')
-    }
-  } catch (e) { console.error('Erro verificarPrazosTarefas:', e.message) }
-}
-setInterval(verificarPrazosTarefas, 60 * 60 * 1000)
-setTimeout(verificarPrazosTarefas, 20000)
 
 
 app.get('*', (req, res) => {
