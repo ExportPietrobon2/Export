@@ -107,29 +107,34 @@ function renderImportacoes() {
       const pago = i.status === 'PAGO'
       return `<div class="card mb-2 ${pago ? 'card-ok' : ''}" id="imp-card-${i.id}">
         <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2 py-2">
-          <div>
+          <div class="d-flex align-items-center gap-2 flex-wrap">
             <span class="fw-bold">${esc(i.invoice)}</span>
-            <span class="text-muted small ms-2">${esc(i.fornecedor_nome || '')}</span>
-            <span class="badge ${STATUS_COR[i.status]} ms-2">${i.status}</span>
+            <span class="text-muted small">${esc(i.fornecedor_nome || '')}</span>
+            <span class="badge ${STATUS_COR[i.status]}">${i.status}</span>
           </div>
           <div class="d-flex gap-2 align-items-center flex-wrap">
             <span class="small text-muted">${brl(i.valor_reais)}</span>
             <span class="small fw-semibold ${i.saldo > 0.01 ? 'text-danger' : 'text-success'}">${brl(i.saldo)}</span>
-            <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="toggleImpDetalhe(${i.id})">Ver ▾</button>
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="border-radius:8px"
+              data-ver-id="${i.id}" onclick="toggleImpDetalhe(${i.id})">Ver ▾</button>
+            <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="border-radius:8px"
+              onclick="editarImp(${i.id})" title="Editar">✏️</button>
+            <button class="btn btn-sm btn-outline-danger py-0 px-2" style="border-radius:8px"
+              onclick="excluirImp(${i.id})" title="Excluir">🗑</button>
           </div>
         </div>
         <div id="imp-det-${i.id}" style="display:none" class="border-top px-3 pb-3 pt-2">
           <div class="row g-2 mb-2 small">
             <div class="col-6 col-md-3"><span class="text-muted">Mercadoria</span><br><strong>${esc(i.mercadoria || '-')}</strong></div>
             <div class="col-6 col-md-2"><span class="text-muted">Moeda / Valor</span><br><strong>${i.moeda || ''} ${numf(i.valor_moeda)}</strong></div>
-            <div class="col-6 col-md-2"><span class="text-muted">Taxa</span><br><strong>${numf(i.taxa_cambio, 4)}</strong></div>
-            <div class="col-6 col-md-2"><span class="text-muted">Pago R$</span><br><strong class="text-success">${brl(i.pago)}</strong></div>
-            <div class="col-6 col-md-3"><span class="text-muted">Saldo R$</span><br><strong class="${i.saldo > 0.01 ? 'text-danger' : 'text-success'}">${brl(i.saldo)}</strong></div>
+            <div class="col-6 col-md-2"><span class="text-muted">Taxa câmbio</span><br><strong>${numf(i.taxa_cambio, 4)}</strong></div>
+            <div class="col-6 col-md-2"><span class="text-muted">Total pago</span><br><strong class="text-success">${brl(i.pago)}</strong></div>
+            <div class="col-6 col-md-3"><span class="text-muted">Saldo devedor</span><br><strong class="${i.saldo > 0.01 ? 'text-danger' : 'text-success'}">${brl(i.saldo)}</strong></div>
+            ${i.data_invoice ? `<div class="col-6 col-md-2"><span class="text-muted">Data invoice</span><br><strong>${dBR(i.data_invoice)}</strong></div>` : ''}
+            ${i.banco ? `<div class="col-6 col-md-2"><span class="text-muted">Banco</span><br><strong>${esc(i.banco)}</strong></div>` : ''}
           </div>
-          <div class="d-flex gap-2 flex-wrap">
-            <button class="btn btn-sm btn-outline-secondary" onclick="editarImp(${i.id})">Editar</button>
-            <button class="btn btn-sm btn-outline-primary" onclick="abrirPagamentos(${i.id})">Pagamentos</button>
-            <button class="btn btn-sm btn-outline-danger" onclick="excluirImp(${i.id})">🗑</button>
+          <div class="d-flex gap-2 flex-wrap mt-2">
+            <button class="btn btn-sm btn-outline-primary" style="border-radius:8px" onclick="abrirPagamentos(${i.id})">💳 Pagamentos</button>
           </div>
         </div>
       </div>`
@@ -170,6 +175,16 @@ async function salvarEdicaoImp() {
   if (r?.erro) { alert(r.erro); return }
   editImp = null
   carregar()
+}
+
+
+window.toggleImpDetalhe = function(id) {
+  const det = document.getElementById('imp-det-' + id)
+  if (!det) return
+  const aberto = det.style.display !== 'none'
+  det.style.display = aberto ? 'none' : 'block'
+  const btn = document.querySelector('[data-ver-id="' + id + '"]')
+  if (btn) btn.textContent = aberto ? 'Ver ▾' : 'Recolher ▴'
 }
 
 window.editarImp = function (id) { editImp = id; aba = 'importacoes'; render(); window.scrollTo({ top: 0, behavior: 'smooth' }) }
