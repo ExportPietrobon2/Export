@@ -30,11 +30,11 @@ function inicGrupos(grupos) {
 }
 window.toggleGrupoPais = function(pais) {
   if (paisesAbertos.has(pais)) paisesAbertos.delete(pais); else paisesAbertos.add(pais)
-  renderizarLista(todosOsPedidos)
+  renderizarLista(todosOsPedidos).catch(e => console.error('Erro ao renderizar:', e))
 }
 window.toggleGrupoAno = function(chave) {
   if (anosAbertos.has(chave)) anosAbertos.delete(chave); else anosAbertos.add(chave)
-  renderizarLista(todosOsPedidos)
+  renderizarLista(todosOsPedidos).catch(e => console.error('Erro ao renderizar:', e))
 }
 
 function criarCardPi(pedido, produtos) {

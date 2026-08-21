@@ -26,6 +26,14 @@ function dataParaInput(valor) {
 
 let podeEditarEmbarque = false
 
+const rotuloInsumo = {
+  embalagem: 'Embalagem',
+  rotulo: 'Rótulo',
+  caixa: 'Caixa',
+  etiqueta: 'Etiqueta'
+}
+
+
 
 function renderAlmoxarifado(produtos) {
  if (!produtos || produtos.length === 0) {
@@ -227,27 +235,22 @@ function renderCard(pedido) {
 
 async function salvarEmbarque(piId, numeroPi) {
  const input = document.getElementById(`embarque-input-${piId}`)
- const btn = document.getElementById(`embarque-btn-${piId}`)
+ const btn = document.querySelector(`.btn-salvar-embarque[data-pid="${piId}"]`)
  const msg = document.getElementById(`embarque-msg-${piId}`)
- if (!input || !btn) return
+ if (!input) return
 
- btn.disabled = true
- btn.textContent = 'Salvando...'
+ if (btn) { btn.disabled = true; btn.textContent = 'Salvando...' }
  msg.textContent = ''
 
  const resultado = await api.pedidos.editarEmbarque(piId, input.value || null)
  if (resultado?.erro) {
- msg.className = 'small ms-1 text-danger'
- msg.textContent = 'Erro ao salvar.'
- btn.disabled = false
- btn.textContent = '💾 Salvar data'
+ if (msg) { msg.className = 'small ms-1 text-danger'; msg.textContent = 'Erro ao salvar.' }
+ if (btn) { btn.disabled = false; btn.textContent = '💾 Salvar data' }
  return
  }
 
- msg.className = 'small ms-1 text-success fw-semibold'
- msg.textContent = input.value ? 'Data salva' : 'Data removida'
- btn.disabled = false
- btn.textContent = '💾 Salvar data'
+ if (msg) { msg.className = 'small ms-1 text-success fw-semibold'; msg.textContent = input.value ? 'Data salva' : 'Data removida' }
+ if (btn) { btn.disabled = false; btn.textContent = '💾 Salvar data' }
 
  setTimeout(carregar, 900)
 }
@@ -323,11 +326,6 @@ function renderizarPis(pedidos) {
   }
   containerPis.appendChild(wrap)
 
-  // Bind embarque buttons
-  lista.forEach((pedido) => {
-    const btn = document.getElementById(`embarque-btn-${pedido.id}`)
-    if (btn) btn.addEventListener('click', () => salvarEmbarque(pedido.id, pedido.numero_pi))
-  })
 }
 
 async function carregar() {
@@ -351,6 +349,11 @@ async function carregar() {
 }
 
 containerPis.addEventListener('click', (e) => {
+ const btnEmbarque = e.target.closest('.btn-salvar-embarque')
+ if (btnEmbarque) {
+  salvarEmbarque(Number(btnEmbarque.dataset.pid), btnEmbarque.dataset.numeropi)
+  return
+ }
  const btnExpandir = e.target.closest('.btn-expandir')
  if (!btnExpandir) return
  const id = btnExpandir.dataset.id

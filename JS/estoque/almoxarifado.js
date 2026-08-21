@@ -154,7 +154,10 @@ window.selecionarPi = function(id) {
   renderizarSeletorPi(todosPedidosList, (document.getElementById('busca-pi')?.value || '').toLowerCase())
   const p = todosPedidosList.find(x => x.id == id)
   const badge = document.getElementById('pi-selecionada-badge')
-  if (badge && p) badge.innerHTML = `PI ${p.numero_pi}${p.cliente ? ' · ' + p.cliente : ''}${p.destino ? ' · ' + p.destino : ''}`
+  if (badge && p) {
+    badge.style.display = 'inline-block'
+    badge.innerHTML = `PI ${p.numero_pi}${p.cliente ? ' · ' + p.cliente : ''}${p.destino ? ' · ' + p.destino : ''}`
+  }
   carregarPi(id)
 }
 
@@ -418,6 +421,7 @@ async function salvarProduto(produtoId, quantidade) {
  const form = document.getElementById(`form-produto-${produtoId}`)
  const btnExpandir = containerConteudo.querySelector(`.btn-expandir-produto[data-id="${produtoId}"]`)
 
+ if (btn) btn.disabled = false
  btn.textContent = 'Salvo!'
  btn.style.background = 'var(--green-ok)'
  setTimeout(() => {
