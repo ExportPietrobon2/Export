@@ -1785,65 +1785,6 @@ app.delete('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
 })
 
 
-app.post('/api/conferencia-nfse', autenticar(['admin']), async (req, res) => {
-  try {
-    const { textoNfse, aliquotaIssqn } = req.body
-    if (!textoNfse) return res.status(400).json({ erro: 'Texto da NFS-e não enviado.' })
-    if (!process.env.GEMINI_API_KEY) return res.status(500).json({ erro: 'GEMINI_API_KEY não configurada no servidor.' })
-
-    const aliq = parseFloat(aliquotaIssqn) || 2.0
-    console.log('Texto NFS-e recebido (primeiros 300 chars):', textoNfse.slice(0, 300))
-    const prompt = `Extraia os dados desta NFS-e brasileira e retorne APENAS um objeto JSON válido, sem nenhum texto antes ou depois, sem markdown, sem explicação.
-
-Formato exato que deve retornar:
-{"numero_nfse":"","emitente":"","tomador":"","descricao_servico":"","valor_comissao":0,"valor_doze_avos":0,"valor_total_declarado":0,"irrf_declarado":0,"issqn_declarado":0,"valor_liquido":0,"faturas_referenciadas":""}
-
-Instruções:
-- valor_comissao: valor base da comissão declarada
-- valor_doze_avos: valor do 1/12 avos (doze avos) declarado
-- valor_total_declarado: valor total do serviço na nota
-- irrf_declarado: valor do IRRF retido
-- issqn_declarado: valor do ISSQN apurado
-- valor_liquido: valor liquido final
-- Use ponto como separador decimal nos números
-- Se não encontrar um campo, use null
-
-TEXTO DA NFS-e:
-${textoNfse.slice(0, 4000)}`
-
-    const resp = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=' + process.env.GEMINI_API_KEY,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
-        })
-      }
-    )
-
-    const data = await resp.json()
-    if (data.error) return res.status(500).json({ erro: data.error.message })
-
-    const texto = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    try {
-      const limpo = texto.replace(/```json/g, '').replace(/```/g, '').trim()
-      const inicioJson = limpo.indexOf('{')
-      const fimJson = limpo.lastIndexOf('}')
-      if (inicioJson === -1 || fimJson === -1) throw new Error('JSON incompleto')
-      const json = JSON.parse(limpo.slice(inicioJson, fimJson + 1))
-      res.json({ ok: true, dados: json })
-    } catch (parseErr) {
-      console.error('Erro parse conferencia:', parseErr.message)
-      res.status(500).json({ erro: 'Não foi possível extrair os dados da nota.' })
-    }
-  } catch (e) {
-    console.error('Erro conferencia-nfse:', e.message)
-    res.status(500).json({ erro: e.message })
-  }
-})
-
 
 
 
