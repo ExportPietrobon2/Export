@@ -1140,7 +1140,7 @@ async function montarContexto(papel, emailUsuario) {
       ).join('\n') : 'Nenhuma entrada.'))
 
     // 7. Tarefas da equipe
-    const EMAILS_T = ['export@pietrobon.com.br','export2@pietrobon.com.br','joaoantonio@pietrobon.com.br','auxiliarexp@pietrobon.com.br']
+    const EMAILS_T = ['export@pietrobon.com.br','export2@pietrobon.com.br','joaoantonio@pietrobon.com.br','export3@pietrobon.com.br']
     if (EMAILS_T.includes((emailUsuario||'').toLowerCase()) || ['admin','auxiliar'].includes(papel)) {
       try {
         const [tarefas] = await pool.query(`SELECT titulo, descricao, coluna, prioridade, responsavel, prazo FROM tarefas ORDER BY criado_em DESC LIMIT 50`)
@@ -2125,7 +2125,7 @@ const EMAILS_TAREFAS = [
   'export@pietrobon.com.br',
   'export2@pietrobon.com.br',
   'joaoantonio@pietrobon.com.br',
-  'auxiliarexp@pietrobon.com.br'
+  'export3@pietrobon.com.br'
 ]
 
 function autenticarTarefas() {
@@ -2163,7 +2163,7 @@ async function inicializarTarefas() {
     const hash = await bcrypt.hash('exp123', 10)
     await pool.query(
       'INSERT IGNORE INTO usuarios (email, senha, nome, papel) VALUES (?, ?, ?, ?)',
-      ['auxiliarexp@pietrobon.com.br', hash, 'Auxiliar Exportação', 'auxiliar']
+      ['export3@pietrobon.com.br', hash, 'Bernardo', 'auxiliar']
     )
   } catch (e) {
     console.error('Erro ao inicializar Tarefas:', e.message)
@@ -2224,42 +2224,6 @@ app.delete('/api/tarefas/:id', autenticarTarefas(), async (req, res) => {
   } catch (e) {
     res.status(500).json({ erro: e.message })
   }
-})
-
-
-async function inicializarCatalogoProdutos() {
-  try {
-    await pool.query(`CREATE TABLE IF NOT EXISTS produtos_catalogo (
-      id   INT AUTO_INCREMENT PRIMARY KEY,
-      nome VARCHAR(500) NOT NULL,
-      UNIQUE KEY unique_nome (nome(250)),
-      criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`)
-  } catch (e) { console.error('Erro ao criar tabela catálogo:', e.message) }
-}
-setTimeout(inicializarCatalogoProdutos, 3000)
-
-app.get('/api/catalogo-produtos', autenticar(TODOS), async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT id, nome FROM produtos_catalogo ORDER BY nome ASC')
-    res.json(rows)
-  } catch (e) { res.status(500).json({ erro: e.message }) }
-})
-
-app.post('/api/catalogo-produtos', autenticar(TODOS), async (req, res) => {
-  try {
-    const { nome } = req.body
-    if (!nome || !nome.trim()) return res.status(400).json({ erro: 'Nome obrigatório.' })
-    await pool.query('INSERT IGNORE INTO produtos_catalogo (nome) VALUES (?)', [nome.trim()])
-    res.json({ ok: true })
-  } catch (e) { res.status(500).json({ erro: e.message }) }
-})
-
-app.delete('/api/catalogo-produtos/:id', autenticar(['admin']), async (req, res) => {
-  try {
-    await pool.query('DELETE FROM produtos_catalogo WHERE id = ?', [req.params.id])
-    res.json({ ok: true })
-  } catch (e) { res.status(500).json({ erro: e.message }) }
 })
 
 

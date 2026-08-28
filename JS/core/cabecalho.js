@@ -8,7 +8,7 @@ const EMAILS_TAREFAS = [
   'export@pietrobon.com.br',
   'export2@pietrobon.com.br',
   'joaoantonio@pietrobon.com.br',
-  'auxiliarexp@pietrobon.com.br'
+  'export3@pietrobon.com.br'
 ]
 
 const EMAILS_FINANCEIRO = [

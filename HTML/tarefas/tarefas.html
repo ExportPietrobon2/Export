@@ -8,353 +8,116 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/CSS/style.css">
   <style>
-    /* ── Board layout ─────────────────────── */
-    .board-wrap {
-      display: flex;
-      flex-direction: row;
-      gap: 18px;
-      align-items: flex-start;
-      overflow-x: auto;
-      padding-bottom: 16px;
-      min-height: 400px;
-    }
-
-    /* ── Coluna por usuário ───────────────── */
-    .col-usuario {
-      flex: 0 0 280px;
-      background: #f0f2f7;
-      border-radius: 16px;
-      display: flex;
-      flex-direction: column;
-      min-height: 180px;
-    }
-    .col-usuario.drag-over {
-      outline: 2px dashed var(--red);
-      outline-offset: -2px;
-    }
-
-    .col-usuario-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 14px 16px 10px;
-      border-radius: 16px 16px 0 0;
-      background: #e2e8f0;
-    }
-    .col-header-voce { background: #fde8e8; }
-
-    .col-usuario-avatar {
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      color: #fff;
-      font-size: .72rem;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .col-usuario-nome {
-      flex: 1;
-      font-size: .82rem;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: .05em;
-      color: #334155;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .col-usuario-badge {
-      font-size: .72rem;
-      font-weight: 700;
-      background: rgba(0,0,0,.12);
-      color: #334155;
-      border-radius: 999px;
-      padding: 2px 9px;
-      min-width: 24px;
-      text-align: center;
-    }
-
-    .col-usuario-body {
-      padding: 10px 10px 0;
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-      flex: 1;
-    }
-
-    /* ── Grupos de status dentro da coluna ── */
-    .status-grupo { margin-bottom: 8px; }
-
-    .status-divider {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: .7rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      padding: 6px 2px 4px;
-    }
-
-    .status-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-
-    .status-count {
-      margin-left: auto;
-      background: rgba(0,0,0,.08);
-      border-radius: 999px;
-      padding: 1px 7px;
-      font-size: .65rem;
-    }
-
-    /* ── Card ─────────────────────────────── */
-    .tarefa-card {
-      background: #fff;
-      border: 1px solid #e4e7ef;
-      border-radius: 12px;
-      padding: 13px 14px 11px;
-      box-shadow: 0 1px 3px rgba(15,23,42,.06);
-      cursor: grab;
-      transition: box-shadow .18s, transform .18s;
-      border-left: 4px solid #cbd5e1;
-      margin-bottom: 8px;
-      user-select: none;
-    }
-    .tarefa-card:hover { box-shadow: 0 4px 16px rgba(15,23,42,.10); transform: translateY(-1px); }
-    .tarefa-card.dragging { opacity: .45; cursor: grabbing; }
-    .tarefa-card.concluida { opacity: .65; }
-    .tarefa-card.concluida .card-titulo { text-decoration: line-through; color: var(--muted); }
-
-    .prioridade-baixa   { border-left-color: #3b82f6; }
-    .prioridade-normal  { border-left-color: #94a3b8; }
-    .prioridade-alta    { border-left-color: #f59332; }
-    .prioridade-urgente { border-left-color: #E8313A; }
-
-    .card-topo {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 6px;
-    }
-    .card-titulo {
-      font-size: .875rem;
-      font-weight: 700;
-      color: #1c2230;
-      line-height: 1.4;
-      flex: 1;
-    }
-    .card-desc {
-      font-size: .78rem;
-      color: #64748b;
-      line-height: 1.5;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-      margin-bottom: 10px;
-    }
-    .card-rodape {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .card-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-
-    .chip-prioridade { font-size: .68rem; font-weight: 700; border-radius: 999px; padding: 2px 8px; }
-    .chip-baixa   { background: #eff6ff; color: #1d4ed8; }
-    .chip-normal  { background: #f1f5f9; color: #475569; }
-    .chip-alta    { background: #fff8f0; color: #c2680a; }
-    .chip-urgente { background: #fef2f2; color: #b91c1c; }
-
-    .chip-prazo { font-size: .72rem; font-weight: 600; color: #64748b; }
-    .chip-prazo.vencido { color: #b91c1c; font-weight: 700; }
-    .chip-prazo.hoje    { color: #c2680a; font-weight: 700; }
-
-    .card-acoes { display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
-    .tarefa-card:hover .card-acoes { opacity: 1; }
-    .btn-card {
-      width: 28px; height: 28px; border: none; border-radius: 7px;
-      background: #f1f5f9; color: #64748b; font-size: .8rem;
-      cursor: pointer; display: flex; align-items: center; justify-content: center;
-      transition: all .12s;
-    }
-    .btn-card:hover { background: #e2e8f0; color: #1c2230; }
-    .btn-card.excluir:hover { background: #fef2f2; color: #b91c1c; }
-
-    /* ── Botão adicionar ──────────────────── */
-    .btn-nova-tarefa {
-      margin: 6px 0 10px;
-      width: 100%;
-      background: rgba(255,255,255,.7);
-      border: 1.5px dashed #c0cad8;
-      border-radius: 10px;
-      padding: 9px;
-      font-size: .82rem;
-      font-weight: 600;
-      color: var(--muted);
-      cursor: pointer;
-      transition: all .15s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    }
-    .btn-nova-tarefa:hover { background: #fff; border-color: var(--red); color: var(--red); }
-
-    /* ── Filtros ──────────────────────────── */
-    .filtros-bar {
-      background: #fff;
-      border: 1px solid #e4e7ef;
-      border-radius: 14px;
-      padding: 12px 16px;
-      margin-bottom: 20px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-      box-shadow: 0 1px 3px rgba(15,23,42,.05);
-    }
-    .input-busca {
-      flex: 1; min-width: 180px;
-      border: 1px solid #e4e7ef; border-radius: 9px;
-      padding: 7px 12px; font-size: .875rem; outline: none;
-      transition: border-color .15s, box-shadow .15s;
-      font-family: 'Inter', system-ui, sans-serif; color: #1c2230;
-    }
-    .input-busca:focus { border-color: var(--red); box-shadow: 0 0 0 3px rgba(232,49,58,.10); }
-    .filtro-select {
-      border: 1px solid #e4e7ef; border-radius: 9px;
-      padding: 7px 30px 7px 10px; font-size: .82rem; font-weight: 600;
-      color: #475569; background: #f8fafc; outline: none; cursor: pointer;
-      font-family: 'Inter', system-ui, sans-serif; appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2394a3b8'/%3E%3C/svg%3E");
-      background-repeat: no-repeat; background-position: right 10px center;
-      transition: border-color .15s;
-    }
-    .filtro-select:focus { border-color: var(--red); }
-
-    /* ── Auxiliares ───────────────────────── */
-    .grupo-voce {
-      font-size: .65rem; background: rgba(232,49,58,.12); color: #E8313A;
-      border-radius: 999px; padding: 1px 7px; font-weight: 700;
-      text-transform: none; letter-spacing: 0;
-    }
-    .empty-coluna {
-      text-align: center; padding: 28px 16px;
-      color: #94a3b8; font-size: .8rem;
-    }
-    .empty-coluna svg { opacity: .35; margin-bottom: 8px; display: block; margin-inline: auto; }
-
-    /* ── Modal ────────────────────────────── */
-    .modal-content { border: none; border-radius: 18px; box-shadow: 0 20px 60px rgba(15,23,42,.18); }
-    .modal-header  { border-bottom: 1px solid #f0f2f7; padding: 20px 24px 14px; }
-    .modal-body    { padding: 20px 24px; }
-    .modal-footer  { border-top: 1px solid #f0f2f7; padding: 14px 24px 20px; }
-
-    @media (max-width: 768px) {
-      .board-wrap { flex-direction: column; overflow-x: unset; }
-      .col-usuario { flex: 1 1 auto; width: 100%; }
-    }
+    #board{display:flex;flex-direction:column;gap:20px}
+    .usuario-section{background:#f0f2f7;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,.06)}
+    .usuario-section-header{display:flex;align-items:center;gap:10px;padding:13px 18px;background:#e2e8f0}
+    .header-voce{background:#fde8e8}
+    .u-avatar{width:30px;height:30px;border-radius:50%;color:#fff;font-size:.72rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .u-nome{font-size:.85rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#334155;flex:1;display:flex;align-items:center;gap:6px}
+    .u-total{font-size:.72rem;font-weight:700;background:rgba(0,0,0,.1);color:#475569;border-radius:999px;padding:2px 9px}
+    .urgencia-columns{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px}
+    @media(max-width:900px){.urgencia-columns{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:540px){.urgencia-columns{grid-template-columns:1fr}}
+    .urgencia-col{background:#fff;border-radius:12px;overflow:hidden;border-top:3px solid var(--urg-cor);box-shadow:0 1px 3px rgba(15,23,42,.05);display:flex;flex-direction:column}
+    .urgencia-col-header{display:flex;align-items:center;gap:6px;padding:8px 12px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--urg-cor);background:var(--urg-bg);border-bottom:1px solid #f0f2f7}
+    .urgencia-dot{width:7px;height:7px;border-radius:50%;background:var(--urg-cor);flex-shrink:0}
+    .urgencia-count{margin-left:auto;background:rgba(0,0,0,.08);border-radius:999px;padding:1px 7px;font-size:.65rem}
+    .urgencia-cards{padding:8px;display:flex;flex-direction:column;gap:8px;flex:1}
+    .urgencia-vazia{text-align:center;color:#c8d0dc;font-size:.78rem;padding:12px 0;font-style:italic}
+    .tarefa-card{background:#fff;border:1px solid #e4e7ef;border-radius:10px;padding:11px 12px 9px;box-shadow:0 1px 2px rgba(15,23,42,.05);transition:box-shadow .15s,transform .15s}
+    .tarefa-card:hover{box-shadow:0 4px 12px rgba(15,23,42,.10);transform:translateY(-1px)}
+    .tarefa-card.concluida{opacity:.6}
+    .card-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:5px}
+    .card-titulo{font-size:.83rem;font-weight:700;color:#1c2230;line-height:1.4;flex:1}
+    .card-titulo.riscado{text-decoration:line-through;color:var(--muted)}
+    .card-desc{font-size:.75rem;color:#64748b;line-height:1.45;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .card-rodape{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}
+    .card-acoes{display:flex;gap:3px;opacity:0;transition:opacity .12s}
+    .tarefa-card:hover .card-acoes{opacity:1}
+    .btn-card{width:26px;height:26px;border:none;border-radius:6px;background:#f1f5f9;color:#64748b;font-size:.78rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .1s}
+    .btn-card:hover{background:#e2e8f0;color:#1c2230}
+    .btn-card.excluir:hover{background:#fef2f2;color:#b91c1c}
+    .btn-nova-tarefa{margin:4px 8px 8px;width:calc(100% - 16px);border:1.5px dashed #d0d8e4;border-radius:8px;background:transparent;color:#94a3b8;font-size:.78rem;font-weight:600;padding:6px;cursor:pointer;transition:all .12s}
+    .btn-nova-tarefa:hover{border-color:var(--red);color:var(--red);background:var(--red-light)}
+    .filtros-bar{background:#fff;border:1px solid #e4e7ef;border-radius:14px;padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(15,23,42,.05)}
+    .input-busca{flex:1;min-width:160px;border:1px solid #e4e7ef;border-radius:9px;padding:7px 12px;font-size:.875rem;outline:none;font-family:inherit}
+    .input-busca:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(232,49,58,.10)}
+    .filtro-select{border:1px solid #e4e7ef;border-radius:9px;padding:7px 28px 7px 10px;font-size:.82rem;font-weight:600;color:#475569;background:#f8fafc;outline:none;cursor:pointer;font-family:inherit;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2394a3b8'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
+    .grupo-voce{font-size:.62rem;background:rgba(232,49,58,.12);color:#E8313A;border-radius:999px;padding:1px 7px;font-weight:700;text-transform:none;letter-spacing:0}
+    .modal-content{border:none;border-radius:18px;box-shadow:0 20px 60px rgba(15,23,42,.18)}
+    .modal-header{border-bottom:1px solid #f0f2f7;padding:20px 24px 14px}
+    .modal-body{padding:20px 24px}
+    .modal-footer{border-top:1px solid #f0f2f7;padding:14px 24px 20px}
   </style>
-
 </head>
 <body data-pagina="tarefas.html">
   <div id="cabecalho"></div>
-
   <div class="container py-4">
     <div class="page-header">
       <div class="page-header-icon"></div>
       <div class="page-header-texto">
         <h1 class="page-titulo">Tarefas Exportação</h1>
-        <p class="page-subtitulo">Quadro de tarefas da equipe de exportação</p>
+        <p class="page-subtitulo">Organizado por pessoa e urgência</p>
       </div>
       <button class="btn btn-pietrobon ms-auto" onclick="abrirModal()">+ Nova Tarefa</button>
     </div>
-
     <div class="filtros-bar">
       <input class="input-busca" type="text" id="busca" placeholder="🔍  Buscar tarefa..." oninput="renderizarBoard()">
       <select class="filtro-select" id="filtro-responsavel" onchange="renderizarBoard()">
-        <option value="">Todos os responsáveis</option>
-        <option value="export@pietrobon.com.br">Export</option>
-        <option value="export2@pietrobon.com.br">Export 2</option>
-        <option value="joaoantonio@pietrobon.com.br">João</option>
-        <option value="auxiliarexp@pietrobon.com.br">Auxiliar</option>
+        <option value="">Todos</option>
+        <option value="export@pietrobon.com.br">Diego Diniz</option>
+        <option value="export2@pietrobon.com.br">Kauã Mello</option>
+        <option value="joaoantonio@pietrobon.com.br">João Antonio</option>
+        <option value="export3@pietrobon.com.br">Bernardo</option>
       </select>
-      <select class="filtro-select" id="filtro-prioridade" onchange="renderizarBoard()">
-        <option value="">Todas as prioridades</option>
-        <option value="urgente">Urgente</option>
-        <option value="alta">Alta</option>
-        <option value="normal">Normal</option>
-        <option value="baixa">Baixa</option>
+      <select class="filtro-select" id="filtro-status" onchange="renderizarBoard()">
+        <option value="">Todos os status</option>
+        <option value="a_fazer">A Fazer</option>
+        <option value="em_progresso">Em Progresso</option>
+        <option value="concluido">Concluído</option>
       </select>
     </div>
-
-    <div class="board-wrap" id="board"></div>
-
-    <!-- Modal criar/editar -->
+    <div id="board"></div>
+  </div>
   <div class="modal fade" id="modal-tarefa" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title fw-800" id="modal-titulo-label">Nova Tarefa</h5>
+          <h5 class="modal-title fw-bold" id="modal-titulo-label">Nova Tarefa</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
           <input type="hidden" id="modal-id">
-          <div class="mb-3">
-            <label class="form-label">Título <span class="text-danger">*</span></label>
-            <input type="text" class="form-control" id="modal-titulo" placeholder="O que precisa ser feito?">
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Descrição</label>
-            <textarea class="form-control" id="modal-descricao" rows="3" placeholder="Detalhes opcionais..."></textarea>
-          </div>
+          <div class="mb-3"><label class="form-label">Título <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="modal-titulo" placeholder="O que precisa ser feito?"></div>
+          <div class="mb-3"><label class="form-label">Descrição</label>
+            <textarea class="form-control" id="modal-descricao" rows="2" placeholder="Detalhes opcionais..."></textarea></div>
           <div class="row g-3">
-            <div class="col-6">
-              <label class="form-label">Prioridade</label>
+            <div class="col-6"><label class="form-label">Prioridade</label>
               <select class="form-select" id="modal-prioridade">
-                <option value="baixa">🔵 Baixa</option>
-                <option value="normal" selected>⚪ Normal</option>
-                <option value="alta">🟠 Alta</option>
                 <option value="urgente">🔴 Urgente</option>
-              </select>
-            </div>
-            <div class="col-6">
-              <label class="form-label">Coluna</label>
+                <option value="alta">🟠 Alta</option>
+                <option value="normal" selected>⚪ Normal</option>
+                <option value="baixa">🔵 Baixa</option>
+              </select></div>
+            <div class="col-6"><label class="form-label">Status</label>
               <select class="form-select" id="modal-coluna">
                 <option value="a_fazer">A Fazer</option>
                 <option value="em_progresso">Em Progresso</option>
                 <option value="concluido">Concluído</option>
-              </select>
-            </div>
+              </select></div>
           </div>
           <div class="row g-3 mt-0">
-            <div class="col-6">
-              <label class="form-label">Responsável</label>
+            <div class="col-6"><label class="form-label">Responsável <span class="text-danger">*</span></label>
               <select class="form-select" id="modal-responsavel">
-                <option value="">Sem responsável</option>
-                <option value="export@pietrobon.com.br">Export</option>
-                <option value="export2@pietrobon.com.br">Export 2</option>
-                <option value="joaoantonio@pietrobon.com.br">João</option>
-                <option value="auxiliarexp@pietrobon.com.br">Auxiliar</option>
-              </select>
-            </div>
-            <div class="col-6">
-              <label class="form-label">Prazo</label>
-              <input type="date" class="form-control" id="modal-prazo">
-            </div>
+                <option value="">Selecione...</option>
+                <option value="export@pietrobon.com.br">Diego Diniz</option>
+                <option value="export2@pietrobon.com.br">Kauã Mello</option>
+                <option value="joaoantonio@pietrobon.com.br">João Antonio</option>
+                <option value="export3@pietrobon.com.br">Bernardo</option>
+              </select></div>
+            <div class="col-6"><label class="form-label">Prazo</label>
+              <input type="date" class="form-control" id="modal-prazo"></div>
           </div>
         </div>
         <div class="modal-footer">
@@ -364,7 +127,6 @@
       </div>
     </div>
   </div>
-
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script type="module" src="/JS/tarefas/tarefas.js"></script>
 </body>
