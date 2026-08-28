@@ -8,6 +8,7 @@ const paisesAbertos = new Set()
 const anosAbertos   = new Set()
 let primeiraVez     = true
 let todosOsPedidos  = []
+const pisAbertos    = new Set()
 
 // ── Agrupamento ─────────────────────────────────────────────────
 function extrarAno(d) {
@@ -36,6 +37,17 @@ window.toggleGrupoPais = function(pais) {
 window.toggleGrupoAno = function(chave) {
   if (anosAbertos.has(chave)) anosAbertos.delete(chave); else anosAbertos.add(chave)
   renderizarLista(todosOsPedidos).catch(e => console.error(e))
+}
+
+
+window.togglePi = function(piId) {
+  const body    = document.getElementById(`pi-body-${piId}`)
+  const chevron = document.getElementById(`pi-chevron-${piId}`)
+  if (!body) return
+  const aberto = body.style.display !== 'none'
+  body.style.display = aberto ? 'none' : 'block'
+  if (chevron) chevron.textContent = aberto ? '▶' : '▼'
+  if (aberto) pisAbertos.delete(String(piId)); else pisAbertos.add(String(piId))
 }
 
 // ── Toggle form adicionar produto inline ─────────────────────────
@@ -75,32 +87,46 @@ window.salvarProdutoInline = async function(piId) {
   renderizarLista(todosOsPedidos).catch(e => console.error(e))
 }
 
-// ── Card de PI com form inline de produto ────────────────────────
+// ── Card de PI colapsável com form inline de produto ─────────────
 function criarCardPi(pedido, produtos) {
+  const aberto = pisAbertos.has(String(pedido.id))
   const bloco = document.createElement('div')
   bloco.className = 'card border-0 shadow-sm mb-2'
+  bloco.id = `pi-card-${pedido.id}`
 
-  // Cabeçalho da PI
+  // Cabeçalho sempre visível — clicável para expandir/recolher
   const cabecalho = document.createElement('div')
-  cabecalho.className = 'card-body d-flex justify-content-between align-items-center flex-wrap gap-2 py-3'
+  cabecalho.className = 'card-body d-flex justify-content-between align-items-center flex-wrap gap-2 py-2'
+  cabecalho.style.cursor = 'pointer'
+  cabecalho.onclick = () => window.togglePi(pedido.id)
+
   const dataCadFmt = pedido.data_cadastro
     ? ' · ' + new Date(String(pedido.data_cadastro).slice(0, 10) + 'T00:00:00').toLocaleDateString('pt-BR')
     : ''
+  const qtdProd = produtos?.length || 0
   cabecalho.innerHTML = `
-    <div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span id="pi-chevron-${pedido.id}" style="font-size:.65rem;color:#94a3b8;width:12px">${aberto ? '▼' : '▶'}</span>
       <strong class="text-danger">PI ${pedido.numero_pi}</strong>
-      <span class="text-muted small"> — ${pedido.cliente || 'sem cliente'}${dataCadFmt}</span>
+      <span class="text-muted small">${pedido.cliente ? '— ' + pedido.cliente : ''}${dataCadFmt}</span>
+      <span class="badge bg-light text-dark border" style="font-size:.72rem">${qtdProd} produto${qtdProd !== 1 ? 's' : ''}</span>
     </div>`
+
   if (!window._convidado) {
     const btnExcluir = document.createElement('button')
     btnExcluir.type = 'button'
     btnExcluir.className = 'btn btn-sm btn-outline-danger'
     btnExcluir.style.borderRadius = '8px'
     btnExcluir.textContent = 'Excluir PI'
-    btnExcluir.addEventListener('click', () => excluirPi(pedido.id, pedido.numero_pi))
+    btnExcluir.addEventListener('click', (e) => { e.stopPropagation(); excluirPi(pedido.id, pedido.numero_pi) })
     cabecalho.appendChild(btnExcluir)
   }
   bloco.appendChild(cabecalho)
+
+  // Corpo colapsável
+  const corpo = document.createElement('div')
+  corpo.id = `pi-body-${pedido.id}`
+  corpo.style.display = aberto ? 'block' : 'none'
 
   // Lista de produtos
   const lista = document.createElement('ul')
@@ -130,7 +156,7 @@ function criarCardPi(pedido, produtos) {
       lista.appendChild(item)
     })
   }
-  bloco.appendChild(lista)
+  corpo.appendChild(lista)
 
   // Form inline para adicionar produto (somente admin)
   if (!window._convidado) {
@@ -161,9 +187,10 @@ function criarCardPi(pedido, produtos) {
           </div>
         </div>
       </div>`
-    bloco.appendChild(footer)
+    corpo.appendChild(footer)
   }
 
+  bloco.appendChild(corpo)
   return bloco
 }
 
