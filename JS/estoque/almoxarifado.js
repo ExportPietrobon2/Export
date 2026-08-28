@@ -12,6 +12,7 @@ let podeResponderPedido = false
 const containerConteudo = document.getElementById('conteudo-pi')
 let todosPedidosList = []
 let piSelecionadaId = null
+let pendentesMap = {}
 const paisesAbertosSel = new Set()
 const anosAbertosSel   = new Set()
 
@@ -119,12 +120,15 @@ function renderizarSeletorPi(pedidos, busca) {
       const abertoAno = anosAbertosSel.has(chave)
       const pisDdoAno = grupos[pais][ano]
 
-      const chipsHtml = pisDdoAno.map(p => `
+      const chipsHtml = pisDdoAno.map(p => {
+        const nPend = pendentesMap[p.numero_pi] || 0
+        return `
         <button class="pi-chip${p.id == piSelecionadaId ? ' pi-chip-ativo' : ''}"
           onclick="selecionarPi(${p.id})" data-pi-id="${p.id}">
           <span class="pi-chip-numero">PI ${p.numero_pi}</span>
           ${p.cliente ? `<span class="pi-chip-cliente">${p.cliente}</span>` : ''}
-        </button>`).join('')
+          ${nPend > 0 ? `<span class="pi-chip-pendente">${nPend}</span>` : ''}
+        </button>`}).join('')
 
       return `
         <div class="sel-ano-grupo">
@@ -221,8 +225,17 @@ async function carregarPi(piId) {
 
  adicionarListeners()
 
- 
- let algumRestaurado = false
+  if (!window._convidado && produtos.length > 1) {
+    const btnTudo = document.createElement('button')
+    btnTudo.id = 'btn-salvar-tudo'
+    btnTudo.className = 'btn btn-pietrobon w-100 mb-3'
+    btnTudo.innerHTML = '💾 Salvar tudo'
+    btnTudo.style.cssText = 'border-radius:12px;font-size:.9rem'
+    btnTudo.onclick = salvarTudo
+    containerConteudo.insertBefore(btnTudo, containerConteudo.firstChild)
+  }
+
+  let algumRestaurado = false
  for (const produto of produtos) {
  if (aplicarRascunho(produto.id)) {
  algumRestaurado = true
@@ -239,6 +252,49 @@ async function carregarPi(piId) {
  aviso.innerHTML = 'Recuperamos o que você havia digitado e ainda não tinha sido salvo. Confira os valores e clique em <strong>Salvar</strong>.'
  containerConteudo.insertBefore(aviso, containerConteudo.firstChild)
  }
+}
+
+
+async function salvarTudo() {
+  const botoes = [...containerConteudo.querySelectorAll('.btn-salvar-produto')]
+  if (!botoes.length) return
+  const btnTudo = document.getElementById('btn-salvar-tudo')
+  if (btnTudo) { btnTudo.disabled = true; btnTudo.textContent = `Salvando 0/${botoes.length}...` }
+
+  let salvos = 0
+  for (const btn of botoes) {
+    if (btnTudo) btnTudo.textContent = `Salvando ${salvos + 1}/${botoes.length}...`
+    await salvarProdutoSilencioso(btn.dataset.produto, btn.dataset.quantidade)
+    salvos++
+  }
+
+  if (btnTudo) {
+    btnTudo.disabled = false
+    btnTudo.innerHTML = `✔ ${salvos} produto${salvos !== 1 ? 's' : ''} salvo${salvos !== 1 ? 's' : ''}!`
+    btnTudo.style.background = 'var(--green-ok)'
+    setTimeout(() => {
+      btnTudo.innerHTML = '💾 Salvar tudo'
+      btnTudo.style.background = ''
+    }, 2500)
+  }
+  carregarAlertaDeclaracao()
+  await carregarPedidos()
+}
+
+async function salvarProdutoSilencioso(produtoId, quantidade) {
+  const insumosParaSalvar = ['embalagem', 'caixa', 'etiqueta'].map((chave) => ({
+    tipo: chave,
+    sobra: parseFloat(containerConteudo.querySelector(`input[data-produto="${produtoId}"][data-campo="sobra"][data-tipo="${chave}"]`)?.value) || 0,
+    quantidade_por_pacote: parseFloat(containerConteudo.querySelector(`input[data-produto="${produtoId}"][data-campo="quantidade_por_pacote"][data-tipo="${chave}"]`)?.value) || 0
+  }))
+  const rotulos = [...containerConteudo.querySelectorAll(`#rotulos-${produtoId} .rotulo-row`)].map(row => ({
+    nome: row.querySelector('.rotulo-nome').value.trim() || null,
+    sobra: row.querySelector('.rotulo-sobra').value || 0,
+    quantidade_por_pacote: row.querySelector('.rotulo-pac').value || 0
+  })).filter(r => r.nome || Number(r.sobra) > 0)
+  const textarea = containerConteudo.querySelector(`textarea[data-produto="${produtoId}"]`)
+  await api.produtos.salvarInsumos(produtoId, { insumos: insumosParaSalvar, rotulos, observacoes: textarea?.value || '', quantidade })
+  limparRascunho(produtoId)
 }
 
 function adicionarListeners() {
