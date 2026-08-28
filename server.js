@@ -1721,6 +1721,18 @@ app.delete('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, re
 // ORDEM DE PRODUÇÃO (por PI) — restrito ao financeiro (export2, export, joaoantonio)
 // =============================================
 
+const EMAILS_CHECKLIST = ['export2@pietrobon.com.br', 'export@pietrobon.com.br']
+
+function autenticarChecklist() {
+  const base = autenticar(['admin'])
+  return (req, res, next) => base(req, res, () => {
+    if (!EMAILS_CHECKLIST.includes((req.usuario.email || '').toLowerCase())) {
+      return res.status(403).json({ erro: 'Sem permissão' })
+    }
+    next()
+  })
+}
+
 async function inicializarChecklist() {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS checklist_exp (
