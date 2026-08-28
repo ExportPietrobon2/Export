@@ -2236,14 +2236,6 @@ async function inicializarCatalogoProdutos() {
       criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`)
   } catch (e) { console.error('Erro ao criar tabela catálogo:', e.message) }
-  try {
-    const [r] = await pool.query(
-      `INSERT IGNORE INTO produtos_catalogo (nome)
-       SELECT DISTINCT produto FROM produtos_pi
-       WHERE produto IS NOT NULL AND produto != ''`
-    )
-    if (r.affectedRows > 0) console.log(`Catálogo: ${r.affectedRows} produto(s) importado(s) de produtos_pi.`)
-  } catch (e) { console.error('Erro ao importar produtos para catálogo:', e.message) }
 }
 setTimeout(inicializarCatalogoProdutos, 3000)
 

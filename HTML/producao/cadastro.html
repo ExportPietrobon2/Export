@@ -12,49 +12,48 @@
   <link rel="stylesheet" href="/CSS/style.css">
   <style>
     .btn-nova-pi-toggle {
-      border: 1.5px dashed var(--red); background: var(--red-light);
-      color: var(--red-dark); border-radius: var(--r); padding: 10px 20px;
-      font-weight: 700; font-size: .9rem; cursor: pointer; transition: all .15s;
-      display: inline-flex; align-items: center; gap: 8px;
+      border: 1.5px dashed var(--red); background: var(--red-light); color: var(--red-dark);
+      border-radius: var(--r); padding: 10px 20px; font-weight: 700; font-size: .9rem;
+      cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 8px;
     }
     .btn-nova-pi-toggle:hover { background: var(--red); color: #fff; }
-
     .form-nova-pi-wrap {
       background: #fff; border: 1px solid var(--border); border-radius: var(--r-lg);
       padding: 20px; margin-top: 10px; box-shadow: var(--shadow); display: none;
     }
-
     .btn-add-produto-inline {
-      width: 100%; border: 1.5px dashed #c0cad8; background: transparent;
-      color: var(--muted); border-radius: 8px; padding: 7px; font-size: .82rem;
-      font-weight: 600; cursor: pointer; transition: all .15s; margin-top: 8px;
+      width: 100%; border: 1.5px dashed #c0cad8; background: transparent; color: var(--muted);
+      border-radius: 8px; padding: 8px; font-size: .82rem; font-weight: 600;
+      cursor: pointer; transition: all .15s; margin-top: 8px;
     }
     .btn-add-produto-inline:hover { border-color: var(--red); color: var(--red); background: var(--red-light); }
 
-    .form-add-produto {
-      background: #fafbfd; border: 1px solid var(--border);
-      border-radius: 10px; padding: 12px; margin-top: 8px;
+    /* ── Seletor de produto ── */
+    .seletor-item {
+      padding: 10px 16px; cursor: pointer; font-size: .855rem; color: #334155;
+      border-bottom: 1px solid #f5f5f5; transition: background .1s; line-height: 1.4;
     }
+    .seletor-item:last-child { border-bottom: none; }
+    .seletor-item:hover { background: var(--red-light); color: var(--red-dark); }
+    .seletor-ativo {
+      background: var(--red) !important; color: #fff !important; font-weight: 600;
+    }
+    .seletor-novo {
+      color: #1d4ed8; font-style: italic; background: #eff6ff;
+    }
+    .seletor-novo:hover { background: #dbeafe !important; color: #1e40af !important; }
+    .seletor-vazio { padding: 20px 16px; color: #94a3b8; font-size: .83rem; font-style: italic; text-align: center; }
 
-    /* Autocomplete */
-    .ac-lista {
-      position: absolute; top: calc(100% + 3px); left: 0; right: 0;
-      background: #fff; border: 1px solid #e4e7ef; border-radius: 10px;
-      box-shadow: 0 6px 20px rgba(0,0,0,.12); z-index: 300;
-      max-height: 200px; overflow-y: auto;
+    .produto-selecionado-box {
+      background: var(--green-bg); border: 1.5px solid #bbf7d0;
+      border-radius: 10px; padding: 10px 14px;
     }
-    .ac-item {
-      padding: 8px 14px; cursor: pointer; font-size: .83rem; color: #334155;
-      border-bottom: 1px solid #f5f5f5; transition: background .1s;
-    }
-    .ac-item:last-child { border-bottom: none; }
-    .ac-item:hover { background: var(--red-light); color: var(--red-dark); }
 
     /* Catálogo */
     .catalogo-wrap {
       background: #fff; border: 1px solid var(--border); border-radius: var(--r-lg);
       padding: 16px; margin-top: 10px; box-shadow: var(--shadow); display: none;
-      max-height: 320px; overflow-y: auto;
+      max-height: 300px; overflow-y: auto;
     }
     .catalogo-item { font-size: .83rem; color: #334155; }
   </style>
@@ -75,7 +74,7 @@
         <button class="btn-nova-pi-toggle" id="btn-toggle-nova-pi">➕ Nova PI</button>
         <div>
           <button class="btn btn-sm btn-outline-secondary" id="btn-toggle-catalogo" style="border-radius:8px">
-            Ver catálogo ▾
+            📦 Catálogo ▾
           </button>
           <span class="small text-muted ms-2" id="catalogo-total"></span>
         </div>
@@ -106,8 +105,8 @@
 
       <div class="catalogo-wrap" id="catalogo-wrap">
         <div class="d-flex align-items-center justify-content-between mb-2">
-          <span class="secao-titulo-card mb-0" style="border:none;padding:0;font-size:.85rem">📦 Catálogo de produtos salvos</span>
-          <span class="small text-muted fst-italic">Clique ✕ para remover do catálogo</span>
+          <span class="fw-semibold small">Produtos salvos no catálogo</span>
+          <span class="small text-muted fst-italic">✕ remove do catálogo</span>
         </div>
         <div id="lista-catalogo"></div>
       </div>
@@ -116,6 +115,49 @@
     <h5 class="secao-titulo-card mb-3">PIs cadastradas</h5>
     <div id="lista-pedidos"></div>
   </div>
+
+  <!-- Modal seletor de produto -->
+  <div class="modal fade" id="modal-seletor-produto" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width:480px">
+      <div class="modal-content" style="border-radius:18px;border:none;box-shadow:0 20px 60px rgba(0,0,0,.18)">
+        <div class="modal-header" style="border-bottom:1px solid #f0f2f7;padding:16px 20px 12px">
+          <div>
+            <h5 class="modal-title fw-bold" style="font-size:.95rem">Adicionar produto</h5>
+            <div class="small text-muted" id="seletor-pi-label"></div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="p-3 border-bottom" style="background:#fafbfd">
+          <input type="text" id="seletor-busca" class="form-control"
+            placeholder="🔍  Buscar no catálogo..." autocomplete="off">
+        </div>
+
+        <div id="seletor-lista" style="min-height:120px;max-height:300px;overflow-y:auto"></div>
+
+        <div class="modal-footer flex-column gap-0 p-3" style="border-top:1px solid #f0f2f7">
+          <div id="seletor-selecionado" style="display:none;width:100%">
+            <div class="produto-selecionado-box mb-3">
+              <div class="small text-muted mb-1">Produto selecionado</div>
+              <div class="fw-semibold" id="seletor-nome-display" style="font-size:.88rem;word-break:break-word"></div>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+              <label class="small fw-semibold mb-0 text-nowrap">Quantidade (cx)</label>
+              <input type="number" id="seletor-qtd" class="form-control" placeholder="ex: 100" min="1"
+                style="max-width:140px">
+              <button class="btn btn-pietrobon flex-fill" id="btn-confirmar-produto">
+                ✔ Adicionar
+              </button>
+            </div>
+          </div>
+          <div id="seletor-hint" class="small text-muted text-center w-100 py-1">
+            Selecione um produto da lista acima
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script type="module" src="/JS/producao/cadastro.js"></script>
   <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js') }</script>
