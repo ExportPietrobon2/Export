@@ -204,6 +204,12 @@ export const api = {
     excluir: (id) => requisitar('DELETE', `/api/ordemproducao/${id}`)
   },
 
+  catalogoProdutos: {
+    listar:    ()     => requisitar('GET',    '/api/catalogo-produtos'),
+    adicionar: (nome) => requisitar('POST',   '/api/catalogo-produtos', { nome }),
+    excluir:   (id)   => requisitar('DELETE', `/api/catalogo-produtos/${id}`)
+  },
+
   checklist: {
     listar: () => requisitar('GET', '/api/checklist'),
     obter: (id) => requisitar('GET', `/api/checklist/${id}`),

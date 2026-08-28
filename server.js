@@ -2227,6 +2227,42 @@ app.delete('/api/tarefas/:id', autenticarTarefas(), async (req, res) => {
 })
 
 
+async function inicializarCatalogoProdutos() {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS produtos_catalogo (
+      id   INT AUTO_INCREMENT PRIMARY KEY,
+      nome VARCHAR(500) NOT NULL,
+      UNIQUE KEY unique_nome (nome(250)),
+      criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`)
+  } catch (e) { console.error('Erro ao inicializar catálogo de produtos:', e.message) }
+}
+setTimeout(inicializarCatalogoProdutos, 3000)
+
+app.get('/api/catalogo-produtos', autenticar(TODOS), async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT id, nome FROM produtos_catalogo ORDER BY nome ASC')
+    res.json(rows)
+  } catch (e) { res.status(500).json({ erro: e.message }) }
+})
+
+app.post('/api/catalogo-produtos', autenticar(TODOS), async (req, res) => {
+  try {
+    const { nome } = req.body
+    if (!nome || !nome.trim()) return res.status(400).json({ erro: 'Nome obrigatório.' })
+    await pool.query('INSERT IGNORE INTO produtos_catalogo (nome) VALUES (?)', [nome.trim()])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ erro: e.message }) }
+})
+
+app.delete('/api/catalogo-produtos/:id', autenticar(['admin']), async (req, res) => {
+  try {
+    await pool.query('DELETE FROM produtos_catalogo WHERE id = ?', [req.params.id])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ erro: e.message }) }
+})
+
+
 app.get('*', (req, res) => {
  res.sendFile(path.join(__dirname, 'index.html'))
 })

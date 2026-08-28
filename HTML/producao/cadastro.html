@@ -12,53 +12,51 @@
   <link rel="stylesheet" href="/CSS/style.css">
   <style>
     .btn-nova-pi-toggle {
-      border: 1.5px dashed var(--red);
-      background: var(--red-light);
-      color: var(--red-dark);
-      border-radius: var(--r);
-      padding: 10px 20px;
-      font-weight: 700;
-      font-size: .9rem;
-      cursor: pointer;
-      transition: all .15s;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
+      border: 1.5px dashed var(--red); background: var(--red-light);
+      color: var(--red-dark); border-radius: var(--r); padding: 10px 20px;
+      font-weight: 700; font-size: .9rem; cursor: pointer; transition: all .15s;
+      display: inline-flex; align-items: center; gap: 8px;
     }
     .btn-nova-pi-toggle:hover { background: var(--red); color: #fff; }
 
     .form-nova-pi-wrap {
-      background: #fff;
-      border: 1px solid var(--border);
-      border-radius: var(--r-lg);
-      padding: 20px;
-      margin-top: 10px;
-      box-shadow: var(--shadow);
-      display: none;
+      background: #fff; border: 1px solid var(--border); border-radius: var(--r-lg);
+      padding: 20px; margin-top: 10px; box-shadow: var(--shadow); display: none;
     }
 
     .btn-add-produto-inline {
-      width: 100%;
-      border: 1.5px dashed #c0cad8;
-      background: transparent;
-      color: var(--muted);
-      border-radius: 8px;
-      padding: 7px;
-      font-size: .82rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all .15s;
-      margin-top: 8px;
+      width: 100%; border: 1.5px dashed #c0cad8; background: transparent;
+      color: var(--muted); border-radius: 8px; padding: 7px; font-size: .82rem;
+      font-weight: 600; cursor: pointer; transition: all .15s; margin-top: 8px;
     }
     .btn-add-produto-inline:hover { border-color: var(--red); color: var(--red); background: var(--red-light); }
 
     .form-add-produto {
-      background: #fafbfd;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px;
-      margin-top: 8px;
+      background: #fafbfd; border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px; margin-top: 8px;
     }
+
+    /* Autocomplete */
+    .ac-lista {
+      position: absolute; top: calc(100% + 3px); left: 0; right: 0;
+      background: #fff; border: 1px solid #e4e7ef; border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(0,0,0,.12); z-index: 300;
+      max-height: 200px; overflow-y: auto;
+    }
+    .ac-item {
+      padding: 8px 14px; cursor: pointer; font-size: .83rem; color: #334155;
+      border-bottom: 1px solid #f5f5f5; transition: background .1s;
+    }
+    .ac-item:last-child { border-bottom: none; }
+    .ac-item:hover { background: var(--red-light); color: var(--red-dark); }
+
+    /* Catálogo */
+    .catalogo-wrap {
+      background: #fff; border: 1px solid var(--border); border-radius: var(--r-lg);
+      padding: 16px; margin-top: 10px; box-shadow: var(--shadow); display: none;
+      max-height: 320px; overflow-y: auto;
+    }
+    .catalogo-item { font-size: .83rem; color: #334155; }
   </style>
 </head>
 <body data-pagina="cadastro.html">
@@ -73,9 +71,16 @@
     </div>
 
     <div id="area-admin" class="mb-4">
-      <button class="btn-nova-pi-toggle" id="btn-toggle-nova-pi">
-        ➕ Nova PI
-      </button>
+      <div class="d-flex align-items-center gap-3 flex-wrap mb-2">
+        <button class="btn-nova-pi-toggle" id="btn-toggle-nova-pi">➕ Nova PI</button>
+        <div>
+          <button class="btn btn-sm btn-outline-secondary" id="btn-toggle-catalogo" style="border-radius:8px">
+            Ver catálogo ▾
+          </button>
+          <span class="small text-muted ms-2" id="catalogo-total"></span>
+        </div>
+      </div>
+
       <div class="form-nova-pi-wrap" id="form-nova-pi-wrap">
         <h5 class="secao-titulo-card mb-3">Cadastrar nova PI</h5>
         <form id="form-novo-pi" class="row g-2 align-items-end">
@@ -97,6 +102,14 @@
             <button type="button" class="btn btn-outline-secondary" id="btn-cancelar-nova-pi">✕</button>
           </div>
         </form>
+      </div>
+
+      <div class="catalogo-wrap" id="catalogo-wrap">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span class="secao-titulo-card mb-0" style="border:none;padding:0;font-size:.85rem">📦 Catálogo de produtos salvos</span>
+          <span class="small text-muted fst-italic">Clique ✕ para remover do catálogo</span>
+        </div>
+        <div id="lista-catalogo"></div>
       </div>
     </div>
 
