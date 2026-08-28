@@ -129,7 +129,6 @@ export function montarCabecalho(papel) {
         { href: '/HTML/financeiro/contabil.html', texto: 'Mensal Contabil' },
         { href: '/HTML/financeiro/exp-contabil.html', texto: 'Fechamento Contabil' },
         { href: '/HTML/financeiro/financeiro.html', texto: 'Importações' },
-        { href: '/HTML/financeiro/conferencia-nfse.html', texto: 'Conferência NFS-e', quando: temAcessoFinanceiro },
       ]
     }
     ,
