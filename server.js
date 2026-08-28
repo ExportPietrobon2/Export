@@ -1906,6 +1906,57 @@ app.delete('/api/tarefas/:id', autenticarTarefas(), async (req, res) => {
 })
 
 
+// =============================================
+// CATÁLOGO DE PRODUTOS
+// =============================================
+
+async function inicializarCatalogoProdutos() {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS produtos_catalogo (
+      id   INT AUTO_INCREMENT PRIMARY KEY,
+      nome VARCHAR(500) NOT NULL,
+      UNIQUE KEY unique_nome (nome(250)),
+      criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`)
+  } catch (e) { console.error('Erro ao criar tabela catálogo:', e.message) }
+  try {
+    const [[{ total }]] = await pool.query('SELECT COUNT(*) as total FROM produtos_catalogo')
+    if (Number(total) === 0) {
+      const [r] = await pool.query(
+        `INSERT IGNORE INTO produtos_catalogo (nome)
+         SELECT DISTINCT produto FROM produtos_pi
+         WHERE produto IS NOT NULL AND produto != ''`
+      )
+      if (r.affectedRows > 0) console.log(`Catálogo: ${r.affectedRows} produto(s) importado(s) de produtos_pi.`)
+    }
+  } catch (e) { console.error('Erro ao popular catálogo:', e.message) }
+}
+setTimeout(inicializarCatalogoProdutos, 4000)
+
+app.get('/api/catalogo-produtos', autenticar(TODOS), async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT id, nome FROM produtos_catalogo ORDER BY nome ASC')
+    res.json(rows)
+  } catch (e) { res.status(500).json({ erro: e.message }) }
+})
+
+app.post('/api/catalogo-produtos', autenticar(TODOS), async (req, res) => {
+  try {
+    const { nome } = req.body
+    if (!nome || !nome.trim()) return res.status(400).json({ erro: 'Nome obrigatório.' })
+    await pool.query('INSERT IGNORE INTO produtos_catalogo (nome) VALUES (?)', [nome.trim()])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ erro: e.message }) }
+})
+
+app.delete('/api/catalogo-produtos/:id', autenticar(['admin']), async (req, res) => {
+  try {
+    await pool.query('DELETE FROM produtos_catalogo WHERE id = ?', [req.params.id])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ erro: e.message }) }
+})
+
+
 app.get('*', (req, res) => {
  res.sendFile(path.join(__dirname, 'index.html'))
 })
