@@ -562,26 +562,64 @@ document.querySelectorAll('[data-aba]').forEach((btn) => {
 })
 
 async function carregarAlertaDeclaracao() {
- const container = document.getElementById('alerta-declaracao-almox')
- if (!container) return
- const rows = await api.alertas.declaracaoPendente()
- if (!Array.isArray(rows) || !rows.length) { container.innerHTML = ''; return }
+  const container = document.getElementById('alerta-declaracao-almox')
+  if (!container) return
+  const rows = await api.alertas.declaracaoPendente()
+  if (!Array.isArray(rows) || !rows.length) { container.innerHTML = ''; return }
 
- const porPi = {}
- rows.forEach((r) => {
- if (!porPi[r.numero_pi]) porPi[r.numero_pi] = { cliente: r.cliente, produtos: [] }
- const horas = Math.floor((Date.now() - new Date(r.criado_em).getTime()) / 3600000)
- porPi[r.numero_pi].produtos.push(`${r.produto} (há ${horas}h)`)
- })
+  const porPi = {}
+  rows.forEach((r) => {
+    if (!porPi[r.numero_pi]) porPi[r.numero_pi] = { cliente: r.cliente, qtd: 0, maxHoras: 0 }
+    porPi[r.numero_pi].qtd++
+    const horas = Math.floor((Date.now() - new Date(r.criado_em).getTime()) / 3600000)
+    if (horas > porPi[r.numero_pi].maxHoras) porPi[r.numero_pi].maxHoras = horas
+  })
 
- const blocos = Object.entries(porPi).map(([numeroPi, info]) => `
- <div class="mb-1"><span class="fw-bold">PI ${numeroPi}</span>${info.cliente ? ` — ${info.cliente}` : ''}:
- <span style="opacity:.95">${info.produtos.join(', ')}</span></div>`).join('')
+  const numPis = Object.keys(porPi).length
+  const detalhes = Object.entries(porPi).map(([numeroPi, info]) =>
+    `<div class="declaracao-pi-row">
+      <span class="declaracao-pi-num">PI ${numeroPi}</span>
+      ${info.cliente ? `<span class="declaracao-pi-cli">${info.cliente}</span>` : ''}
+      <span class="declaracao-pi-qtd">${info.qtd} produto${info.qtd > 1 ? 's' : ''} — há ${info.maxHoras}h</span>
+    </div>`
+  ).join('')
 
- container.innerHTML = `
- <div class="resumo-alerta-declaracao-topo"><div style="font-size:1.1rem;margin-bottom:8px">⏰ ${rows.length} PRODUTO(S) SEM ESTOQUE DECLARADO (48h+)</div><div style="font-weight:600;opacity:.95;margin-bottom:8px">Declare o estoque destes produtos na aba "Estoque PI":</div>
- ${blocos}
- </div>`
+  container.innerHTML = `
+    <style>
+      .alerta-decl-wrap {
+        background: #fff8f0; border: 1.5px solid var(--orange);
+        border-radius: 12px; overflow: hidden; margin-bottom: 16px;
+      }
+      .alerta-decl-header {
+        display: flex; align-items: center; gap: 10px; padding: 11px 16px;
+        cursor: pointer; user-select: none;
+      }
+      .alerta-decl-header:hover { background: #fff3e6; }
+      .alerta-decl-icone { font-size: 1.1rem; flex-shrink: 0; }
+      .alerta-decl-texto { flex: 1; font-size: .88rem; font-weight: 700; color: #92400e; }
+      .alerta-decl-sub { font-size: .75rem; font-weight: 500; color: #b45309; margin-left: 4px; }
+      .alerta-decl-btn { font-size: .75rem; font-weight: 600; color: #d97706; background: none; border: none; cursor: pointer; padding: 0; }
+      .alerta-decl-corpo { border-top: 1px solid #fde68a; padding: 10px 16px 12px; background: #fffbf5; }
+      .declaracao-pi-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid #fef3c7; flex-wrap: wrap; }
+      .declaracao-pi-row:last-child { border-bottom: none; }
+      .declaracao-pi-num { font-weight: 700; color: #92400e; font-size: .82rem; }
+      .declaracao-pi-cli { font-size: .78rem; color: #b45309; }
+      .declaracao-pi-qtd { font-size: .75rem; color: #d97706; margin-left: auto; font-weight: 600; }
+      .alerta-decl-hint { font-size: .75rem; color: #b45309; margin-top: 8px; font-style: italic; }
+    </style>
+    <div class="alerta-decl-wrap">
+      <div class="alerta-decl-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.alerta-decl-btn').textContent=this.nextElementSibling.style.display==='none'?'Ver ▾':'Fechar ▴'">
+        <span class="alerta-decl-icone">⏰</span>
+        <span class="alerta-decl-texto">${rows.length} produto${rows.length > 1 ? 's' : ''} sem declaração
+          <span class="alerta-decl-sub">· ${numPis} PI${numPis > 1 ? 's' : ''} afetada${numPis > 1 ? 's' : ''}</span>
+        </span>
+        <button class="alerta-decl-btn">Ver ▾</button>
+      </div>
+      <div class="alerta-decl-corpo" style="display:none">
+        ${detalhes}
+        <div class="alerta-decl-hint">Acesse a aba "Estoque PI" para declarar o estoque de cada produto.</div>
+      </div>
+    </div>`
 }
 
 async function iniciar() {
