@@ -55,7 +55,6 @@ export const api = {
 
   pendencias: () => requisitar('GET', '/api/pendencias'),
 
-  chat: (mensagem, historico) => requisitar('POST', '/api/chat', { mensagem, historico }),
 
   pedidos: {
     listar: (incluirConcluidas = false) =>
@@ -196,13 +195,6 @@ export const api = {
     excluirCusto: (impId) => requisitar('DELETE', `/api/fin/custos/${impId}`)
   },
 
-  ordemProducao: {
-    listar: () => requisitar('GET', '/api/ordemproducao'),
-    obter: (id) => requisitar('GET', `/api/ordemproducao/${id}`),
-    criar: (dados) => requisitar('POST', '/api/ordemproducao', dados),
-    editar: (id, dados) => requisitar('PUT', `/api/ordemproducao/${id}`, dados),
-    excluir: (id) => requisitar('DELETE', `/api/ordemproducao/${id}`)
-  },
 
   catalogoProdutos: {
     listar:    ()     => requisitar('GET',    '/api/catalogo-produtos'),

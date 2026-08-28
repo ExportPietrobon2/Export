@@ -1,6 +1,5 @@
 import { sair, getPerfil } from '/JS/core/auth.js'
 import { api } from '/JS/core/api.js'
-import { iniciarChat } from '/JS/core/chat.js'
 import { iniciarToast } from '/JS/core/toast.js'
 
 
@@ -110,7 +109,6 @@ export function montarCabecalho(papel) {
       itens: [
         { href: '/HTML/producao/admin.html', texto: 'Visão Geral das PIs' },
         { href: '/HTML/producao/cadastro.html', texto: 'Cadastrar PI' },
-        { href: '/HTML/producao/ordem-producao.html', texto: 'Ordem de Produção', quando: temAcessoFinanceiro },
         { href: '/HTML/producao/checklist.html', texto: 'Check-list de Expedição', quando: temAcessoChecklist }
       ]
     },
@@ -199,7 +197,6 @@ export function montarCabecalho(papel) {
   })
 
   carregarBadgesPendencias()
-  iniciarChat(papel)
 
   const btnNotificacao = document.getElementById('btn-notificacao')
   if (btnNotificacao && 'Notification' in window && 'PushManager' in window) {
