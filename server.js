@@ -1,221 +1,1977 @@
-import { api } from '/JS/core/api.js'
-import { exigirPapel } from '/JS/core/auth.js'
-import { montarCabecalho } from '/JS/core/cabecalho.js'
+const express = require('express')
+const webpush = require('web-push')
+const mysql = require('mysql2/promise')
+const bcrypt = require('bcryptjs')
+const jwt = require('jsonwebtoken')
+const cloudinary = require('cloudinary').v2
+const multer = require('multer')
+const path = require('path')
+
+const app = express()
+app.use(express.json({ limit: '20mb' }))
+app.use(express.urlencoded({ limit: '20mb', extended: true }))
+app.use(express.static(path.join(__dirname, '.')))
+
+cloudinary.config({
+ cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+ api_key: process.env.CLOUDINARY_API_KEY,
+ api_secret: process.env.CLOUDINARY_API_SECRET
+})
+
+const upload = multer({ storage: multer.memoryStorage() })
+
+const VAPID_PUBLIC  = process.env.VAPID_PUBLIC  || 'BBKXW9q8UQm07c-duKRqEFyyXEbDwQz4AeXipuuTOsPpcKB9nn7wJmXgTHE68GhjxUZej0YsGln4Cafu61_0slE'
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE || 'APBGcOONkbNs6Bf0KNqNj-T9hJMsdVdUpxXKWg4JgF0'
+webpush.setVapidDetails('mailto:export2@pietrobon.com.br', VAPID_PUBLIC, VAPID_PRIVATE)
+
+async function garantirTabelaPush() {
+  await pool.query(`CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id INT AUTO_INCREMENT PRIMARY KEY, usuario_id INT,
+    endpoint TEXT NOT NULL, p256dh TEXT NOT NULL, auth TEXT NOT NULL,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_endpoint (endpoint(255)))`)
+}
+
+async function podeEnviarPush(chave) {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS push_log (
+      chave VARCHAR(80) PRIMARY KEY, data_ref DATE NOT NULL, contador TINYINT NOT NULL DEFAULT 0)`)
+    const hoje = new Date().toISOString().slice(0, 10)
+    const [[r]] = await pool.query('SELECT data_ref, contador FROM push_log WHERE chave = ?', [chave])
+    if (r && new Date(r.data_ref).toISOString().slice(0, 10) === hoje) {
+      if (r.contador >= 3) return false
+      await pool.query('UPDATE push_log SET contador = contador + 1 WHERE chave = ?', [chave])
+    } else {
+      await pool.query('INSERT INTO push_log (chave, data_ref, contador) VALUES (?, CURDATE(), 1) ON DUPLICATE KEY UPDATE data_ref = CURDATE(), contador = 1', [chave])
+    }
+    return true
+  } catch (e) { return true }
+}
+
+async function enviarPush(titulo, corpo, url, chave) {
+  if (!(await podeEnviarPush(chave))) return
+  try {
+    await garantirTabelaPush()
+    const [subs] = await pool.query('SELECT endpoint, p256dh, auth FROM push_subscriptions')
+    const payload = JSON.stringify({ titulo, corpo, url: url || '/' })
+    await Promise.allSettled(subs.map(async (s) => {
+      try {
+        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload)
+      } catch (e) {
+        if (e.statusCode === 410 || e.statusCode === 404) {
+          await pool.query('DELETE FROM push_subscriptions WHERE endpoint = ?', [s.endpoint])
+        }
+      }
+    }))
+  } catch (e) { console.error('Erro enviarPush:', e.message) }
+}
+
+const EMAIL_TESTE = process.env.EMAIL_TESTE || 'pietrobonexport2@gmail.com'
+const MODO_TESTE = process.env.MODO_TESTE !== 'false'
+
+const BREVO_API_KEY = process.env.BREVO_API_KEY
+const EMAIL_REMETENTE = process.env.EMAIL_REMETENTE || 'export2@pietrobon.com.br'
+
+if (!BREVO_API_KEY) console.warn('BREVO_API_KEY não configurada — e-mails não serão enviados.')
+
+async function getDestinatarios(papeis) {
+ if (MODO_TESTE) return [EMAIL_TESTE]
+ if (papeis && papeis.length) {
+ const [rows] = await pool.query('SELECT email FROM usuarios WHERE papel IN (?) AND recebe_email = 1', [papeis])
+ return rows.map((r) => r.email)
+ }
+ const [rows] = await pool.query('SELECT email FROM usuarios WHERE recebe_email = 1')
+ return rows.map((r) => r.email)
+}
+
+// Evita reenvio de cobranças diárias a cada reinício: só permite 1x por dia por chave
+async function podeEnviarHoje(chave) {
+ try {
+ await pool.query('CREATE TABLE IF NOT EXISTS notif_log (chave VARCHAR(60) PRIMARY KEY, ultima_data DATE)')
+ const [[r]] = await pool.query('SELECT ultima_data FROM notif_log WHERE chave = ?', [chave])
+ const hoje = new Date().toISOString().slice(0, 10)
+ if (r && r.ultima_data && new Date(r.ultima_data).toISOString().slice(0, 10) === hoje) return false
+ await pool.query('INSERT INTO notif_log (chave, ultima_data) VALUES (?, CURDATE()) ON DUPLICATE KEY UPDATE ultima_data = CURDATE()', [chave])
+ return true
+ } catch (e) { return true }
+}
+
+async function enviarEmail(assunto, corpo, papeis) {
+ try {
+ if (!BREVO_API_KEY) return
+ const destinatarios = await getDestinatarios(papeis)
+ if (!destinatarios.length) return
+
+ const html = `
+ <div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;"><div style="background:linear-gradient(120deg,#ED3237,#C6242A);padding:24px 28px;border-radius:12px 12px 0 0;"><p style="color:#fff;font-size:1.2rem;font-weight:800;margin:0;">Pietrobon · Insumos</p></div><div style="background:#fff;padding:28px;border:1px solid #f0d0d0;border-top:none;border-radius:0 0 12px 12px;">
+ ${corpo}
+ <hr style="border:none;border-top:1px solid #f0d0d0;margin:24px 0;"><p style="font-size:0.78rem;color:#8a6a6a;margin:0;">Pietrobon & Cia Ltda · Controle de Insumos Exportação<br>
+ ${MODO_TESTE ? '<strong style="color:#ED3237">Modo teste — notificação enviada apenas para ' + EMAIL_TESTE + '</strong>' : ''}</p></div></div>`
+
+ const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+ method: 'POST',
+ headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', 'accept': 'application/json' },
+ body: JSON.stringify({
+ sender: { email: EMAIL_REMETENTE, name: 'Pietrobon · Insumos' },
+ to: destinatarios.map((email) => ({ email })),
+ subject: assunto,
+ htmlContent: html
+ })
+ })
+
+ if (!resp.ok) {
+ const txt = await resp.text()
+ console.error('Erro Brevo:', resp.status, txt)
+ } else {
+ console.log('Email enviado:', assunto)
+ }
+ } catch (e) {
+ console.error('Erro ao enviar email:', e.message)
+ }
+}
+
+// Envia para uma lista específica de e-mails (respeitando o modo teste).
+async function enviarEmailPara(assunto, corpo, emails) {
+ try {
+ if (!BREVO_API_KEY) return
+ const destinatarios = MODO_TESTE ? [EMAIL_TESTE] : (emails || []).filter(Boolean)
+ if (!destinatarios.length) return
+ const html = `
+ <div style="font-family:'Segoe UI',sans-serif;max-width:640px;margin:0 auto;"><div style="background:linear-gradient(120deg,#ED3237,#C6242A);padding:24px 28px;border-radius:12px 12px 0 0;"><p style="color:#fff;font-size:1.2rem;font-weight:800;margin:0;">Pietrobon · Insumos</p></div><div style="background:#fff;padding:28px;border:1px solid #f0d0d0;border-top:none;border-radius:0 0 12px 12px;">
+ ${corpo}
+ <hr style="border:none;border-top:1px solid #f0d0d0;margin:24px 0;"><p style="font-size:0.78rem;color:#8a6a6a;margin:0;">Pietrobon & Cia Ltda · Controle de Insumos Exportação<br>
+ ${MODO_TESTE ? '<strong style="color:#ED3237">Modo teste — enviado apenas para ' + EMAIL_TESTE + '</strong>' : ''}</p></div></div>`
+ const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+ method: 'POST',
+ headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', 'accept': 'application/json' },
+ body: JSON.stringify({
+ sender: { email: EMAIL_REMETENTE, name: 'Pietrobon · Insumos' },
+ to: destinatarios.map((email) => ({ email })),
+ subject: assunto,
+ htmlContent: html
+ })
+ })
+ if (!resp.ok) { const txt = await resp.text(); console.error('Erro Brevo:', resp.status, txt) } else { console.log('Email enviado:', assunto) }
+ } catch (e) { console.error('Erro ao enviar email:', e.message) }
+}
+
+const pool = mysql.createPool({
+ host: process.env.MYSQLHOST,
+ port: process.env.MYSQLPORT,
+ database: process.env.MYSQLDATABASE,
+ user: process.env.MYSQLUSER,
+ password: process.env.MYSQLPASSWORD,
+ waitForConnections: true,
+ connectionLimit: 10
+})
+
+const JWT_SECRET = process.env.JWT_SECRET || 'segredo-trocar-em-producao'
+
+function autenticar(papeis) {
+ return (req, res, next) => {
+ const cabecalho = req.headers.authorization
+ if (!cabecalho) return res.status(401).json({ erro: 'Não autenticado' })
+ const token = cabecalho.replace('Bearer ', '')
+ try {
+ const payload = jwt.verify(token, JWT_SECRET)
+ if (papeis && !papeis.includes(payload.papel)) {
+ return res.status(403).json({ erro: 'Sem permissão' })
+ }
+ req.usuario = payload
+ next()
+ } catch {
+ return res.status(401).json({ erro: 'Token inválido' })
+ }
+ }
+}
+
+const TODOS = ['admin', 'almoxarifado', 'deposito', 'convidado', 'gerente_producao', 'compras', 'compras_aromas', 'auxiliar']
+
+
+app.get('/api/push/vapid-public', (req, res) => res.json({ key: VAPID_PUBLIC }))
+
+app.post('/api/push/subscribe', autenticar(TODOS), async (req, res) => {
+  const { endpoint, keys } = req.body
+  if (!endpoint || !keys?.p256dh || !keys?.auth) return res.status(400).json({ erro: 'Dados inválidos' })
+  try {
+    await garantirTabelaPush()
+    await pool.query(
+      'INSERT INTO push_subscriptions (usuario_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE p256dh = VALUES(p256dh), auth = VALUES(auth), usuario_id = VALUES(usuario_id)',
+      [req.usuario?.id || null, endpoint, keys.p256dh, keys.auth]
+    )
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ erro: e.message }) }
+})
+
+app.post('/api/login', async (req, res) => {
+ const { email, senha } = req.body
+ const [rows] = await pool.query('SELECT * FROM usuarios WHERE email = ?', [email])
+ if (rows.length === 0) return res.status(401).json({ erro: 'E-mail ou senha incorretos.' })
+ const usuario = rows[0]
+ const senhaCorreta = await bcrypt.compare(senha, usuario.senha)
+ if (!senhaCorreta) return res.status(401).json({ erro: 'E-mail ou senha incorretos.' })
+ const expiracao = '30d'
+ const token = jwt.sign(
+ { id: usuario.id, nome: usuario.nome, papel: usuario.papel, email: usuario.email },
+ JWT_SECRET,
+ { expiresIn: expiracao }
+ )
+ res.json({ token, papel: usuario.papel, nome: usuario.nome })
+})
+
+app.get('/api/pedidos', autenticar(TODOS), async (req, res) => {
+ const incluirConcluidas = req.query.incluirConcluidas === 'true'
+ const condicao = incluirConcluidas ? '' : 'WHERE concluida = 0'
+ const [pedidos] = await pool.query(`SELECT * FROM pedidos ${condicao} ORDER BY numero_pi DESC`)
+ res.json(pedidos)
+})
+
+app.get('/api/pedidos/completo', autenticar(TODOS), async (req, res) => {
+ const incluirConcluidas = req.query.incluirConcluidas === 'true'
+ const condicao = incluirConcluidas ? '' : 'WHERE p.concluida = 0'
+ const [pedidos] = await pool.query(`SELECT * FROM pedidos p ${condicao} ORDER BY p.numero_pi DESC`)
+
+ for (const pedido of pedidos) {
+ const [produtos] = await pool.query(
+ 'SELECT * FROM produtos_pi WHERE pi_id = ?', [pedido.id]
+ )
+ for (const produto of produtos) {
+ const [insumos] = await pool.query(
+ 'SELECT * FROM insumos_produto WHERE produto_id = ?', [produto.id]
+ )
+ produto.insumos_produto = insumos
+ }
+ pedido.produtos_pi = produtos
+ const [recebimentos] = await pool.query(
+ `SELECT r.tipo, r.status_recebimento, r.foto_url, r.foto_nota_url, r.quantidade_recebida,
+ r.produto_id, pr.produto as nome_produto
+ FROM recebimentos_b2 r
+ LEFT JOIN produtos_pi pr ON pr.id = r.produto_id
+ WHERE r.pi_id = ?`,
+ [pedido.id]
+ )
+ pedido.recebimentos_b2 = recebimentos
+
+ const [vinculosEstoque] = await pool.query(
+ `SELECT v.*, e.produto as produto_entrada, e.embalagem_kg as entrada_emb,
+ e.rotulo_kg as entrada_rot, e.pallet_caixas as entrada_pal,
+ e.foto_url as entrada_foto, e.foto_nota_url as entrada_foto_nota,
+ e.localizacao as entrada_localizacao,
+ e.criado_em as entrada_data
+ FROM vinculos_insumos v
+ JOIN estoque_insumos e ON e.id = v.entrada_id
+ WHERE v.pi_id = ?
+ ORDER BY v.criado_em DESC`,
+ [pedido.id]
+ )
+ pedido.vinculos_estoque = vinculosEstoque
+ }
+ res.json(pedidos)
+})
+
+app.post('/api/pedidos', autenticar(['admin']), async (req, res) => {
+ const { numero_pi, data_cadastro, cliente, destino } = req.body
+ const [resultado] = await pool.query(
+ 'INSERT INTO pedidos (numero_pi, data_cadastro, cliente, destino) VALUES (?, ?, ?, ?)',
+ [numero_pi, data_cadastro || null, cliente || null, destino || null]
+ )
+ const piId = resultado.insertId
+ const tiposRecebimento = ['embalagem', 'rotulo', 'caixa']
+ res.json({ id: piId })
+ // Notificar nova PI — push + e-mail (máx 3x/dia)
+ const chaveNovaPi = `nova_pi_${new Date().toISOString().slice(0, 10)}`
+ const tituloNovaPi = `Nova PI cadastrada — ${numero_pi}`
+ const detalheNovaPi = [cliente && `Cliente: ${cliente}`, destino && `Destino: ${destino}`].filter(Boolean).join(' · ')
+ enviarPush(tituloNovaPi, detalheNovaPi || 'Acesse o sistema para ver os detalhes.', '/HTML/producao/admin.html', chaveNovaPi).catch(() => {})
+ enviarEmail(
+   tituloNovaPi,
+   `<h2 style="color:#ED3237;margin:0 0 16px">Nova PI Cadastrada</h2>
+   <table style="width:100%;border-collapse:collapse;">
+     <tr><td style="padding:8px 0;color:#8a6a6a;width:140px">Número</td><td style="padding:8px 0;font-weight:700">${numero_pi}</td></tr>
+     ${cliente ? `<tr><td style="padding:8px 0;color:#8a6a6a">Cliente</td><td style="padding:8px 0;font-weight:600">${cliente}</td></tr>` : ''}
+     ${destino ? `<tr><td style="padding:8px 0;color:#8a6a6a">Destino</td><td style="padding:8px 0;font-weight:600">${destino}</td></tr>` : ''}
+   </table>`,
+   ['admin', 'almoxarifado']
+ ).catch(() => {})
+})
+
+app.patch('/api/pedidos/:id/embarque', autenticar(['admin', 'gerente_producao']), async (req, res) => {
+ const { data_embarque } = req.body
+ await pool.query('UPDATE pedidos SET data_embarque = ? WHERE id = ?', [data_embarque || null, req.params.id])
+
+ const [[pi]] = await pool.query('SELECT numero_pi, cliente, destino FROM pedidos WHERE id = ?', [req.params.id])
+ if (pi) {
+ const dataFmt = data_embarque ? new Date(data_embarque + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
+ enviarPush(`Data de embarque — PI ${pi.numero_pi}`, `${pi.cliente || ''} · ${dataFmt}`, '/HTML/estoque/embarques.html', `embarque_def_${pi.numero_pi}`).catch(() => {})
+ enviarEmail(
+ `Data de embarque definida — PI ${pi.numero_pi}`,
+ `<h2 style="color:#1565C0;margin:0 0 16px">Data de Embarque Definida</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:160px">PI</td><td style="padding:8px 0;font-weight:600">${pi.numero_pi}</td></tr>
+ ${pi.cliente ? `<tr><td style="padding:8px 0;color:#8a6a6a">Cliente</td><td style="padding:8px 0;font-weight:600">${pi.cliente}</td></tr>` : ''}
+ ${pi.destino ? `<tr><td style="padding:8px 0;color:#8a6a6a">Destino</td><td style="padding:8px 0;font-weight:600">${pi.destino}</td></tr>` : ''}
+ <tr><td style="padding:8px 0;color:#8a6a6a">Data de embarque</td><td style="padding:8px 0;font-weight:600;color:#1565C0">${dataFmt}</td></tr></table>`,
+ ['admin', 'gerente_producao', 'almoxarifado']
+ )
+ }
+ res.json({ ok: true })
+})
+
+app.patch('/api/pedidos/:id/comentario-embarque', autenticar(['admin']), async (req, res) => {
+ const { comentario } = req.body
+ const nomeUsuario = req.usuario?.nome || req.usuario?.email || 'Admin'
+ await pool.query(
+   'UPDATE pedidos SET comentario_embarque = ?, comentario_usuario = ? WHERE id = ?',
+   [comentario || null, comentario ? nomeUsuario : null, req.params.id]
+ )
+ const [[pi]] = await pool.query('SELECT numero_pi, cliente FROM pedidos WHERE id = ?', [req.params.id])
+ if (pi && comentario && comentario.trim()) {
+ enviarPush(`Comentário na PI ${pi.numero_pi}`, `${nomeUsuario}: ${comentario.slice(0, 80)}`, '/HTML/estoque/embarques.html', `comentario_emb_${pi.numero_pi}`).catch(() => {})
+ enviarEmail(
+ `Cobrança de embarque — PI ${pi.numero_pi}`,
+ `<h2 style="color:#1565C0;margin:0 0 16px">Comentário do Admin — Data de Embarque</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:140px">PI</td><td style="padding:8px 0;font-weight:600">${pi.numero_pi}</td></tr>
+ ${pi.cliente ? `<tr><td style="padding:8px 0;color:#8a6a6a">Cliente</td><td style="padding:8px 0;font-weight:600">${pi.cliente}</td></tr>` : ''}
+ <tr><td style="padding:8px 0;color:#8a6a6a">Comentário</td><td style="padding:8px 0;font-weight:600">${comentario}</td></tr></table><p style="margin:16px 0 0;color:#1565C0;font-weight:600">Gerente: por favor, defina a data de embarque desta PI.</p>`,
+ ['admin', 'gerente_producao']
+ )
+ }
+ res.json({ ok: true })
+})
+
+app.patch('/api/pedidos/:id/concluir', autenticar(['admin']), async (req, res) => {
+ const { concluida } = req.body
+ await pool.query('UPDATE pedidos SET concluida = ? WHERE id = ?', [concluida ? 1 : 0, req.params.id])
+ res.json({ ok: true })
+})
+
+app.delete('/api/pedidos/:id', autenticar(['admin']), async (req, res) => {
+ await pool.query('DELETE FROM pedidos WHERE id = ?', [req.params.id])
+ res.json({ ok: true })
+})
+
+app.patch('/api/produtos/:id/quantidade', autenticar(['admin']), async (req, res) => {
+ const { quantidade } = req.body
+ await pool.query('UPDATE produtos_pi SET quantidade = ? WHERE id = ?', [quantidade, req.params.id])
+ res.json({ ok: true })
+})
+
+app.get('/api/pedidos/:piId/produtos', autenticar(TODOS), async (req, res) => {
+ const [produtos] = await pool.query(
+ 'SELECT * FROM produtos_pi WHERE pi_id = ?', [req.params.piId]
+ )
+ res.json(produtos)
+})
+
+app.post('/api/produtos', autenticar(['admin']), async (req, res) => {
+ const { pi_id, produto, quantidade, observacoes } = req.body
+ const [resultado] = await pool.query(
+ 'INSERT INTO produtos_pi (pi_id, produto, quantidade, observacoes) VALUES (?, ?, ?, ?)',
+ [pi_id, produto, quantidade, observacoes || null]
+ )
+ const produtoId = resultado.insertId
+ const tiposInsumo = ['embalagem', 'rotulo', 'caixa', 'etiqueta']
+ for (const tipo of tiposInsumo) {
+ await pool.query(
+ 'INSERT INTO insumos_produto (produto_id, tipo, confirmado, sobra, quantidade_por_pacote) VALUES (?, ?, 0, 0, 0)',
+ [produtoId, tipo]
+ )
+ }
+ const tiposRecebimento = ['embalagem', 'rotulo', 'caixa']
+ const piId = req.body.pi_id
+ for (const tipo of tiposRecebimento) {
+ await pool.query(
+ 'INSERT INTO recebimentos_b2 (pi_id, produto_id, tipo, status_recebimento) VALUES (?, ?, ?, ?)',
+ [piId, produtoId, tipo, 'pendente']
+ )
+ }
+ res.json({ id: produtoId })
+})
+
+app.get('/api/produtos/:produtoId/insumos', autenticar(TODOS), async (req, res) => {
+ const [produto] = await pool.query('SELECT * FROM produtos_pi WHERE id = ?', [req.params.produtoId])
+ const [insumos] = await pool.query('SELECT * FROM insumos_produto WHERE produto_id = ?', [req.params.produtoId])
+ res.json({ produto: produto[0], insumos })
+})
+
+app.patch('/api/produtos/:produtoId/insumos', autenticar(['admin', 'almoxarifado']), async (req, res) => {
+  try {
+ const { insumos, rotulos, observacoes, quantidade } = req.body
+
+ const [antesInsumos] = await pool.query('SELECT tipo, confirmado FROM insumos_produto WHERE produto_id = ?', [req.params.produtoId])
+ const antesSemEtiqueta = antesInsumos.filter((i) => i.tipo !== 'etiqueta')
+ const eraLiberado = antesSemEtiqueta.length > 0 && antesSemEtiqueta.every((i) => i.confirmado)
+
+ for (const insumo of (insumos || [])) {
+ if (insumo.tipo === 'rotulo') continue
+ let confirmado = 0
+ if (insumo.tipo === 'etiqueta') {
+ confirmado = 1
+ } else if (insumo.tipo === 'caixa') {
+ confirmado = Number(insumo.sobra) >= Number(quantidade) ? 1 : 0
+ } else {
+ confirmado = Number(insumo.sobra) > 0 ? 1 : 0
+ }
+ await pool.query(
+ 'UPDATE insumos_produto SET sobra = ?, quantidade_por_pacote = ?, confirmado = ? WHERE produto_id = ? AND tipo = ?',
+        [parseFloat(insumo.sobra) || 0, parseFloat(insumo.quantidade_por_pacote) || 0, confirmado, req.params.produtoId, insumo.tipo]
+ )
+ }
+
+ if (Array.isArray(rotulos)) {
+ await pool.query('DELETE FROM insumos_produto WHERE produto_id = ? AND tipo = ?', [req.params.produtoId, 'rotulo'])
+ for (const r of rotulos) {
+ const confirmado = Number(r.sobra) > 0 ? 1 : 0
+ await pool.query(
+ 'INSERT INTO insumos_produto (produto_id, tipo, nome, confirmado, sobra, quantidade_por_pacote) VALUES (?, ?, ?, ?, ?, ?)',
+ [req.params.produtoId, 'rotulo', r.nome || null, confirmado, r.sobra || 0, r.quantidade_por_pacote || 0]
+ )
+ }
+ }
+
+ if (observacoes !== undefined) {
+ await pool.query('UPDATE produtos_pi SET observacoes = ? WHERE id = ?', [observacoes, req.params.produtoId])
+ }
+
+ await pool.query('UPDATE produtos_pi SET declarado_em = NOW() WHERE id = ? AND declarado_em IS NULL', [req.params.produtoId])
+
+ const [produtoInfo] = await pool.query(
+ 'SELECT pp.pi_id, pp.produto, p.numero_pi, p.cliente FROM produtos_pi pp JOIN pedidos p ON p.id = pp.pi_id WHERE pp.id = ?',
+ [req.params.produtoId]
+ )
+ const [todosInsumos] = await pool.query(
+ 'SELECT tipo, confirmado, sobra FROM insumos_produto WHERE produto_id = ?',
+ [req.params.produtoId]
+ )
+
+ if (produtoInfo[0]) {
+ const { pi_id, numero_pi, cliente } = produtoInfo[0]
+
+ const semEtiqueta = todosInsumos.filter((i) => i.tipo !== 'etiqueta')
+ const produtoLiberado = semEtiqueta.length > 0 && semEtiqueta.every((i) => i.confirmado)
+
+ const [outros] = await pool.query(
+ `SELECT SUM(CASE WHEN ip.tipo <> 'etiqueta' AND ip.confirmado = 0 THEN 1 ELSE 0 END) as pendentes
+ FROM produtos_pi pp JOIN insumos_produto ip ON ip.produto_id = pp.id
+ WHERE pp.pi_id = ? AND pp.id <> ?
+ GROUP BY pp.id`,
+ [pi_id, req.params.produtoId]
+ )
+ const outrosLiberados = outros.every((o) => Number(o.pendentes) === 0)
+ const piEraLiberada = outrosLiberados && eraLiberado
+ const piEstaLiberada = outrosLiberados && produtoLiberado
+
+ if (piEstaLiberada && !piEraLiberada) {
+ enviarPush(`✅ PI Liberada — ${numero_pi}`, `${cliente || ''} — todos os insumos confirmados.`, '/HTML/producao/admin.html', `pi_liberada_${numero_pi}`).catch(() => {})
+ enviarEmail(
+ `PI Liberada para Produção — ${numero_pi}`,
+ `<h2 style="color:#2E7D32;margin:0 0 16px">PI Liberada para Produção</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:140px">PI</td><td style="padding:8px 0;font-weight:600">${numero_pi}</td></tr><tr><td style="padding:8px 0;color:#8a6a6a">Cliente</td><td style="padding:8px 0;font-weight:600">${cliente || '—'}</td></tr></table><p style="margin:16px 0 0;color:#2E7D32;font-weight:600">Todos os produtos desta PI estão com os insumos disponíveis para produção.</p>`,
+ ['admin', 'gerente_producao', 'almoxarifado']
+ )
+ }
+ }
+
+  res.json({ ok: true })
+  } catch (e) {
+    console.error('Erro ao salvar insumos:', e.message)
+    if (!res.headersSent) res.status(500).json({ erro: 'Erro ao salvar. Tente novamente.' })
+  }
+})
+
+app.get('/api/recebimentos/pendentes', autenticar(TODOS), async (req, res) => {
+ const [pedidos] = await pool.query(`
+ SELECT DISTINCT p.id, p.numero_pi, p.cliente
+ FROM pedidos p
+ JOIN recebimentos_b2 r ON r.pi_id = p.id
+ WHERE p.concluida = 0
+ ORDER BY p.numero_pi ASC
+ `)
+
+ for (const pedido of pedidos) {
+ const [produtos] = await pool.query(
+ 'SELECT id, produto FROM produtos_pi WHERE pi_id = ? ORDER BY criado_em',
+ [pedido.id]
+ )
+ for (const produto of produtos) {
+ const [insumos] = await pool.query(
+ 'SELECT id, tipo, status_recebimento, quantidade_recebida, foto_url, foto_nota_url FROM recebimentos_b2 WHERE pi_id = ? AND produto_id = ?',
+ [pedido.id, produto.id]
+ )
+ produto.insumos = insumos
+ }
+ pedido.produtos = produtos
+ }
+
+ res.json(pedidos)
+})
+
+app.patch('/api/recebimentos/:id', autenticar(['admin', 'deposito']), upload.fields([{ name: 'foto_produto', maxCount: 1 }, { name: 'foto_nota', maxCount: 1 }]), async (req, res) => {
+ const { quantidade_recebida } = req.body
+ let fotoProdutoUrl = null
+ let fotoNotaUrl = null
+
+ async function uploadFoto(buffer, pasta) {
+ return new Promise((resolve, reject) => {
+ cloudinary.uploader.upload_stream(
+ { folder: pasta, resource_type: 'image' },
+ (erro, resultado) => erro ? reject(erro) : resolve(resultado.secure_url)
+ ).end(buffer)
+ })
+ }
+
+ if (req.files?.foto_produto?.[0]) {
+ fotoProdutoUrl = await uploadFoto(req.files.foto_produto[0].buffer, 'recebimentos/produtos')
+ }
+ if (req.files?.foto_nota?.[0]) {
+ fotoNotaUrl = await uploadFoto(req.files.foto_nota[0].buffer, 'recebimentos/notas')
+ }
+
+ await pool.query(
+ 'UPDATE recebimentos_b2 SET status_recebimento = ?, recebido_em = NOW(), quantidade_recebida = ?, foto_url = ?, foto_nota_url = ? WHERE id = ?',
+ ['recebido', quantidade_recebida || null, fotoProdutoUrl, fotoNotaUrl, req.params.id]
+ )
+
+ res.json({ ok: true })
+})
+
+app.patch('/api/recebimentos/:id/excluir-foto', autenticar(['admin']), async (req, res) => {
+ const { campo } = req.body
+ if (!['foto_url', 'foto_nota_url'].includes(campo)) {
+ return res.status(400).json({ erro: 'Campo inválido' })
+ }
+
+ const [rows] = await pool.query(`SELECT ${campo} FROM recebimentos_b2 WHERE id = ?`, [req.params.id])
+ if (rows.length && rows[0][campo]) {
+ const urlFoto = rows[0][campo]
+ const partes = urlFoto.split('/')
+ const publicId = partes.slice(partes.indexOf('recebimentos')).join('/').replace(/\.[^/.]+$/, '')
+ try {
+ await cloudinary.uploader.destroy(publicId)
+ } catch (e) {
+ console.error('Erro ao apagar foto do Cloudinary:', e.message)
+ }
+ }
+
+ const outrosCampos = campo === 'foto_url' ? 'foto_nota_url' : 'foto_url'
+ const [rec] = await pool.query(`SELECT ${outrosCampos}, status_recebimento FROM recebimentos_b2 WHERE id = ?`, [req.params.id])
+ const outraFoto = rec[0]?.[outrosCampos]
+ const novoStatus = outraFoto ? 'recebido' : 'pendente'
+
+ await pool.query(
+ `UPDATE recebimentos_b2 SET ${campo} = NULL, status_recebimento = ? WHERE id = ?`,
+ [novoStatus, req.params.id]
+ )
+ res.json({ ok: true })
+})
+
+app.get('/api/usuarios', autenticar(['admin']), async (req, res) => {
+ const [rows] = await pool.query('SELECT id, nome, email, papel FROM usuarios ORDER BY nome')
+ res.json(rows)
+})
+
+app.post('/api/usuarios', autenticar(['admin']), async (req, res) => {
+ const { nome, email, senha, papel } = req.body
+ const hash = await bcrypt.hash(senha, 10)
+ const [resultado] = await pool.query(
+ 'INSERT INTO usuarios (nome, email, senha, papel) VALUES (?, ?, ?, ?)',
+ [nome, email, hash, papel]
+ )
+ res.json({ id: resultado.insertId })
+})
+
+app.delete('/api/usuarios/:id', autenticar(['admin']), async (req, res) => {
+ await pool.query('DELETE FROM usuarios WHERE id = ?', [req.params.id])
+ res.json({ ok: true })
+})
+
+
+app.post('/api/estoque/entrada', autenticar(['admin', 'deposito']), upload.fields([{ name: 'foto_produto', maxCount: 1 }, { name: 'foto_nota', maxCount: 1 }]), async (req, res) => {
+ const { embalagem_kg, rotulo_kg, pallet_caixas, produto, localizacao } = req.body
+ let fotoUrl = null
+ let fotoNotaUrl = null
+
+ async function uploadFoto(buffer, pasta) {
+ return new Promise((resolve, reject) => {
+ cloudinary.uploader.upload_stream(
+ { folder: pasta, resource_type: 'image' },
+ (erro, resultado) => erro ? reject(erro) : resolve(resultado.secure_url)
+ ).end(buffer)
+ })
+ }
+
+ if (req.files?.foto_produto?.[0]) {
+ fotoUrl = await uploadFoto(req.files.foto_produto[0].buffer, 'estoque/produtos')
+ }
+ if (req.files?.foto_nota?.[0]) {
+ fotoNotaUrl = await uploadFoto(req.files.foto_nota[0].buffer, 'estoque/notas')
+ }
+
+ await pool.query(
+ 'INSERT INTO estoque_insumos (produto, embalagem_kg, rotulo_kg, pallet_caixas, foto_url, foto_nota_url, localizacao) VALUES (?, ?, ?, ?, ?, ?, ?)',
+ [produto || null, parseFloat(embalagem_kg) || 0, parseFloat(rotulo_kg) || 0, parseInt(pallet_caixas) || 0, fotoUrl, fotoNotaUrl, localizacao || null]
+ )
+
+ res.json({ ok: true })
+})
+
+app.get('/api/estoque/historico', autenticar(TODOS), async (req, res) => {
+ const [rows] = await pool.query('SELECT * FROM estoque_insumos ORDER BY criado_em DESC LIMIT 50')
+ res.json(rows)
+})
+
+app.get('/api/estoque/saldo', autenticar(TODOS), async (req, res) => {
+ const [[entradas]] = await pool.query(
+ 'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM estoque_insumos'
+ )
+ const [[vinculos]] = await pool.query(
+ 'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM vinculos_insumos'
+ )
+ res.json({
+ embalagem_kg: Math.max(0, parseFloat(entradas.emb) - parseFloat(vinculos.emb)),
+ rotulo_kg: Math.max(0, parseFloat(entradas.rot) - parseFloat(vinculos.rot)),
+ pallet_caixas: Math.max(0, parseInt(entradas.pal) - parseInt(vinculos.pal))
+ })
+})
+
+app.get('/api/estoque/vinculos', autenticar(TODOS), async (req, res) => {
+ const [rows] = await pool.query(`
+ SELECT v.*, p.numero_pi, p.cliente
+ FROM vinculos_insumos v
+ JOIN pedidos p ON p.id = v.pi_id
+ ORDER BY v.criado_em DESC LIMIT 100
+ `)
+ res.json(rows)
+})
+
+app.post('/api/estoque/vincular', autenticar(['admin', 'almoxarifado']), async (req, res) => {
+ const { entrada_id, pi_id, produto, embalagem_kg, rotulo_kg, pallet_caixas } = req.body
+
+ const [[entrada]] = await pool.query(
+ 'SELECT embalagem_kg, rotulo_kg, pallet_caixas FROM estoque_insumos WHERE id = ?', [entrada_id]
+ )
+ if (!entrada) return res.status(400).json({ erro: 'Entrada não encontrada.' })
+
+ const [[vinculados]] = await pool.query(
+ 'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM vinculos_insumos WHERE entrada_id = ?',
+ [entrada_id]
+ )
+ const saldoEmb = parseFloat(entrada.embalagem_kg) - parseFloat(vinculados.emb)
+ const saldoRot = parseFloat(entrada.rotulo_kg) - parseFloat(vinculados.rot)
+ const saldoPal = parseInt(entrada.pallet_caixas) - parseInt(vinculados.pal)
+
+ if ((parseFloat(embalagem_kg) || 0) > saldoEmb) return res.status(400).json({ erro: `Saldo insuficiente de embalagem. Disponível: ${saldoEmb} kg` })
+ if ((parseFloat(rotulo_kg) || 0) > saldoRot) return res.status(400).json({ erro: `Saldo insuficiente de rótulo. Disponível: ${saldoRot} kg` })
+ if ((parseInt(pallet_caixas) || 0) > saldoPal) return res.status(400).json({ erro: `Saldo insuficiente de pallets. Disponível: ${saldoPal}` })
+
+ await pool.query(
+ 'INSERT INTO vinculos_insumos (entrada_id, pi_id, produto, embalagem_kg, rotulo_kg, pallet_caixas) VALUES (?, ?, ?, ?, ?, ?)',
+ [entrada_id, pi_id, produto || null, parseFloat(embalagem_kg) || 0, parseFloat(rotulo_kg) || 0, parseInt(pallet_caixas) || 0]
+ )
+
+ res.json({ ok: true })
+})
+
+
+app.delete('/api/estoque/entradas/:id', autenticar(['admin', 'deposito']), async (req, res) => {
+ await pool.query('DELETE FROM estoque_insumos WHERE id = ?', [req.params.id])
+ res.json({ ok: true })
+})
+
+app.patch('/api/estoque/entradas/:id/produto', autenticar(['admin', 'almoxarifado']), async (req, res) => {
+ const { produto } = req.body
+ await pool.query('UPDATE estoque_insumos SET produto = ? WHERE id = ?', [produto || null, req.params.id])
+ res.json({ ok: true })
+})
+
+app.patch('/api/estoque/entradas/:id/localizacao', autenticar(['admin', 'almoxarifado', 'deposito']), async (req, res) => {
+ const { localizacao } = req.body
+ await pool.query('UPDATE estoque_insumos SET localizacao = ? WHERE id = ?', [localizacao || null, req.params.id])
+ res.json({ ok: true })
+})
+
+app.patch('/api/estoque/vinculos/:id', autenticar(['admin', 'almoxarifado']), async (req, res) => {
+ const { pi_id, embalagem_kg, rotulo_kg, pallet_caixas } = req.body
+
+ const [[entradas]] = await pool.query(
+ 'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM estoque_insumos'
+ )
+ const [[outros]] = await pool.query(
+ 'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM vinculos_insumos WHERE id != ?',
+ [req.params.id]
+ )
+ const saldoEmb = parseFloat(entradas.emb) - parseFloat(outros.emb)
+ const saldoRot = parseFloat(entradas.rot) - parseFloat(outros.rot)
+ const saldoPal = parseInt(entradas.pal) - parseInt(outros.pal)
+
+ if ((parseFloat(embalagem_kg) || 0) > saldoEmb) return res.status(400).json({ erro: `Saldo insuficiente de embalagem. Disponível: ${saldoEmb} kg` })
+ if ((parseFloat(rotulo_kg) || 0) > saldoRot) return res.status(400).json({ erro: `Saldo insuficiente de rótulo. Disponível: ${saldoRot} kg` })
+ if ((parseInt(pallet_caixas) || 0) > saldoPal) return res.status(400).json({ erro: `Saldo insuficiente de pallets. Disponível: ${saldoPal}` })
+
+ const { produto } = req.body
+ await pool.query(
+ 'UPDATE vinculos_insumos SET pi_id = ?, produto = ?, embalagem_kg = ?, rotulo_kg = ?, pallet_caixas = ? WHERE id = ?',
+ [pi_id, produto || null, parseFloat(embalagem_kg) || 0, parseFloat(rotulo_kg) || 0, parseInt(pallet_caixas) || 0, req.params.id]
+ )
+ res.json({ ok: true })
+})
+
+app.delete('/api/estoque/vinculos/:id', autenticar(['admin', 'almoxarifado']), async (req, res) => {
+ await pool.query('DELETE FROM vinculos_insumos WHERE id = ?', [req.params.id])
+ res.json({ ok: true })
+})
+
+async function verificarAlertasEmbarque() {
+ try {
+ const [pis] = await pool.query(
+ `SELECT id, numero_pi, cliente, destino, data_embarque
+ FROM pedidos
+ WHERE concluida = 0 AND data_embarque IS NOT NULL
+ AND data_embarque <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+ ORDER BY data_embarque ASC`
+ )
+
+ const alertas = []
+ for (const pi of pis) {
+ const [[tot]] = await pool.query('SELECT COUNT(*) as total FROM produtos_pi WHERE pi_id = ?', [pi.id])
+ const [[pend]] = await pool.query(
+ `SELECT COUNT(*) as pendentes
+ FROM produtos_pi pp
+ JOIN insumos_produto ip ON ip.produto_id = pp.id
+ WHERE pp.pi_id = ? AND ip.confirmado = 0`,
+ [pi.id]
+ )
+ const pronta = tot.total > 0 && pend.pendentes === 0
+ if (!pronta) alertas.push(pi)
+ }
+
+ if (!alertas.length) return
+ if (!(await podeEnviarHoje('alertas_embarque'))) return
+
+ const hoje = new Date()
+ hoje.setHours(0, 0, 0, 0)
+ const linhas = alertas.map((pi) => {
+ const alvo = new Date(String(pi.data_embarque).slice(0, 10) + 'T00:00:00')
+ const dias = Math.round((alvo - hoje) / 86400000)
+ const quando = dias < 0 ? `VENCIDO há ${Math.abs(dias)} dia(s)` : dias === 0 ? 'HOJE' : `em ${dias} dia(s)`
+ const dataFmt = alvo.toLocaleDateString('pt-BR')
+ return `<tr><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;font-weight:700">PI ${pi.numero_pi}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${pi.cliente || '—'}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;color:#ED3237;font-weight:700">${dataFmt} (${quando})</td></tr>`
+ }).join('')
+
+ enviarPush(`⚠️ ${alertas.length} PI(s) em risco de embarque`, alertas.map((p) => `PI ${p.numero_pi}`).join(', '), '/HTML/estoque/embarques.html', 'alertas_embarque').catch(() => {})
+ enviarEmail(
+ `ALERTA: ${alertas.length} PI(s) perto do embarque e SEM estar pronta`,
+ `<h2 style="color:#ED3237;margin:0 0 16px">PIs em Risco de Embarque</h2><p style="margin:0 0 12px;color:#8a6a6a">As PIs abaixo têm embarque em até 7 dias (ou já vencido) e ainda possuem itens pendentes no almoxarifado:</p><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">PI</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Cliente</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Embarque</th></tr></thead><tbody>${linhas}</tbody></table>`,
+ ['admin', 'gerente_producao']
+ )
+ console.log(`Alerta de embarque enviado: ${alertas.length} PI(s)`)
+ } catch (e) {
+ console.error('Erro no alerta de embarque:', e.message)
+ }
+}
+
+setTimeout(verificarAlertasEmbarque, 60 * 1000)
+setInterval(verificarAlertasEmbarque, 24 * 60 * 60 * 1000)
+
+const SQL_DECLARACAO_PENDENTE = `
+ SELECT pp.id as produto_id, pp.produto, pp.criado_em,
+ p.id as pi_id, p.numero_pi, p.cliente
+ FROM produtos_pi pp
+ JOIN pedidos p ON p.id = pp.pi_id
+ WHERE p.concluida = 0 AND pp.declarado_em IS NULL
+ AND pp.criado_em <= DATE_SUB(NOW(), INTERVAL 48 HOUR)
+ AND NOT EXISTS (SELECT 1 FROM insumos_produto ip WHERE ip.produto_id = pp.id AND ip.sobra > 0)
+ ORDER BY pp.criado_em ASC`
+
+async function verificarAlertasDeclaracao() {
+ try {
+ const [rows] = await pool.query(SQL_DECLARACAO_PENDENTE)
+ if (!rows.length) return
+ if (!(await podeEnviarHoje('declaracao_pendente'))) return
+
+ const linhas = rows.map((r) => {
+ const horas = Math.floor((Date.now() - new Date(r.criado_em).getTime()) / 3600000)
+ return `<tr><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;font-weight:700">PI ${r.numero_pi}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${r.cliente || '—'}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${r.produto}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;color:#E65100;font-weight:700">há ${horas}h sem declarar</td></tr>`
+ }).join('')
+
+ const maxHoras = Math.max(...rows.map((r) => Math.floor((Date.now() - new Date(r.criado_em).getTime()) / 3600000)))
+ const urgente = maxHoras >= 96
+
+ enviarPush(`${urgente ? '🚨 URGENTE' : '⚠️ Atenção'} — Estoque não declarado`, `${rows.length} produto(s) sem declaração no almoxarifado.`, '/HTML/estoque/almoxarifado.html', 'declaracao_pendente').catch(() => {})
+ enviarEmail(
+ `${urgente ? 'URGENTE — ' : ''}${rows.length} produto(s) sem estoque declarado (Almoxarifado)`,
+ `<h2 style="color:#E65100;margin:0 0 16px">${urgente ? 'URGENTE — ' : ''}Estoque não declarado pelo Almoxarifado</h2><p style="margin:0 0 12px;color:#8a6a6a">Os produtos abaixo foram cadastrados há mais de 48h e ainda não tiveram o informe de estoque salvo no almoxarifado:</p><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #E65100">PI</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #E65100">Cliente</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #E65100">Produto</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #E65100">Situação</th></tr></thead><tbody>${linhas}</tbody></table>`,
+ ['admin', 'almoxarifado']
+ )
+ console.log(`Alerta de declaração enviado: ${rows.length} produto(s)`)
+ } catch (e) {
+ console.error('Erro no alerta de declaração:', e.message)
+ }
+}
+
+setTimeout(verificarAlertasDeclaracao, 90 * 1000)
+setInterval(verificarAlertasDeclaracao, 24 * 60 * 60 * 1000)
+
+app.get('/api/alertas/declaracao', autenticar(TODOS), async (req, res) => {
+ const [rows] = await pool.query(SQL_DECLARACAO_PENDENTE)
+ res.json(rows)
+})
+
+app.get('/api/pendencias', autenticar(TODOS), async (req, res) => {
+ try {
+ const [decl] = await pool.query(SQL_DECLARACAO_PENDENTE)
+ const [emb] = await pool.query(SQL_EMBARQUES_PENDENTES)
+ const [[ped]] = await pool.query(`SELECT COUNT(*) as n FROM demandas WHERE status = 'pendente'`)
+ const [[atr]] = await pool.query(`SELECT COUNT(*) as n FROM compras WHERE status <> 'recebido' AND data_prevista IS NOT NULL AND data_prevista < CURDATE()`)
+ res.json({
+ estoqueNaoDeclarado: decl.length,
+ embarquesPendentes: emb.length,
+ pedidosCompra: ped.n,
+ comprasAtrasadas: atr.n
+ })
+ } catch (e) {
+ res.json({ estoqueNaoDeclarado: 0, embarquesPendentes: 0, pedidosCompra: 0, comprasAtrasadas: 0 })
+ }
+})
+
+// =============================================
+// COMPRAS
+// =============================================
+
+const tipoLabelCompra = { embalagem: 'Embalagem', rotulo: 'Rótulo', caixa: 'Caixa', etiqueta: 'Etiqueta', outro: 'Outro' }
+
+app.get('/api/compras', autenticar(TODOS), async (req, res) => {
+ const [rows] = await pool.query(`
+ SELECT c.*, p.numero_pi, p.cliente, p.data_embarque
+ FROM compras c
+ LEFT JOIN pedidos p ON p.id = c.pi_id
+ ORDER BY c.criado_em DESC LIMIT 300`)
+ res.json(rows)
+})
+
+app.post('/api/compras', autenticar(['admin', 'compras', 'compras_aromas']), async (req, res) => {
+ const { descricao, tipo, quantidade, unidade, fornecedor, data_compra, data_prevista, custo, pi_id, observacoes, status } = req.body
+ if (!descricao) return res.status(400).json({ erro: 'Informe o que está sendo comprado.' })
+
+ const [r] = await pool.query(
+ `INSERT INTO compras (descricao, tipo, quantidade, unidade, fornecedor, data_compra, data_prevista, custo, pi_id, observacoes, status)
+ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+ [descricao, tipo || 'outro', parseFloat(quantidade) || 0, unidade || null, fornecedor || null,
+ data_compra || null, data_prevista || null, (custo !== undefined && custo !== null && custo !== '') ? parseFloat(custo) : null,
+ pi_id || null, observacoes || null, status || 'comprado']
+ )
+
+ res.json({ id: r.insertId })
+})
+
+app.patch('/api/compras/:id', autenticar(['admin', 'compras', 'compras_aromas']), async (req, res) => {
+ const campos = ['descricao', 'tipo', 'quantidade', 'unidade', 'fornecedor', 'data_compra', 'data_prevista', 'custo', 'pi_id', 'observacoes', 'status']
+ const sets = []
+ const vals = []
+ for (const campo of campos) {
+ if (campo in req.body) {
+ let v = req.body[campo]
+ if ((campo === 'quantidade' || campo === 'custo') && v !== '' && v !== null) v = parseFloat(v)
+ if (v === '') v = null
+ sets.push(`${campo} = ?`)
+ vals.push(v)
+ }
+ }
+ if (!sets.length) return res.json({ ok: true })
+ vals.push(req.params.id)
+ await pool.query(`UPDATE compras SET ${sets.join(', ')} WHERE id = ?`, vals)
+ res.json({ ok: true })
+})
+
+app.patch('/api/compras/:id/receber', autenticar(['admin', 'compras', 'compras_aromas']), async (req, res) => {
+ await pool.query(`UPDATE compras SET status = 'recebido', recebido_em = NOW() WHERE id = ?`, [req.params.id])
+ const [[c]] = await pool.query(`SELECT c.*, p.numero_pi FROM compras c LEFT JOIN pedidos p ON p.id = c.pi_id WHERE c.id = ?`, [req.params.id])
+ if (c) {
+ enviarPush(`📦 Compra recebida — lançar no B2`, `${c.descricao}${c.numero_pi ? ' · PI ' + c.numero_pi : ''}`, '/HTML/estoque/recebimento.html', `compra_recebida_${c.id}`).catch(() => {})
+ enviarEmail(
+ `Compra recebida — lançar no estoque B2 (${c.descricao})`,
+ `<h2 style="color:#2E7D32;margin:0 0 16px">Compra Recebida</h2><p style="margin:0 0 12px;color:#8a6a6a">O setor de compras marcou este item como recebido. Depósito/almoxarifado: confiram e lancem no estoque B2.</p><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:160px">Item</td><td style="padding:8px 0;font-weight:600">${c.descricao}</td></tr><tr><td style="padding:8px 0;color:#8a6a6a">Tipo</td><td style="padding:8px 0;font-weight:600">${tipoLabelCompra[c.tipo] || 'Outro'}</td></tr>
+ ${c.quantidade > 0 ? `<tr><td style="padding:8px 0;color:#8a6a6a">Quantidade</td><td style="padding:8px 0;font-weight:600">${c.quantidade} ${c.unidade || ''}</td></tr>` : ''}
+ ${c.fornecedor ? `<tr><td style="padding:8px 0;color:#8a6a6a">Fornecedor</td><td style="padding:8px 0;font-weight:600">${c.fornecedor}</td></tr>` : ''}
+ ${c.numero_pi ? `<tr><td style="padding:8px 0;color:#8a6a6a">PI vinculada</td><td style="padding:8px 0;font-weight:600">${c.numero_pi}</td></tr>` : ''}
+ </table>`,
+ ['admin', 'deposito', 'almoxarifado']
+ )
+ }
+ res.json({ ok: true })
+})
+
+app.delete('/api/compras/:id', autenticar(['admin', 'compras', 'compras_aromas']), async (req, res) => {
+ await pool.query('DELETE FROM compras WHERE id = ?', [req.params.id])
+ res.json({ ok: true })
+})
+
+app.patch('/api/compras/:id/observacao', autenticar(['admin', 'compras', 'compras_aromas']), async (req, res) => {
+ const { observacoes } = req.body
+ await pool.query('UPDATE compras SET observacoes = ? WHERE id = ?', [observacoes || null, req.params.id])
+ const [[c]] = await pool.query('SELECT descricao FROM compras WHERE id = ?', [req.params.id])
+ if (c && observacoes && observacoes.trim()) {
+ enviarPush(`💬 Observação na compra`, `${c.descricao}: ${observacoes.slice(0, 80)}`, '/HTML/estoque/compras.html', `obs_compra_${Date.now()}`).catch(() => {})
+ enviarEmail(
+ `Observação na compra — ${c.descricao}`,
+ `<h2 style="color:#E65100;margin:0 0 16px">Observação / Verificação de Compra</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:140px">Item</td><td style="padding:8px 0;font-weight:600">${c.descricao}</td></tr><tr><td style="padding:8px 0;color:#8a6a6a">Observação</td><td style="padding:8px 0;font-weight:600">${observacoes}</td></tr></table>`,
+ ['compras', 'admin']
+ )
+ }
+ res.json({ ok: true })
+})
+
+app.get('/api/compras/sugestoes', autenticar(TODOS), async (req, res) => {
+ const [rows] = await pool.query(`
+ SELECT p.id as pi_id, p.numero_pi, p.cliente, p.data_embarque,
+ pp.id as produto_id, pp.produto, pp.quantidade,
+ ip.tipo as insumo_tipo, ip.sobra
+ FROM pedidos p
+ JOIN produtos_pi pp ON pp.pi_id = p.id
+ JOIN insumos_produto ip ON ip.produto_id = pp.id
+ WHERE p.concluida = 0
+ AND ( ip.confirmado = 0 OR (ip.tipo = 'etiqueta' AND ip.sobra < 100) )
+ ORDER BY (p.data_embarque IS NULL), p.data_embarque ASC, p.numero_pi ASC`)
+ res.json(rows)
+})
+
+async function verificarComprasAtrasadas() {
+ try {
+ const [rows] = await pool.query(`
+ SELECT c.*, p.numero_pi FROM compras c
+ LEFT JOIN pedidos p ON p.id = c.pi_id
+ WHERE c.status <> 'recebido' AND c.data_prevista IS NOT NULL AND c.data_prevista < CURDATE()
+ ORDER BY c.data_prevista ASC`)
+ if (!rows.length) return
+ if (!(await podeEnviarHoje('compras_atrasadas'))) return
+
+ const linhas = rows.map((c) => {
+ const prev = new Date(String(c.data_prevista).slice(0, 10) + 'T00:00:00')
+ const dias = Math.floor((Date.now() - prev.getTime()) / 86400000)
+ return `<tr><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;font-weight:700">${c.descricao}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${c.fornecedor || '—'}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${c.numero_pi ? 'PI ' + c.numero_pi : 'Estoque geral'}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;color:#ED3237;font-weight:700">atrasada ${dias} dia(s)</td></tr>`
+ }).join('')
+
+ enviarPush(`⏰ ${rows.length} compra(s) atrasada(s)`, rows.map((c) => c.descricao).slice(0, 3).join(', '), '/HTML/estoque/compras.html', 'compras_atrasadas').catch(() => {})
+ enviarEmail(
+ `⏰ ALERTA: ${rows.length} compra(s) atrasada(s) na entrega`,
+ `<h2 style="color:#ED3237;margin:0 0 16px">⏰ Compras com Entrega Atrasada</h2><p style="margin:0 0 12px;color:#8a6a6a">As compras abaixo passaram da data prevista de chegada e ainda não foram marcadas como recebidas:</p><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Item</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Fornecedor</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Destino</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Situação</th></tr></thead><tbody>${linhas}</tbody></table>`,
+ ['admin', 'compras']
+ )
+ console.log(`Alerta de compras atrasadas enviado: ${rows.length}`)
+ } catch (e) {
+ console.error('Erro no alerta de compras atrasadas:', e.message)
+ }
+}
+
+setTimeout(verificarComprasAtrasadas, 120 * 1000)
+setInterval(verificarComprasAtrasadas, 24 * 60 * 60 * 1000)
+
+const SQL_EMBARQUES_PENDENTES = `
+ SELECT p.id, p.numero_pi, p.cliente
+ FROM pedidos p
+ WHERE p.concluida = 0 AND p.data_embarque IS NULL
+ AND EXISTS (SELECT 1 FROM produtos_pi pp WHERE pp.pi_id = p.id)
+ AND NOT EXISTS (
+ SELECT 1 FROM produtos_pi pp JOIN insumos_produto ip ON ip.produto_id = pp.id
+ WHERE pp.pi_id = p.id AND ip.tipo <> 'etiqueta' AND ip.confirmado = 0
+ )
+ ORDER BY p.numero_pi ASC`
+
+async function verificarEmbarquesPendentes() {
+ try {
+ const [rows] = await pool.query(SQL_EMBARQUES_PENDENTES)
+ if (!rows.length) return
+ if (!(await podeEnviarHoje('embarques_pendentes'))) return
+ const linhas = rows.map((p) => `<tr><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;font-weight:700">PI ${p.numero_pi}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${p.cliente || '—'}</td></tr>`).join('')
+ enviarPush(`🚢 ${rows.length} PI(s) prontas sem data de embarque`, rows.map((p) => `PI ${p.numero_pi}`).join(', '), '/HTML/estoque/embarques.html', 'embarques_pendentes').catch(() => {})
+ enviarEmail(
+ `${rows.length} PI(s) pronta(s) aguardando data de embarque`,
+ `<h2 style="color:#1565C0;margin:0 0 16px">PIs prontas sem data de embarque</h2><p style="margin:0 0 12px;color:#8a6a6a">As PIs abaixo já estão liberadas para produção, mas ainda não têm data de embarque definida. Gerente: por favor, declare o embarque.</p><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #1565C0">PI</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #1565C0">Cliente</th></tr></thead><tbody>${linhas}</tbody></table>`,
+ ['admin', 'gerente_producao']
+ )
+ console.log(`Aviso de embarques pendentes enviado: ${rows.length} PI(s)`)
+ } catch (e) {
+ console.error('Erro no aviso de embarques pendentes:', e.message)
+ }
+}
+
+setTimeout(verificarEmbarquesPendentes, 150 * 1000)
+setInterval(verificarEmbarquesPendentes, 24 * 60 * 60 * 1000)
+
+// =============================================
+// DEMANDAS DE COMPRA
+// =============================================
+
+app.get('/api/demandas', autenticar(TODOS), async (req, res) => {
+ const [rows] = await pool.query(`
+ SELECT d.*, p.numero_pi, p.cliente
+ FROM demandas d
+ LEFT JOIN pedidos p ON p.id = d.pi_id
+ ORDER BY (d.status <> 'pendente'), d.criado_em DESC LIMIT 300`)
+ res.json(rows)
+})
+
+app.post('/api/demandas', autenticar(['admin', 'almoxarifado']), async (req, res) => {
+ const { descricao, quantidade, unidade, pi_id, observacoes } = req.body
+ const categoria = req.body.categoria === 'aromas' ? 'aromas' : 'gerais'
+ if (!descricao) return res.status(400).json({ erro: 'Informe o que está faltando.' })
+
+ const [r] = await pool.query(
+ `INSERT INTO demandas (descricao, quantidade, unidade, pi_id, observacoes, solicitante, categoria)
+ VALUES (?, ?, ?, ?, ?, ?, ?)`,
+ [descricao, parseFloat(quantidade) || 0, unidade || null, pi_id || null, observacoes || null, req.usuario && req.usuario.nome ? req.usuario.nome : null, categoria]
+ )
+
+ const destino = categoria === 'aromas' ? ['admin', 'compras_aromas'] : ['admin', 'compras']
+ const label = categoria === 'aromas' ? 'Aromas' : 'Insumos gerais'
+ const [[pi]] = pi_id ? await pool.query('SELECT numero_pi FROM pedidos WHERE id = ?', [pi_id]) : [[null]]
+ enviarPush(`🛒 Novo pedido ao Compras`, `${descricao}${pi && pi.numero_pi ? ' · PI ' + pi.numero_pi : ''}`, '/HTML/estoque/compras.html', `demanda_${Date.now()}`).catch(() => {})
+ enviarEmail(
+ `Novo pedido ao Compras (${label}) — ${descricao}`,
+ `<h2 style="color:#6A1B9A;margin:0 0 16px">Novo Pedido ao Compras — ${label}</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:160px">Item</td><td style="padding:8px 0;font-weight:600">${descricao}</td></tr>
+ ${parseFloat(quantidade) > 0 ? `<tr><td style="padding:8px 0;color:#8a6a6a">Quantidade</td><td style="padding:8px 0;font-weight:600">${quantidade} ${unidade || ''}</td></tr>` : ''}
+ ${pi && pi.numero_pi ? `<tr><td style="padding:8px 0;color:#8a6a6a">PI</td><td style="padding:8px 0;font-weight:600">${pi.numero_pi}</td></tr>` : ''}
+ ${req.usuario && req.usuario.nome ? `<tr><td style="padding:8px 0;color:#8a6a6a">Solicitante</td><td style="padding:8px 0;font-weight:600">${req.usuario.nome}</td></tr>` : ''}
+ </table><p style="margin:16px 0 0;color:#6A1B9A;font-weight:600">Compras: verificar disponibilidade e marcar "Tenho" ou "Não tenho".</p>`,
+ destino
+ )
+ res.json({ id: r.insertId })
+})
+
+app.patch('/api/demandas/:id/status', autenticar(['admin', 'compras', 'compras_aromas']), async (req, res) => {
+ const { status } = req.body
+ if (!['tem', 'nao_tem', 'pendente'].includes(status)) return res.status(400).json({ erro: 'Status inválido.' })
+ const quem = req.usuario && req.usuario.nome ? req.usuario.nome : null
+ await pool.query('UPDATE demandas SET status = ?, respondido_por = ?, respondido_em = NOW() WHERE id = ?', [status, quem, req.params.id])
+
+ const [[d]] = await pool.query('SELECT d.*, p.numero_pi FROM demandas d LEFT JOIN pedidos p ON p.id = d.pi_id WHERE d.id = ?', [req.params.id])
+ if (d) {
+ const label = status === 'tem' ? 'TEM em estoque' : status === 'nao_tem' ? 'NÃO TEM — precisa comprar' : 'Pendente'
+ const cor = status === 'nao_tem' ? '#ED3237' : '#2E7D32'
+ enviarPush(`Demanda respondida — ${status === 'nao_tem' ? '❌ NÃO TEM' : status === 'tem' ? '✅ TEM' : '⏳ Pendente'}`, `${d.descricao}${d.numero_pi ? ' · PI ' + d.numero_pi : ''}`, '/HTML/estoque/compras.html', `demanda_resp_${req.params.id}`).catch(() => {})
+ enviarEmail(
+ `Demanda respondida (${status === 'nao_tem' ? 'NÃO TEM' : status === 'tem' ? 'TEM' : 'pendente'}) — ${d.descricao}`,
+ `<h2 style="color:${cor};margin:0 0 16px">Demanda de Compra Respondida</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:160px">Item</td><td style="padding:8px 0;font-weight:600">${d.descricao}</td></tr>
+ ${d.numero_pi ? `<tr><td style="padding:8px 0;color:#8a6a6a">PI</td><td style="padding:8px 0;font-weight:600">${d.numero_pi}</td></tr>` : ''}
+ <tr><td style="padding:8px 0;color:#8a6a6a">Resposta</td><td style="padding:8px 0;font-weight:700;color:${cor}">${label}</td></tr>
+ ${quem ? `<tr><td style="padding:8px 0;color:#8a6a6a">Respondido por</td><td style="padding:8px 0;font-weight:600">${quem}</td></tr>` : ''}
+ </table>`,
+ ['admin', 'almoxarifado', 'compras', 'compras_aromas']
+ )
+ }
+ res.json({ ok: true })
+})
+
+app.delete('/api/demandas/:id', autenticar(['admin', 'almoxarifado']), async (req, res) => {
+ await pool.query('DELETE FROM demandas WHERE id = ?', [req.params.id])
+ res.json({ ok: true })
+})
+
+
+// =============================================
+// CONTÁBIL / FATURAMENTO NFe — restrito ao export2
+// =============================================
+const EMAILS_FINANCEIRO = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'joaoantonio@pietrobon.com.br']
+
+function autenticarContabil() {
+ const base = autenticar(['admin'])
+ return (req, res, next) => base(req, res, () => {
+ if (!EMAILS_FINANCEIRO.includes((req.usuario.email || '').toLowerCase())) {
+ return res.status(403).json({ erro: 'Sem permissão' })
+ }
+ next()
+ })
+}
+
+const CAMPOS_NFE = ['ano', 'mes', 'data', 'nf', 'fatura', 'num_due', 'data_due',
+ 'num_conhecimento', 'data_conhecimento', 'tipo', 'valor_nfe', 'peso', 'vendedor', 'produto', 'pais']
+
+app.get('/api/contabil/anos', autenticarContabil(), async (req, res) => {
+ const [rows] = await pool.query('SELECT DISTINCT ano FROM nfe_lancamentos ORDER BY ano DESC')
+ const anos = rows.map((r) => r.ano)
+ const atual = new Date().getFullYear()
+ if (!anos.includes(atual)) anos.unshift(atual)
+ res.json(anos)
+})
+
+app.get('/api/contabil', autenticarContabil(), async (req, res) => {
+ const ano = parseInt(req.query.ano) || new Date().getFullYear()
+ const [rows] = await pool.query(
+ 'SELECT * FROM nfe_lancamentos WHERE ano = ? ORDER BY mes ASC, data ASC, id ASC', [ano])
+ res.json(rows)
+})
+
+app.post('/api/contabil', autenticarContabil(), async (req, res) => {
+ const b = req.body
+ if (!b.ano || !b.mes) return res.status(400).json({ erro: 'Ano e mês são obrigatórios.' })
+ const vals = CAMPOS_NFE.map((c) => {
+ let v = b[c]
+ if (v === '' || v === undefined) v = null
+ if ((c === 'valor_nfe' || c === 'peso') && v !== null) v = parseFloat(String(v).replace(',', '.')) || 0
+ if ((c === 'ano' || c === 'mes') && v !== null) v = parseInt(v)
+ return v
+ })
+ const [r] = await pool.query(
+ `INSERT INTO nfe_lancamentos (${CAMPOS_NFE.join(', ')}) VALUES (${CAMPOS_NFE.map(() => '?').join(', ')})`, vals)
+ res.json({ id: r.insertId })
+})
+
+app.patch('/api/contabil/:id', autenticarContabil(), async (req, res) => {
+ const sets = [], vals = []
+ for (const c of CAMPOS_NFE) {
+ if (c in req.body) {
+ let v = req.body[c]
+ if (v === '' || v === undefined) v = null
+ if ((c === 'valor_nfe' || c === 'peso') && v !== null) v = parseFloat(String(v).replace(',', '.')) || 0
+ if ((c === 'ano' || c === 'mes') && v !== null) v = parseInt(v)
+ sets.push(`${c} = ?`); vals.push(v)
+ }
+ }
+ if (!sets.length) return res.json({ ok: true })
+ vals.push(req.params.id)
+ await pool.query(`UPDATE nfe_lancamentos SET ${sets.join(', ')} WHERE id = ?`, vals)
+ res.json({ ok: true })
+})
+
+app.delete('/api/contabil/:id', autenticarContabil(), async (req, res) => {
+ await pool.query('DELETE FROM nfe_lancamentos WHERE id = ?', [req.params.id])
+ res.json({ ok: true })
+})
+
+// =============================================
+// CONTABILIDADE DE EXPORTAÇÃO (baixas e saldos) — restrito ao export2
+// =============================================
+const NOMES_MESES_EC = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+
+// Cria as tabelas e importa os dados de Junho/2026 automaticamente (uma vez)
+async function inicializarContabExportacao() {
+  let ecSeed
+  try {
+    ecSeed = require('./ec_seed')
+  } catch (e) {
+    // O arquivo ec_seed.js é usado só na 1ª importação. Depois pode ser
+    // removido do projeto — as tabelas e os dados já existem no banco.
+    return
+  }
+  try {
+    for (const stmt of ecSeed.schema) await pool.query(stmt)
+    const [[c]] = await pool.query('SELECT COUNT(*) AS n FROM ec_clientes')
+    if (c.n === 0) {
+      for (const stmt of ecSeed.seed) await pool.query(stmt)
+      console.log('Contabilidade de Exportação: dados iniciais importados.')
+    }
+  } catch (e) {
+    console.error('Erro ao inicializar Contab. Exportação:', e.message)
+  }
+}
+setTimeout(inicializarContabExportacao, 4000)
+
+// Cria as tabelas e importa os dados do Financeiro (Importações) automaticamente
+async function inicializarFinanceiro() {
+  let seed
+  try {
+    seed = require('./fin_seed')
+  } catch (e) {
+    return // arquivo já pode ter sido removido após a 1ª importação
+  }
+  try {
+    for (const stmt of seed.schema) await pool.query(stmt)
+    const [[c]] = await pool.query('SELECT COUNT(*) AS n FROM fin_importacoes')
+    if (c.n === 0) {
+      for (const stmt of seed.seed) await pool.query(stmt)
+      console.log('Financeiro (Importações): dados iniciais importados.')
+    }
+  } catch (e) {
+    console.error('Erro ao inicializar Financeiro:', e.message)
+  }
+}
+setTimeout(inicializarFinanceiro, 5000)
+const EC_MOD = {
+  exterior: { tabela: 'ec_lanc_exterior', col: 'cliente_id', ent: 'ec_clientes', aumenta: 'debito', diminui: 'baixa', temFatura: true },
+  adiant_clientes: { tabela: 'ec_lanc_adiant_clientes', col: 'cliente_id', ent: 'ec_clientes', aumenta: 'credito', diminui: 'debito', temFatura: false },
+  adiant_fornecedores: { tabela: 'ec_lanc_adiant_fornecedores', col: 'fornecedor_id', ent: 'ec_fornecedores', aumenta: 'debito', diminui: 'pagamento', temFatura: false }
+}
+function ecCfg(modulo) { return EC_MOD[modulo] || null }
+
+// Períodos (meses)
+app.get('/api/ec/meses', autenticarContabil(), async (req, res) => {
+  const [rows] = await pool.query('SELECT * FROM ec_meses ORDER BY ano DESC, mes DESC')
+  res.json(rows)
+})
+app.post('/api/ec/meses', autenticarContabil(), async (req, res) => {
+  const ano = parseInt(req.body.ano), mes = parseInt(req.body.mes)
+  if (!(ano > 2000) || !(mes >= 1 && mes <= 12)) return res.status(400).json({ erro: 'Ano/mês inválido.' })
+  const [ex] = await pool.query('SELECT id FROM ec_meses WHERE ano = ? AND mes = ?', [ano, mes])
+  if (ex.length) return res.json({ id: ex[0].id })
+  const [r] = await pool.query('INSERT INTO ec_meses (ano, mes, nome) VALUES (?, ?, ?)', [ano, mes, `${NOMES_MESES_EC[mes]} ${ano}`])
+  res.json({ id: r.insertId })
+})
+app.delete('/api/ec/meses/:id', autenticarContabil(), async (req, res) => {
+  await pool.query('DELETE FROM ec_meses WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
+})
+
+// Entidades (clientes / fornecedores)
+app.get('/api/ec/entidades', autenticarContabil(), async (req, res) => {
+  const tabela = req.query.tipo === 'fornecedores' ? 'ec_fornecedores' : 'ec_clientes'
+  const [rows] = await pool.query(`SELECT * FROM ${tabela} ORDER BY nome`)
+  res.json(rows)
+})
+app.post('/api/ec/entidades', autenticarContabil(), async (req, res) => {
+  const nome = (req.body.nome || '').trim()
+  if (!nome) return res.status(400).json({ erro: 'Informe o nome.' })
+  if (req.body.tipo === 'fornecedores') {
+    await pool.query('INSERT IGNORE INTO ec_fornecedores (nome) VALUES (?)', [nome])
+  } else {
+    await pool.query('INSERT IGNORE INTO ec_clientes (nome, pais) VALUES (?, ?)', [nome, (req.body.pais || '').trim() || null])
+  }
+  res.json({ ok: true })
+})
+app.patch('/api/ec/entidades/:id', autenticarContabil(), async (req, res) => {
+  const tabela = req.body.tipo === 'fornecedores' ? 'ec_fornecedores' : 'ec_clientes'
+  await pool.query(`UPDATE ${tabela} SET ativo = 1 - ativo WHERE id = ?`, [req.params.id])
+  res.json({ ok: true })
+})
+
+// Saldos do mês por módulo
+app.get('/api/ec/saldos', autenticarContabil(), async (req, res) => {
+  const cfg = ecCfg(req.query.modulo)
+  const mesId = parseInt(req.query.mesId)
+  if (!cfg || !mesId) return res.status(400).json({ erro: 'Parâmetros inválidos.' })
+  const [[mes]] = await pool.query('SELECT * FROM ec_meses WHERE id = ?', [mesId])
+  if (!mes) return res.status(404).json({ erro: 'Período não encontrado.' })
+  const chave = mes.ano * 12 + mes.mes
+  const [entidades] = await pool.query(`SELECT * FROM ${cfg.ent} WHERE ativo = 1 ORDER BY nome`)
+  const linhas = []
+  for (const ent of entidades) {
+    const [[ant]] = await pool.query(
+      `SELECT COALESCE(SUM(CASE WHEN l.tipo = ? THEN l.valor ELSE 0 END),0) - COALESCE(SUM(CASE WHEN l.tipo = ? THEN l.valor ELSE 0 END),0) AS s
+       FROM ${cfg.tabela} l JOIN ec_meses m ON m.id = l.mes_id
+       WHERE l.${cfg.col} = ? AND (m.ano*12+m.mes) < ?`, [cfg.aumenta, cfg.diminui, ent.id, chave])
+    const [[mov]] = await pool.query(
+      `SELECT COALESCE(SUM(CASE WHEN tipo = ? THEN valor ELSE 0 END),0) AS aumenta,
+              COALESCE(SUM(CASE WHEN tipo = ? THEN valor ELSE 0 END),0) AS diminui
+       FROM ${cfg.tabela} WHERE ${cfg.col} = ? AND mes_id = ?`, [cfg.aumenta, cfg.diminui, ent.id, mesId])
+    const anterior = Number(ant.s) || 0, aumenta = Number(mov.aumenta) || 0, diminui = Number(mov.diminui) || 0
+    linhas.push({ id: ent.id, nome: ent.nome, pais: ent.pais || '', anterior, aumenta, diminui, atual: anterior + aumenta - diminui })
+  }
+  res.json({ mes, temFatura: cfg.temFatura, linhas })
+})
+
+// Lançamentos de uma entidade no mês
+app.get('/api/ec/lancamentos', autenticarContabil(), async (req, res) => {
+  const cfg = ecCfg(req.query.modulo)
+  const mesId = parseInt(req.query.mesId), entidadeId = parseInt(req.query.entidadeId)
+  if (!cfg || !mesId || !entidadeId) return res.status(400).json({ erro: 'Parâmetros inválidos.' })
+  const [rows] = await pool.query(`SELECT * FROM ${cfg.tabela} WHERE ${cfg.col} = ? AND mes_id = ? ORDER BY data_lanc, id`, [entidadeId, mesId])
+  res.json({ temFatura: cfg.temFatura, lancamentos: rows })
+})
+app.post('/api/ec/lancamentos', autenticarContabil(), async (req, res) => {
+  const cfg = ecCfg(req.body.modulo)
+  const mesId = parseInt(req.body.mesId), entidadeId = parseInt(req.body.entidadeId)
+  const tipo = req.body.tipo, data = req.body.data_lanc
+  const valor = parseFloat(String(req.body.valor || '').replace(',', '.'))
+  if (!cfg || !mesId || !entidadeId || !data || !(valor >= 0) || ![cfg.aumenta, cfg.diminui].includes(tipo)) {
+    return res.status(400).json({ erro: 'Preencha tipo, data e valor corretamente.' })
+  }
+  const obs = (req.body.observacao || '').trim() || null
+  if (cfg.temFatura) {
+    await pool.query(`INSERT INTO ${cfg.tabela} (mes_id, ${cfg.col}, tipo, data_lanc, valor, fatura, observacao) VALUES (?,?,?,?,?,?,?)`,
+      [mesId, entidadeId, tipo, data, valor, (req.body.fatura || '').trim() || null, obs])
+  } else {
+    await pool.query(`INSERT INTO ${cfg.tabela} (mes_id, ${cfg.col}, tipo, data_lanc, valor, observacao) VALUES (?,?,?,?,?,?)`,
+      [mesId, entidadeId, tipo, data, valor, obs])
+  }
+  res.json({ ok: true })
+})
+app.delete('/api/ec/lancamentos/:modulo/:id', autenticarContabil(), async (req, res) => {
+  const cfg = ecCfg(req.params.modulo)
+  if (!cfg) return res.status(400).json({ erro: 'Módulo inválido.' })
+  await pool.query(`DELETE FROM ${cfg.tabela} WHERE id = ?`, [req.params.id])
+  res.json({ ok: true })
+})
+
+// =============================================
+// FINANCEIRO — IMPORTAÇÕES (pagamentos, câmbio, saldos) — restrito ao financeiro
+// =============================================
+function statusImportacao(valorReais, pago) {
+  if (pago >= valorReais - 0.01) return 'PAGO'
+  if (pago > 0.01) return 'PARCIAL'
+  return 'DEVENDO'
+}
+
+async function importacoesComputadas() {
+  const [imps] = await pool.query(`
+    SELECT i.*, f.nome AS fornecedor_nome, f.pais AS fornecedor_pais
+    FROM fin_importacoes i LEFT JOIN fin_fornecedores f ON f.id = i.fornecedor_id
+    ORDER BY i.data_invoice DESC, i.id DESC`)
+  const [pgs] = await pool.query('SELECT importacao_id, COALESCE(SUM(valor_reais),0) AS pago, COALESCE(SUM(valor_moeda),0) AS pago_moeda FROM fin_pagamentos GROUP BY importacao_id')
+  const mapa = {}
+  pgs.forEach((p) => { mapa[p.importacao_id] = { pago: Number(p.pago) || 0, pago_moeda: Number(p.pago_moeda) || 0 } })
+  return imps.map((i) => {
+    const vr = Number(i.valor_reais) || 0
+    const pago = mapa[i.id] ? mapa[i.id].pago : 0
+    const pagoMoeda = mapa[i.id] ? mapa[i.id].pago_moeda : 0
+    const valorMoeda = Number(i.valor_moeda) || 0
+    return { ...i, pago, saldo: vr - pago, saldo_moeda: valorMoeda - pagoMoeda, status: statusImportacao(vr, pago) }
+  })
+}
+
+// Migração: garante a coluna contrato_id em fin_pagamentos (vínculo com câmbio)
+async function migrarFinanceiro() {
+  try {
+    const [cols] = await pool.query("SHOW COLUMNS FROM fin_pagamentos LIKE 'contrato_id'")
+    if (!cols.length) {
+      await pool.query('ALTER TABLE fin_pagamentos ADD COLUMN contrato_id INT NULL')
+      console.log('fin_pagamentos.contrato_id adicionado.')
+    }
+    // Backfill (1x): estima o valor em USD dos pagamentos antigos lançados só em R$,
+    // dividindo o R$ pago pela taxa da invoice. Guardado por flag para não repetir.
+    const [[flag]] = await pool.query("SELECT chave FROM notif_log WHERE chave = 'backfill_pag_usd'")
+    if (!flag) {
+      await pool.query('CREATE TABLE IF NOT EXISTS notif_log (chave VARCHAR(60) PRIMARY KEY, ultima_data DATE)')
+      const [r] = await pool.query(`
+        UPDATE fin_pagamentos p JOIN fin_importacoes i ON i.id = p.importacao_id
+        SET p.valor_moeda = ROUND(p.valor_reais / i.taxa_cambio, 2)
+        WHERE (p.valor_moeda IS NULL OR p.valor_moeda = 0) AND i.taxa_cambio > 0 AND p.valor_reais > 0`)
+      await pool.query("INSERT INTO notif_log (chave, ultima_data) VALUES ('backfill_pag_usd', CURDATE()) ON DUPLICATE KEY UPDATE ultima_data = CURDATE()")
+      console.log('Backfill USD dos pagamentos:', r.affectedRows, 'linhas.')
+    }
+    // garante a coluna unidade em fin_custos (KG/UN)
+    try {
+      const [uc] = await pool.query("SHOW COLUMNS FROM fin_custos LIKE 'unidade'")
+      if (!uc.length) await pool.query("ALTER TABLE fin_custos ADD COLUMN unidade VARCHAR(4) DEFAULT 'KG'")
+      const [pc] = await pool.query("SHOW COLUMNS FROM fin_custos LIKE 'produto'")
+      if (!pc.length) await pool.query("ALTER TABLE fin_custos ADD COLUMN produto VARCHAR(200)")
+    } catch (e) { /* tabela ainda não existe */ }
+  } catch (e) { console.error('Erro migração financeiro:', e.message) }
+}
+setTimeout(migrarFinanceiro, 7000)
+
+// ---- Resumo Semanal de Importação (e-mail) ----
+const EMAILS_RESUMO_IMPORT = ['joaoantonio@pietrobon.com.br', 'export2@pietrobon.com.br']
+function _brl(n) { return 'R$ ' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+function _num2(n) { return (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+function _escEmail(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
+
+async function montarCorpoResumoImport() {
+  const imps = await importacoesComputadas()
+  // valores em moeda (USD). Se o pagamento não foi lançado em USD, estima
+  // o pago em USD pelo R$ pago dividido pela taxa da invoice.
+  imps.forEach((i) => {
+    i._vm = Number(i.valor_moeda) || 0
+    const smRegistrado = Number(i.saldo_moeda) || 0
+    const pmRegistrado = i._vm - smRegistrado
+    const taxa = Number(i.taxa_cambio) || 0
+    i._pm = pmRegistrado > 0.01 ? pmRegistrado : (taxa > 0 ? (i.pago / taxa) : 0)
+    if (i._pm > i._vm) i._pm = i._vm
+    i._sm = i._vm - i._pm
+  })
+  const totImp = imps.reduce((s, i) => s + (Number(i.valor_reais) || 0), 0)
+  const totPago = imps.reduce((s, i) => s + i.pago, 0)
+  const totImpM = imps.reduce((s, i) => s + i._vm, 0)
+  const totPagoM = imps.reduce((s, i) => s + i._pm, 0)
+  const grupos = {}
+  imps.forEach((i) => {
+    const k = i.fornecedor_nome || '—'
+    if (!grupos[k]) grupos[k] = []
+    grupos[k].push(i)
+  })
+  const corStatus = { PAGO: '#1a7f37', PARCIAL: '#b7791f', DEVENDO: '#c0392b' }
+  const nomes = Object.keys(grupos).sort((a, b) => a.localeCompare(b))
+  let linhas = ''
+  for (const forn of nomes) {
+    const lista = grupos[forn]
+    const sImp = lista.reduce((s, i) => s + (Number(i.valor_reais) || 0), 0)
+    const sPago = lista.reduce((s, i) => s + i.pago, 0)
+    const sImpM = lista.reduce((s, i) => s + i._vm, 0)
+    const sPagoM = lista.reduce((s, i) => s + i._pm, 0)
+    linhas += `<tr style="background:#1f2d50;color:#fff"><td colspan="8" style="padding:6px 8px;font-weight:bold">${_escEmail(forn)}</td></tr>`
+    lista.forEach((i) => {
+      const moeda = _escEmail(i.moeda || 'USD')
+      linhas += `<tr style="border-bottom:1px solid #e5e7eb">
+        <td style="padding:5px 8px">${_escEmail(i.invoice || '-')}</td>
+        <td style="padding:5px 8px">${_escEmail(i.mercadoria || '-')}</td>
+        <td style="padding:5px 8px;text-align:right">${moeda} ${_num2(i._vm)}</td>
+        <td style="padding:5px 8px;text-align:right">${moeda} ${_num2(i._pm)}</td>
+        <td style="padding:5px 8px;text-align:right;color:${i._sm > 0.01 ? '#c0392b' : '#1a7f37'}">${moeda} ${_num2(i._sm)}</td>
+        <td style="padding:5px 8px;text-align:right">${_brl(i.valor_reais)}</td>
+        <td style="padding:5px 8px;text-align:right">${_brl(i.pago)}</td>
+        <td style="padding:5px 8px;text-align:right;color:${i.saldo > 0.01 ? '#c0392b' : '#1a7f37'}">${_brl(i.saldo)} <span style="color:${corStatus[i.status] || '#555'};font-size:.72rem">(${i.status})</span></td>
+      </tr>`
+    })
+    linhas += `<tr style="background:#eef1f5;font-weight:bold"><td colspan="2" style="padding:5px 8px;text-align:right">Subtotal ${_escEmail(forn)}</td>
+      <td style="padding:5px 8px;text-align:right">${_num2(sImpM)}</td><td style="padding:5px 8px;text-align:right">${_num2(sPagoM)}</td><td style="padding:5px 8px;text-align:right">${_num2(sImpM - sPagoM)}</td>
+      <td style="padding:5px 8px;text-align:right">${_brl(sImp)}</td><td style="padding:5px 8px;text-align:right">${_brl(sPago)}</td><td style="padding:5px 8px;text-align:right">${_brl(sImp - sPago)}</td></tr>`
+  }
+  return `
+  <h2 style="color:#1f2d50;margin:0 0 4px">Resumo Semanal de Importação</h2>
+  <p style="color:#555;margin:0 0 16px">${new Date().toLocaleDateString('pt-BR')} · ${imps.length} importações</p>
+  <table style="width:100%;border-collapse:collapse;font-size:.8rem">
+    <thead><tr style="background:#c0392b;color:#fff">
+      <th style="padding:6px 8px;text-align:left">Invoice</th><th style="padding:6px 8px;text-align:left">Mercadoria</th>
+      <th style="padding:6px 8px;text-align:right">Valor USD</th><th style="padding:6px 8px;text-align:right">Pago USD</th><th style="padding:6px 8px;text-align:right">Saldo USD</th>
+      <th style="padding:6px 8px;text-align:right">Valor R$</th><th style="padding:6px 8px;text-align:right">Pago R$</th><th style="padding:6px 8px;text-align:right">Saldo R$</th>
+    </tr></thead>
+    <tbody>${linhas}</tbody>
+    <tfoot><tr style="background:#1f2d50;color:#fff;font-weight:bold">
+      <td colspan="2" style="padding:7px 8px;text-align:right">TOTAL GERAL</td>
+      <td style="padding:7px 8px;text-align:right">${_num2(totImpM)}</td><td style="padding:7px 8px;text-align:right">${_num2(totPagoM)}</td><td style="padding:7px 8px;text-align:right">${_num2(totImpM - totPagoM)}</td>
+      <td style="padding:7px 8px;text-align:right">${_brl(totImp)}</td><td style="padding:7px 8px;text-align:right">${_brl(totPago)}</td><td style="padding:7px 8px;text-align:right">${_brl(totImp - totPago)}</td>
+    </tr></tfoot>
+  </table>
+  <p style="color:#8a6a6a;font-size:.72rem;margin:10px 0 0">Pago/Saldo em USD estimado pela taxa da invoice quando o pagamento foi lançado em R$.</p>`
+}
+
+async function enviarResumoSemanalImportacao(forcar = false) {
+  try {
+    if (!forcar) {
+      if (new Date().getDay() !== 1) return // envia às segundas-feiras
+      if (!(await podeEnviarHoje('resumo_semanal_import'))) return
+    }
+    const corpo = await montarCorpoResumoImport()
+    await enviarEmailPara('Resumo Semanal de Importação', corpo, EMAILS_RESUMO_IMPORT)
+  } catch (e) { console.error('Erro resumo semanal import:', e.message) }
+}
+setTimeout(() => enviarResumoSemanalImportacao(false), 200 * 1000)
+setInterval(() => enviarResumoSemanalImportacao(false), 24 * 60 * 60 * 1000)
+
+// Envio manual (para testar): dispara o resumo na hora
+app.post('/api/fin/resumo-semanal/enviar', autenticarContabil(), async (req, res) => {
+  await enviarResumoSemanalImportacao(true)
+  res.json({ ok: true })
+})
+
+// Painel + lista
+app.get('/api/fin/resumo', autenticarContabil(), async (req, res) => {
+  const imps = await importacoesComputadas()
+  const totalImportado = imps.reduce((s, i) => s + (Number(i.valor_reais) || 0), 0)
+  const totalPago = imps.reduce((s, i) => s + i.pago, 0)
+  const cont = { PAGO: 0, PARCIAL: 0, DEVENDO: 0 }
+  const porForn = {}
+  imps.forEach((i) => {
+    cont[i.status]++
+    const k = i.fornecedor_nome || '—'
+    if (!porForn[k]) porForn[k] = { fornecedor: k, importado: 0, pago: 0, saldo: 0 }
+    porForn[k].importado += Number(i.valor_reais) || 0
+    porForn[k].pago += i.pago
+    porForn[k].saldo += i.saldo
+  })
+  res.json({
+    totalImportado, totalPago, saldoDevedor: totalImportado - totalPago,
+    qtd: imps.length, contagem: cont,
+    porFornecedor: Object.values(porForn).sort((a, b) => b.saldo - a.saldo),
+    importacoes: imps
+  })
+})
+
+// Cotação PTAX do dólar (Banco Central). Se não houver cotação na data
+// (fim de semana/feriado/ainda não publicada), retorna a última disponível.
+const _ptaxCache = {}
+function _fmtBCB(d) { const [y, m, dd] = d.split('-'); return `${m}-${dd}-${y}` }
+app.get('/api/fin/ptax', autenticarContabil(), async (req, res) => {
+  const data = String(req.query.data || '').slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return res.status(400).json({ erro: 'Data inválida.' })
+  if (_ptaxCache[data]) return res.json(_ptaxCache[data])
+  try {
+    const ini = new Date(data + 'T00:00:00'); ini.setDate(ini.getDate() - 12)
+    const iniStr = ini.toISOString().slice(0, 10)
+    const url = `https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)?@dataInicial='${_fmtBCB(iniStr)}'&@dataFinalCotacao='${_fmtBCB(data)}'&$top=100&$orderby=dataHoraCotacao%20desc&$format=json`
+    const resp = await fetch(url)
+    if (!resp.ok) return res.status(502).json({ erro: 'Banco Central indisponível.' })
+    const j = await resp.json()
+    const arr = (j && j.value) || []
+    if (!arr.length) return res.json({ taxa: null, dataCotacao: null, aviso: 'Sem cotação no período.' })
+    const c = arr[0]
+    const out = { taxa: c.cotacaoVenda, dataCotacao: String(c.dataHoraCotacao || '').slice(0, 10) }
+    _ptaxCache[data] = out
+    res.json(out)
+  } catch (e) {
+    console.error('Erro PTAX:', e.message)
+    res.status(502).json({ erro: 'Falha ao consultar PTAX.' })
+  }
+})
+
+// Fornecedores
+app.get('/api/fin/fornecedores', autenticarContabil(), async (req, res) => {
+  const [rows] = await pool.query('SELECT * FROM fin_fornecedores ORDER BY nome')
+  res.json(rows)
+})
+app.post('/api/fin/fornecedores', autenticarContabil(), async (req, res) => {
+  const b = req.body
+  if (!(b.nome || '').trim()) return res.status(400).json({ erro: 'Informe o nome.' })
+  await pool.query('INSERT INTO fin_fornecedores (nome, pais, moeda, contato, email, obs) VALUES (?,?,?,?,?,?)',
+    [b.nome.trim(), b.pais || null, b.moeda || 'USD', b.contato || null, b.email || null, b.obs || null])
+  res.json({ ok: true })
+})
+app.patch('/api/fin/fornecedores/:id', autenticarContabil(), async (req, res) => {
+  const campos = ['nome', 'pais', 'moeda', 'contato', 'email', 'obs', 'ativo']
+  const sets = [], vals = []
+  for (const c of campos) { if (c in req.body) { sets.push(`${c} = ?`); vals.push(req.body[c] === '' ? null : req.body[c]) } }
+  if (!sets.length) return res.json({ ok: true })
+  vals.push(req.params.id)
+  await pool.query(`UPDATE fin_fornecedores SET ${sets.join(', ')} WHERE id = ?`, vals)
+  res.json({ ok: true })
+})
+app.delete('/api/fin/fornecedores/:id', autenticarContabil(), async (req, res) => {
+  await pool.query('DELETE FROM fin_fornecedores WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
+})
+
+// Importações
+const CAMPOS_IMP = ['fornecedor_id', 'invoice', 'data_invoice', 'mercadoria', 'moeda', 'valor_moeda', 'taxa_cambio', 'banco', 'obs']
+function calcValorReais(b) { return (parseFloat(b.valor_moeda) || 0) * (parseFloat(b.taxa_cambio) || 0) }
+app.post('/api/fin/importacoes', autenticarContabil(), async (req, res) => {
+  const b = req.body
+  if (!b.invoice) return res.status(400).json({ erro: 'Informe o Nº do invoice.' })
+  const valorReais = calcValorReais(b)
+  await pool.query(
+    `INSERT INTO fin_importacoes (fornecedor_id, invoice, data_invoice, mercadoria, moeda, valor_moeda, taxa_cambio, valor_reais, banco, obs)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    [b.fornecedor_id || null, b.invoice, b.data_invoice || null, b.mercadoria || null, b.moeda || 'USD',
+     parseFloat(b.valor_moeda) || 0, parseFloat(b.taxa_cambio) || 0, valorReais, b.banco || null, b.obs || null])
+  res.json({ ok: true })
+})
+app.patch('/api/fin/importacoes/:id', autenticarContabil(), async (req, res) => {
+  const sets = [], vals = []
+  for (const c of CAMPOS_IMP) { if (c in req.body) { let v = req.body[c]; if (v === '') v = null; if (c === 'valor_moeda' || c === 'taxa_cambio') v = parseFloat(v) || 0; sets.push(`${c} = ?`); vals.push(v) } }
+  if ('valor_moeda' in req.body || 'taxa_cambio' in req.body) { sets.push('valor_reais = ?'); vals.push(calcValorReais(req.body)) }
+  if (!sets.length) return res.json({ ok: true })
+  vals.push(req.params.id)
+  await pool.query(`UPDATE fin_importacoes SET ${sets.join(', ')} WHERE id = ?`, vals)
+  res.json({ ok: true })
+})
+app.delete('/api/fin/importacoes/:id', autenticarContabil(), async (req, res) => {
+  await pool.query('DELETE FROM fin_pagamentos WHERE importacao_id = ?', [req.params.id])
+  await pool.query('DELETE FROM fin_contratos WHERE importacao_id = ?', [req.params.id])
+  await pool.query('DELETE FROM fin_importacoes WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
+})
+
+// Pagamentos
+app.get('/api/fin/pagamentos', autenticarContabil(), async (req, res) => {
+  const [rows] = await pool.query('SELECT * FROM fin_pagamentos WHERE importacao_id = ? ORDER BY data_pgto, id', [parseInt(req.query.importacaoId) || 0])
+  res.json(rows)
+})
+app.post('/api/fin/pagamentos', autenticarContabil(), async (req, res) => {
+  const b = req.body
+  if (!b.importacao_id || !(parseFloat(b.valor_reais) >= 0)) return res.status(400).json({ erro: 'Dados inválidos.' })
+  await pool.query('INSERT INTO fin_pagamentos (importacao_id, data_pgto, valor_reais, valor_moeda, forma, obs, contrato_id) VALUES (?,?,?,?,?,?,?)',
+    [b.importacao_id, b.data_pgto || null, parseFloat(b.valor_reais) || 0, parseFloat(b.valor_moeda) || 0, b.forma || null, b.obs || null, b.contrato_id || null])
+  res.json({ ok: true })
+})
+app.patch('/api/fin/pagamentos/:id', autenticarContabil(), async (req, res) => {
+  const campos = ['data_pgto', 'valor_reais', 'valor_moeda', 'forma', 'obs', 'contrato_id']
+  const sets = [], vals = []
+  for (const c of campos) { if (c in req.body) { let v = req.body[c]; if (v === '') v = null; if (c === 'valor_reais' || c === 'valor_moeda') v = parseFloat(v) || 0; sets.push(`${c} = ?`); vals.push(v) } }
+  if (!sets.length) return res.json({ ok: true })
+  vals.push(req.params.id)
+  await pool.query(`UPDATE fin_pagamentos SET ${sets.join(', ')} WHERE id = ?`, vals)
+  res.json({ ok: true })
+})
+app.delete('/api/fin/pagamentos/:id', autenticarContabil(), async (req, res) => {
+  await pool.query('DELETE FROM fin_pagamentos WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
+})
+
+// Contratos de câmbio
+app.get('/api/fin/contratos', autenticarContabil(), async (req, res) => {
+  const cond = req.query.importacaoId ? 'WHERE c.importacao_id = ?' : ''
+  const args = req.query.importacaoId ? [parseInt(req.query.importacaoId)] : []
+  const [rows] = await pool.query(`
+    SELECT c.*, i.invoice FROM fin_contratos c LEFT JOIN fin_importacoes i ON i.id = c.importacao_id
+    ${cond} ORDER BY c.data_fechamento DESC, c.id DESC`, args)
+  res.json(rows)
+})
+app.post('/api/fin/contratos', autenticarContabil(), async (req, res) => {
+  const b = req.body
+  if (!b.num_contrato) return res.status(400).json({ erro: 'Informe o Nº do contrato.' })
+  await pool.query(
+    `INSERT INTO fin_contratos (num_contrato, banco, data_fechamento, moeda, valor_moeda, taxa, valor_reais, importacao_id, liquidado, data_liquidacao, obs)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    [b.num_contrato, b.banco || null, b.data_fechamento || null, b.moeda || 'USD', parseFloat(b.valor_moeda) || 0,
+     parseFloat(b.taxa) || 0, (parseFloat(b.valor_moeda) || 0) * (parseFloat(b.taxa) || 0), b.importacao_id || null,
+     b.liquidado ? 1 : 0, b.data_liquidacao || null, b.obs || null])
+  res.json({ ok: true })
+})
+app.patch('/api/fin/contratos/:id', autenticarContabil(), async (req, res) => {
+  const b = req.body
+  const campos = ['num_contrato', 'banco', 'data_fechamento', 'moeda', 'valor_moeda', 'taxa', 'importacao_id', 'liquidado', 'data_liquidacao', 'obs']
+  const sets = [], vals = []
+  for (const c of campos) {
+    if (c in b) {
+      let v = b[c]
+      if (v === '') v = null
+      if (c === 'valor_moeda' || c === 'taxa') v = parseFloat(v) || 0
+      if (c === 'liquidado') v = b[c] ? 1 : 0
+      sets.push(`${c} = ?`); vals.push(v)
+    }
+  }
+  if ('valor_moeda' in b || 'taxa' in b) { sets.push('valor_reais = ?'); vals.push((parseFloat(b.valor_moeda) || 0) * (parseFloat(b.taxa) || 0)) }
+  if (!sets.length) return res.json({ ok: true })
+  vals.push(req.params.id)
+  await pool.query(`UPDATE fin_contratos SET ${sets.join(', ')} WHERE id = ?`, vals)
+  res.json({ ok: true })
+})
+app.delete('/api/fin/contratos/:id', autenticarContabil(), async (req, res) => {
+  await pool.query('DELETE FROM fin_contratos WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
+})
+
+// ---- Custos de Importação (nacionalização) ----
+async function inicializarCustos() {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS fin_custos (
+      id INT AUTO_INCREMENT PRIMARY KEY, importacao_id INT NULL UNIQUE, nfe VARCHAR(60), produto VARCHAR(200),
+      materia_prima DECIMAL(14,2) DEFAULT 0, imposto_importacao DECIMAL(14,2) DEFAULT 0,
+      ipi DECIMAL(14,2) DEFAULT 0, pis DECIMAL(14,2) DEFAULT 0, cofins DECIMAL(14,2) DEFAULT 0, icms DECIMAL(14,2) DEFAULT 0,
+      quantidade_kg DECIMAL(14,3) DEFAULT 0, unidade VARCHAR(4) DEFAULT 'KG', obs VARCHAR(500),
+      atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`)
+    await pool.query(`CREATE TABLE IF NOT EXISTS fin_custo_despesas (
+      id INT AUTO_INCREMENT PRIMARY KEY, custo_id INT NOT NULL, nome VARCHAR(160), valor DECIMAL(14,2) DEFAULT 0, INDEX(custo_id))`)
+    await pool.query(`CREATE TABLE IF NOT EXISTS fin_custo_st (
+      id INT AUTO_INCREMENT PRIMARY KEY, custo_id INT NOT NULL, produto VARCHAR(200), ncm VARCHAR(20),
+      base_icms DECIMAL(14,2) DEFAULT 0, icms_proprio DECIMAL(14,2) DEFAULT 0, aliquota DECIMAL(6,4) DEFAULT 0,
+      ipi_destacado DECIMAL(14,2) DEFAULT 0, mva DECIMAL(8,4) DEFAULT 0, INDEX(custo_id))`)
+  } catch (e) { console.error('Erro init custos:', e.message) }
+}
+setTimeout(inicializarCustos, 6000)
+
+// ST a recolher de um item: ((BaseICMS + IPI) * MVA) * Aliquota - ICMS Próprio
+function stARecolher(it) {
+  const bcSt = ((Number(it.base_icms) || 0) + (Number(it.ipi_destacado) || 0)) * (Number(it.mva) || 0)
+  return bcSt * (Number(it.aliquota) || 0) - (Number(it.icms_proprio) || 0)
+}
+function computarCusto(cab, despesas, st) {
+  const despTotal = (despesas || []).reduce((s, d) => s + (Number(d.valor) || 0), 0)
+  const stCusto = (st || []).reduce((s, i) => s + stARecolher(i), 0)
+  const mp = Number(cab.materia_prima) || 0
+  const ii = Number(cab.imposto_importacao) || 0
+  const ipi = Number(cab.ipi) || 0, pis = Number(cab.pis) || 0, cofins = Number(cab.cofins) || 0, icms = Number(cab.icms) || 0
+  const total = mp + ii + stCusto + ipi + pis + cofins + icms + despTotal
+  const credito = icms + ipi + pis + cofins
+  const custoCredito = total - credito
+  const kg = Number(cab.quantidade_kg) || 0
+  return { despTotal, stCusto, total, credito, custoCredito, custoKg: kg > 0 ? custoCredito / kg : 0 }
+}
+
+app.get('/api/fin/custos', autenticarContabil(), async (req, res) => {
+  const [rows] = await pool.query(`
+    SELECT c.*, i.invoice, f.nome AS fornecedor_nome
+    FROM fin_custos c LEFT JOIN fin_importacoes i ON i.id = c.importacao_id LEFT JOIN fin_fornecedores f ON f.id = i.fornecedor_id
+    ORDER BY c.atualizado_em DESC`)
+  const [desp] = await pool.query('SELECT custo_id, valor FROM fin_custo_despesas')
+  const [st] = await pool.query('SELECT * FROM fin_custo_st')
+  const dMap = {}, sMap = {}
+  desp.forEach((d) => { (dMap[d.custo_id] = dMap[d.custo_id] || []).push(d) })
+  st.forEach((s) => { (sMap[s.custo_id] = sMap[s.custo_id] || []).push(s) })
+  res.json(rows.map((c) => ({ ...c, calc: computarCusto(c, dMap[c.id] || [], sMap[c.id] || []) })))
+})
+
+app.get('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, res) => {
+  const impId = parseInt(req.params.importacaoId) || 0
+  const [[c]] = await pool.query('SELECT * FROM fin_custos WHERE importacao_id = ?', [impId])
+  if (!c) return res.json(null)
+  const [despesas] = await pool.query('SELECT * FROM fin_custo_despesas WHERE custo_id = ? ORDER BY id', [c.id])
+  const [st] = await pool.query('SELECT * FROM fin_custo_st WHERE custo_id = ? ORDER BY id', [c.id])
+  res.json({ ...c, despesas, st, calc: computarCusto(c, despesas, st) })
+})
+
+const CAMPOS_CUSTO = ['nfe', 'produto', 'materia_prima', 'imposto_importacao', 'ipi', 'pis', 'cofins', 'icms', 'quantidade_kg', 'unidade', 'obs']
+app.put('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, res) => {
+  const impId = parseInt(req.params.importacaoId) || 0
+  if (!impId) return res.status(400).json({ erro: 'Selecione uma importação.' })
+  const b = req.body
+  const [[existe]] = await pool.query('SELECT id FROM fin_custos WHERE importacao_id = ?', [impId])
+  let custoId
+  if (existe) {
+    custoId = existe.id
+    const sets = [], vals = []
+    for (const c of CAMPOS_CUSTO) { let v = b[c]; if (v === '' || v === undefined) v = (c === 'nfe' || c === 'obs' || c === 'produto') ? null : (c === 'unidade' ? 'KG' : 0); sets.push(`${c} = ?`); vals.push(v) }
+    vals.push(custoId)
+    await pool.query(`UPDATE fin_custos SET ${sets.join(', ')} WHERE id = ?`, vals)
+  } else {
+    const [r] = await pool.query(
+      'INSERT INTO fin_custos (importacao_id, nfe, produto, materia_prima, imposto_importacao, ipi, pis, cofins, icms, quantidade_kg, unidade, obs) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+      [impId, b.nfe || null, b.produto || null, Number(b.materia_prima) || 0, Number(b.imposto_importacao) || 0, Number(b.ipi) || 0, Number(b.pis) || 0, Number(b.cofins) || 0, Number(b.icms) || 0, Number(b.quantidade_kg) || 0, b.unidade || 'KG', b.obs || null])
+    custoId = r.insertId
+  }
+  await pool.query('DELETE FROM fin_custo_despesas WHERE custo_id = ?', [custoId])
+  for (const d of (b.despesas || [])) {
+    if (!(d.nome || '').trim() && !(Number(d.valor) > 0)) continue
+    await pool.query('INSERT INTO fin_custo_despesas (custo_id, nome, valor) VALUES (?,?,?)', [custoId, d.nome || null, Number(d.valor) || 0])
+  }
+  await pool.query('DELETE FROM fin_custo_st WHERE custo_id = ?', [custoId])
+  for (const s of (b.st || [])) {
+    if (!(s.produto || '').trim() && !(Number(s.base_icms) > 0)) continue
+    await pool.query('INSERT INTO fin_custo_st (custo_id, produto, ncm, base_icms, icms_proprio, aliquota, ipi_destacado, mva) VALUES (?,?,?,?,?,?,?,?)',
+      [custoId, s.produto || null, s.ncm || null, Number(s.base_icms) || 0, Number(s.icms_proprio) || 0, Number(s.aliquota) || 0, Number(s.ipi_destacado) || 0, Number(s.mva) || 0])
+  }
+  res.json({ ok: true })
+})
+
+app.delete('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, res) => {
+  const impId = parseInt(req.params.importacaoId) || 0
+  const [[c]] = await pool.query('SELECT id FROM fin_custos WHERE importacao_id = ?', [impId])
+  if (c) {
+    await pool.query('DELETE FROM fin_custo_despesas WHERE custo_id = ?', [c.id])
+    await pool.query('DELETE FROM fin_custo_st WHERE custo_id = ?', [c.id])
+    await pool.query('DELETE FROM fin_custos WHERE id = ?', [c.id])
+  }
+  res.json({ ok: true })
+})
+
+// ==============================================
+// ORDEM DE PRODUÇÃO (por PI) — restrito ao financeiro (export2, export, joaoantonio)
+// =============================================
 
 const EMAILS_CHECKLIST = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'export3@pietrobon.com.br']
-const EXPORTADOR = ['PIETROBON & CIA. LTDA.', 'Rua Osvaldo Cruz, 126', 'Tapejara - RS - Brasil', 'CNPJ 97.580.260/0001-15']
 
-let editId = null
-const $ = (id) => document.getElementById(id)
-const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-const dISO = (v) => v ? String(v).slice(0, 10) : ''
-const dBR = (v) => { const s = dISO(v); return s ? s.split('-').reverse().join('/') : '' }
-function somaCaixas(itens) {
-  return itens.reduce((s, it) => {
-    const n = parseFloat(String(it.qtd_cx || '').replace(/\./g, '').replace(',', '.')) || 0
-    return s + n
-  }, 0)
-}
-function fmtInt(n) { return (Number(n) || 0).toLocaleString('pt-BR') }
-
-async function verLista() {
-  editId = null
-  const cont = $('conteudo-cl')
-  cont.innerHTML = '<p class="text-muted">Carregando...</p>'
-  const rows = await api.checklist.listar()
-  if (!Array.isArray(rows)) { cont.innerHTML = '<p class="text-danger">Erro ao carregar.</p>'; return }
-  cont.innerHTML = `
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-      <h5 class="secao-titulo-card mb-0">Check-lists cadastrados</h5>
-      <button class="btn btn-ok-grande" id="btn-novo-cl">+ Novo check-list</button>
-    </div>
-    ${rows.length ? `<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0">
-      <thead><tr><th>Fatura</th><th>Pedido</th><th>Cliente</th><th>Destino</th><th>Data emb.</th><th></th></tr></thead>
-      <tbody>${rows.map((c) => `<tr>
-        <td class="fw-semibold">${esc(c.fatura || '-')}</td><td>${esc(c.pedido || '-')}</td>
-        <td>${esc(c.cliente_nome || '-')}</td><td>${esc(c.destino || '-')}</td><td>${dBR(c.data_emb)}</td>
-        <td style="white-space:nowrap" class="text-end">
-          <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="editarCl(${c.id})">Abrir</button>
-          <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="excluirCl(${c.id})">🗑</button>
-        </td></tr>`).join('')}</tbody></table></div></div>`
-      : '<p class="text-muted fst-italic">Nenhum check-list cadastrado. Clique em "Novo check-list".</p>'}`
-  $('btn-novo-cl').addEventListener('click', () => editar(null))
+function autenticarChecklist() {
+  const base = autenticar(TODOS)
+  return (req, res, next) => base(req, res, () => {
+    if (!EMAILS_CHECKLIST.includes((req.usuario.email || '').toLowerCase())) {
+      return res.status(403).json({ erro: 'Sem permissão' })
+    }
+    next()
+  })
 }
 
-window.editarCl = (id) => editar(id)
-window.excluirCl = async function (id) {
-  if (!confirm('Excluir este check-list?')) return
-  await api.checklist.excluir(id)
-  verLista()
+async function inicializarChecklist() {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS checklist_exp (
+      id INT AUTO_INCREMENT PRIMARY KEY, fatura VARCHAR(60), pedido VARCHAR(60), data_emb DATE,
+      cliente_nome VARCHAR(200), cliente_endereco VARCHAR(400), cliente_contato VARCHAR(200),
+      embarque VARCHAR(200), descarga VARCHAR(200), destino VARCHAR(200),
+      peso_liquido VARCHAR(40), peso_bruto VARCHAR(40), volume VARCHAR(40),
+      observacoes VARCHAR(800), criado_por VARCHAR(160), criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`)
+    await pool.query(`CREATE TABLE IF NOT EXISTS checklist_exp_itens (
+      id INT AUTO_INCREMENT PRIMARY KEY, checklist_id INT NOT NULL, ordem INT DEFAULT 0,
+      produto VARCHAR(300), gramatura VARCHAR(80), qtd_cx VARCHAR(40), lote VARCHAR(80), validade VARCHAR(40),
+      INDEX(checklist_id))`)
+  } catch (e) { console.error('Erro init checklist:', e.message) }
+}
+setTimeout(inicializarChecklist, 3000)
+
+const CAMPOS_CL = ['fatura', 'pedido', 'data_emb', 'cliente_nome', 'cliente_endereco', 'cliente_contato', 'embarque', 'descarga', 'destino', 'peso_liquido', 'peso_bruto', 'volume', 'observacoes']
+
+async function salvarItens(checklistId, itens) {
+  await pool.query('DELETE FROM checklist_exp_itens WHERE checklist_id = ?', [checklistId])
+  if (Array.isArray(itens)) {
+    for (let i = 0; i < itens.length; i++) {
+      const it = itens[i]
+      if (!it || (!it.produto && !it.gramatura && !it.qtd_cx)) continue
+      await pool.query('INSERT INTO checklist_exp_itens (checklist_id, ordem, produto, gramatura, qtd_cx, lote, validade) VALUES (?,?,?,?,?,?,?)',
+        [checklistId, i + 1, it.produto || null, it.gramatura || null, it.qtd_cx || null, it.lote || null, it.validade || null])
+    }
+  }
 }
 
-function linhaItemHtml(it) {
-  it = it || {}
-  return `<tr class="cl-item">
-    <td><input class="form-control form-control-sm it-produto" value="${esc(it.produto || '')}"></td>
-    <td><input class="form-control form-control-sm it-gramatura" value="${esc(it.gramatura || '')}" style="min-width:90px"></td>
-    <td><input class="form-control form-control-sm it-qtd_cx" value="${esc(it.qtd_cx || '')}" style="min-width:80px"></td>
-    <td><input class="form-control form-control-sm it-lote" value="${esc(it.lote || '')}" style="min-width:90px"></td>
-    <td><input class="form-control form-control-sm it-validade" value="${esc(it.validade || '')}" style="min-width:90px"></td>
-    <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 btn-rem-item">✕</button></td>
-  </tr>`
+app.get('/api/checklist', autenticarChecklist(), async (req, res) => {
+  const [rows] = await pool.query('SELECT id, fatura, pedido, cliente_nome, data_emb, destino, criado_em FROM checklist_exp ORDER BY id DESC LIMIT 300')
+  res.json(rows)
+})
+app.get('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
+  const [[cab]] = await pool.query('SELECT * FROM checklist_exp WHERE id = ?', [req.params.id])
+  if (!cab) return res.status(404).json({ erro: 'Não encontrado.' })
+  const [itens] = await pool.query('SELECT * FROM checklist_exp_itens WHERE checklist_id = ? ORDER BY ordem, id', [req.params.id])
+  res.json({ ...cab, itens })
+})
+app.post('/api/checklist', autenticarChecklist(), async (req, res) => {
+  const b = req.body
+  const vals = CAMPOS_CL.map((c) => (b[c] === '' || b[c] === undefined) ? null : b[c])
+  vals.push(req.usuario.nome || null)
+  const [r] = await pool.query(`INSERT INTO checklist_exp (${CAMPOS_CL.join(', ')}, criado_por) VALUES (${CAMPOS_CL.map(() => '?').join(', ')}, ?)`, vals)
+  await salvarItens(r.insertId, b.itens)
+  res.json({ id: r.insertId })
+})
+app.put('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
+  const b = req.body
+  const sets = CAMPOS_CL.map((c) => `${c} = ?`)
+  const vals = CAMPOS_CL.map((c) => (b[c] === '' || b[c] === undefined) ? null : b[c])
+  vals.push(req.params.id)
+  await pool.query(`UPDATE checklist_exp SET ${sets.join(', ')} WHERE id = ?`, vals)
+  await salvarItens(req.params.id, b.itens)
+  res.json({ ok: true })
+})
+app.delete('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
+  await pool.query('DELETE FROM checklist_exp_itens WHERE checklist_id = ?', [req.params.id])
+  await pool.query('DELETE FROM checklist_exp WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
+})
+
+
+
+
+
+const EMAILS_TAREFAS = [
+  'export@pietrobon.com.br',
+  'export2@pietrobon.com.br',
+  'joaoantonio@pietrobon.com.br',
+  'export3@pietrobon.com.br'
+]
+
+function autenticarTarefas() {
+  return (req, res, next) => {
+    const token = (req.headers.authorization || '').split(' ')[1]
+    if (!token) return res.status(401).json({ erro: 'Não autenticado.' })
+    try {
+      const decoded = require('jsonwebtoken').verify(token, process.env.JWT_SECRET)
+      if (!EMAILS_TAREFAS.includes((decoded.email || '').toLowerCase())) {
+        return res.status(403).json({ erro: 'Acesso restrito a Tarefas Exportação.' })
+      }
+      req.usuario = decoded
+      next()
+    } catch {
+      return res.status(401).json({ erro: 'Token inválido.' })
+    }
+  }
 }
 
-async function editar(id) {
-  editId = id
-  let d = { itens: [{}, {}, {}] }
-  if (id) { d = await api.checklist.obter(id); if (!d.itens || !d.itens.length) d.itens = [{}] }
-  const cont = $('conteudo-cl')
-  cont.innerHTML = `
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-      <h5 class="secao-titulo-card mb-0">${id ? 'Editar check-list' : 'Novo check-list'}</h5>
-      <button class="btn btn-sm btn-outline-secondary" id="btn-voltar">← Voltar</button>
-    </div>
-    <div class="card mb-3"><div class="card-body">
-      <div class="row g-2 mb-2">
-        <div class="col-6 col-md-3"><label class="form-label small mb-0">Fatura / INV Nº</label><input id="c-fatura" class="form-control form-control-sm" value="${esc(d.fatura || '')}"></div>
-        <div class="col-6 col-md-3"><label class="form-label small mb-0">Pedido Nº</label><input id="c-pedido" class="form-control form-control-sm" value="${esc(d.pedido || '')}"></div>
-        <div class="col-6 col-md-3"><label class="form-label small mb-0">Data do embarque</label><input type="date" id="c-data_emb" class="form-control form-control-sm" value="${dISO(d.data_emb)}"></div>
-      </div>
-      <hr>
-      <div class="row g-3">
-        <div class="col-12 col-md-6">
-          <h6 class="fw-bold small text-uppercase text-muted">Importador / Consignatário</h6>
-          <label class="form-label small mb-0">Cliente</label><input id="c-cliente_nome" class="form-control form-control-sm mb-1" value="${esc(d.cliente_nome || '')}">
-          <label class="form-label small mb-0">Endereço</label><input id="c-cliente_endereco" class="form-control form-control-sm mb-1" value="${esc(d.cliente_endereco || '')}">
-          <label class="form-label small mb-0">Contato</label><input id="c-cliente_contato" class="form-control form-control-sm" value="${esc(d.cliente_contato || '')}">
-        </div>
-        <div class="col-12 col-md-6">
-          <h6 class="fw-bold small text-uppercase text-muted">Embarque</h6>
-          <label class="form-label small mb-0">Local de embarque</label><input id="c-embarque" class="form-control form-control-sm mb-1" value="${esc(d.embarque || '')}" placeholder="Ex.: Rio Grande – RS">
-          <label class="form-label small mb-0">Descarga</label><input id="c-descarga" class="form-control form-control-sm mb-1" value="${esc(d.descarga || '')}">
-          <label class="form-label small mb-0">Destino</label><input id="c-destino" class="form-control form-control-sm" value="${esc(d.destino || '')}">
-        </div>
-      </div>
-    </div></div>
-
-    <div class="card mb-3"><div class="card-body">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h6 class="fw-bold mb-0">Produtos / Itens</h6>
-        <button type="button" class="btn btn-sm btn-outline-danger" id="btn-add-item">+ Adicionar item</button>
-      </div>
-      <div class="table-responsive"><table class="table table-sm mb-0" style="font-size:.85rem">
-        <thead><tr><th>Produto</th><th>Gramatura</th><th>Qtd (cx)</th><th>Lote</th><th>Validade</th><th></th></tr></thead>
-        <tbody id="cl-itens">${d.itens.map(linhaItemHtml).join('')}</tbody>
-      </table></div>
-      <div class="row g-2 mt-2">
-        <div class="col-6 col-md-3"><label class="form-label small mb-0">Peso líquido (kg)</label><input id="c-peso_liquido" class="form-control form-control-sm" value="${esc(d.peso_liquido || '')}"></div>
-        <div class="col-6 col-md-3"><label class="form-label small mb-0">Peso bruto (kg)</label><input id="c-peso_bruto" class="form-control form-control-sm" value="${esc(d.peso_bruto || '')}"></div>
-        <div class="col-6 col-md-3"><label class="form-label small mb-0">Volume (m³)</label><input id="c-volume" class="form-control form-control-sm" value="${esc(d.volume || '')}"></div>
-      </div>
-    </div></div>
-
-    <div class="card mb-3"><div class="card-body">
-      <label class="form-label small mb-0 fw-semibold">Observações</label>
-      <textarea id="c-observacoes" class="form-control form-control-sm" rows="2">${esc(d.observacoes || '')}</textarea>
-    </div></div>
-
-    <div class="d-flex gap-2 flex-wrap">
-      <button class="btn btn-ok-grande" id="btn-salvar-cl">Salvar</button>
-      <button class="btn btn-outline-danger" id="btn-pdf-cl">Salvar e exportar PDF</button>
-    </div>`
-
-  $('btn-voltar').addEventListener('click', verLista)
-  $('btn-add-item').addEventListener('click', () => { $('cl-itens').insertAdjacentHTML('beforeend', linhaItemHtml({})) })
-  $('cl-itens').addEventListener('click', (e) => { const b = e.target.closest('.btn-rem-item'); if (b) b.closest('tr').remove() })
-  $('btn-salvar-cl').addEventListener('click', async () => { const r = await salvar(); if (r) verLista() })
-  $('btn-pdf-cl').addEventListener('click', async () => { const r = await salvar(); if (r) exportarPDF(r) })
+async function inicializarTarefas() {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS tarefas (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      titulo VARCHAR(255) NOT NULL,
+      descricao TEXT,
+      coluna ENUM('a_fazer','em_progresso','concluido') DEFAULT 'a_fazer',
+      prioridade ENUM('baixa','normal','alta','urgente') DEFAULT 'normal',
+      responsavel VARCHAR(100),
+      criado_por VARCHAR(100),
+      prazo DATE,
+      ordem INT DEFAULT 0,
+      criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`)
+    const hash = await bcrypt.hash('exp123', 10)
+    await pool.query(
+      'INSERT IGNORE INTO usuarios (email, senha, nome, papel) VALUES (?, ?, ?, ?)',
+      ['export3@pietrobon.com.br', hash, 'Bernardo', 'auxiliar']
+    )
+  } catch (e) {
+    console.error('Erro ao inicializar Tarefas:', e.message)
+  }
 }
+setTimeout(inicializarTarefas, 3000)
 
-function coletar() {
-  const dados = {}
-  ;['fatura', 'pedido', 'data_emb', 'cliente_nome', 'cliente_endereco', 'cliente_contato', 'embarque', 'descarga', 'destino', 'peso_liquido', 'peso_bruto', 'volume', 'observacoes'].forEach((k) => { dados[k] = $('c-' + k).value })
-  dados.itens = [...document.querySelectorAll('#cl-itens .cl-item')].map((tr) => ({
-    produto: tr.querySelector('.it-produto').value,
-    gramatura: tr.querySelector('.it-gramatura').value,
-    qtd_cx: tr.querySelector('.it-qtd_cx').value,
-    lote: tr.querySelector('.it-lote').value,
-    validade: tr.querySelector('.it-validade').value
-  })).filter((it) => it.produto || it.gramatura || it.qtd_cx)
-  return dados
+app.get('/api/tarefas', autenticarTarefas(), async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM tarefas ORDER BY coluna, ordem, criado_em DESC')
+    res.json(rows)
+  } catch (e) {
+    res.status(500).json({ erro: e.message })
+  }
+})
+
+app.post('/api/tarefas', autenticarTarefas(), async (req, res) => {
+  try {
+    const { titulo, descricao, coluna, prioridade, responsavel, prazo } = req.body
+    if (!titulo) return res.status(400).json({ erro: 'Título obrigatório.' })
+    const [r] = await pool.query(
+      'INSERT INTO tarefas (titulo, descricao, coluna, prioridade, responsavel, prazo, criado_por) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [titulo, descricao || null, coluna || 'a_fazer', prioridade || 'normal', responsavel || null, prazo || null, req.usuario.email]
+    )
+    const [[nova]] = await pool.query('SELECT * FROM tarefas WHERE id = ?', [r.insertId])
+    res.json(nova)
+  } catch (e) {
+    res.status(500).json({ erro: e.message })
+  }
+})
+
+app.patch('/api/tarefas/:id', autenticarTarefas(), async (req, res) => {
+  try {
+    const { titulo, descricao, coluna, prioridade, responsavel, prazo, ordem } = req.body
+    const campos = []
+    const vals = []
+    if (titulo !== undefined)      { campos.push('titulo = ?');      vals.push(titulo) }
+    if (descricao !== undefined)   { campos.push('descricao = ?');   vals.push(descricao) }
+    if (coluna !== undefined)      { campos.push('coluna = ?');      vals.push(coluna) }
+    if (prioridade !== undefined)  { campos.push('prioridade = ?');  vals.push(prioridade) }
+    if (responsavel !== undefined) { campos.push('responsavel = ?'); vals.push(responsavel) }
+    if (prazo !== undefined)       { campos.push('prazo = ?');       vals.push(prazo || null) }
+    if (ordem !== undefined)       { campos.push('ordem = ?');       vals.push(ordem) }
+    if (!campos.length) return res.status(400).json({ erro: 'Nada para atualizar.' })
+    vals.push(req.params.id)
+    await pool.query(`UPDATE tarefas SET ${campos.join(', ')} WHERE id = ?`, vals)
+    const [[atualizada]] = await pool.query('SELECT * FROM tarefas WHERE id = ?', [req.params.id])
+    res.json(atualizada)
+  } catch (e) {
+    res.status(500).json({ erro: e.message })
+  }
+})
+
+app.delete('/api/tarefas/:id', autenticarTarefas(), async (req, res) => {
+  try {
+    await pool.query('DELETE FROM tarefas WHERE id = ?', [req.params.id])
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(500).json({ erro: e.message })
+  }
+})
+
+
+// =============================================
+// CATÁLOGO DE PRODUTOS
+// =============================================
+
+async function inicializarCatalogoProdutos() {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS produtos_catalogo (
+      id   INT AUTO_INCREMENT PRIMARY KEY,
+      nome VARCHAR(500) NOT NULL,
+      UNIQUE KEY unique_nome (nome(250)),
+      criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`)
+  } catch (e) { console.error('Erro ao criar tabela catálogo:', e.message) }
+  try {
+    const [[{ total }]] = await pool.query('SELECT COUNT(*) as total FROM produtos_catalogo')
+    if (Number(total) === 0) {
+      const [r] = await pool.query(
+        `INSERT IGNORE INTO produtos_catalogo (nome)
+         SELECT DISTINCT produto FROM produtos_pi
+         WHERE produto IS NOT NULL AND produto != ''`
+      )
+      if (r.affectedRows > 0) console.log(`Catálogo: ${r.affectedRows} produto(s) importado(s) de produtos_pi.`)
+    }
+  } catch (e) { console.error('Erro ao popular catálogo:', e.message) }
 }
+setTimeout(inicializarCatalogoProdutos, 4000)
 
-async function salvar() {
-  const dados = coletar()
-  let r
-  if (editId) { r = await api.checklist.editar(editId, dados); if (r?.erro) { alert(r.erro); return null } return { id: editId, ...dados } }
-  r = await api.checklist.criar(dados)
-  if (r?.erro) { alert(r.erro); return null }
-  editId = r.id
-  return { id: r.id, ...dados }
-}
+app.get('/api/catalogo-produtos', autenticar(TODOS), async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT id, nome FROM produtos_catalogo ORDER BY nome ASC')
+    res.json(rows)
+  } catch (e) { res.status(500).json({ erro: e.message }) }
+})
 
-function exportarPDF(d) {
-  const itens = d.itens || []
-  const totalCx = somaCaixas(itens)
-  const bloco = (titulo, linhas) => `<td style="border:1px solid #000;padding:6px 8px;vertical-align:top;width:33%">
-    <div style="font-weight:bold;font-size:10px;text-transform:uppercase;margin-bottom:4px">${titulo}</div>
-    <div style="font-size:10px;line-height:1.5">${linhas}</div></td>`
-  const th = 'border:1px solid #000;padding:4px 5px;font-size:9.5px;font-weight:bold;background:#e6e6e6;text-align:center'
-  const td = (al) => `border:1px solid #000;padding:4px 5px;font-size:9.5px;text-align:${al}`
+app.post('/api/catalogo-produtos', autenticar(TODOS), async (req, res) => {
+  try {
+    const { nome } = req.body
+    if (!nome || !nome.trim()) return res.status(400).json({ erro: 'Nome obrigatório.' })
+    await pool.query('INSERT IGNORE INTO produtos_catalogo (nome) VALUES (?)', [nome.trim()])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ erro: e.message }) }
+})
 
-  const html = `
-    <div style="font-family:Arial,sans-serif;color:#000">
-      <table style="width:100%;border-collapse:collapse;margin-bottom:2px">
-        <tr><td style="border:1px solid #000;padding:6px;text-align:center;font-weight:bold;font-size:14px">CHECK-LIST DE EXPEDIÇÃO</td></tr>
-        <tr><td style="border:1px solid #000;padding:5px 8px;font-size:10px"><strong>Fatura / INV Nº:</strong> ${esc(d.fatura || '')} &nbsp;&nbsp;&nbsp; <strong>Pedido Nº:</strong> ${esc(d.pedido || '')}</td></tr>
-      </table>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:8px"><tr>
-        ${bloco('Exportador', EXPORTADOR.join('<br>'))}
-        ${bloco('Importador / Consignatário', `Cliente: ${esc(d.cliente_nome || '')}<br>Endereço: ${esc(d.cliente_endereco || '')}<br>Contato: ${esc(d.cliente_contato || 'N/A')}`)}
-        ${bloco('Embarque', `Data: ${dBR(d.data_emb) || '____'}<br>Embarque: ${esc(d.embarque || '')}<br>Descarga: ${esc(d.descarga || '')}<br>Destino: ${esc(d.destino || '')}`)}
-      </tr></table>
-      <table style="width:100%;border-collapse:collapse">
-        <thead><tr>
-          <th style="${th};width:26px">✓</th><th style="${th};width:26px">Nº</th><th style="${th};text-align:left">PRODUTO</th>
-          <th style="${th}">GRAMATURA</th><th style="${th}">QTD (cx)</th><th style="${th}">LOTE</th><th style="${th}">VALID.</th><th style="${th}">CONF.</th>
-        </tr></thead>
-        <tbody>
-          ${itens.map((it, i) => `<tr>
-            <td style="${td('center')};font-size:12px">&#9744;</td>
-            <td style="${td('center')}">${i + 1}</td>
-            <td style="${td('left')}">${esc(it.produto || '')}</td>
-            <td style="${td('center')}">${esc(it.gramatura || '')}</td>
-            <td style="${td('center')}">${esc(it.qtd_cx || '')}</td>
-            <td style="${td('center')}">${esc(it.lote || '')}</td>
-            <td style="${td('center')}">${esc(it.validade || '')}</td>
-            <td style="${td('center')}"></td>
-          </tr>`).join('')}
-          <tr style="background:#f0f0f0;font-weight:bold">
-            <td colspan="4" style="${td('right')}">TOTAL DE ITENS: ${itens.length}</td>
-            <td style="${td('center')}">${fmtInt(totalCx)} cx</td>
-            <td colspan="3" style="${td('left')}">Peso líq.: ${esc(d.peso_liquido || '—')} kg &nbsp;·&nbsp; Peso bruto: ${esc(d.peso_bruto || '—')} kg &nbsp;·&nbsp; Volume: ${esc(d.volume || '—')} m³</td>
-          </tr>
-        </tbody>
-      </table>
-      <div style="font-size:10px;margin-top:10px"><strong>Observações:</strong> ${esc(d.observacoes || '')}</div>
-      <div style="margin-top:48px;font-size:10px">
-        ____________________________________<br>
-        Responsável pela Expedição<br>
-        Tapejara - RS, Brasil &nbsp;&nbsp;&nbsp; Data: ____ / ____ / ______
-      </div>
-    </div>`
+app.delete('/api/catalogo-produtos/:id', autenticar(['admin']), async (req, res) => {
+  try {
+    await pool.query('DELETE FROM produtos_catalogo WHERE id = ?', [req.params.id])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ erro: e.message }) }
+})
 
-  let area = document.getElementById('area-impressao')
-  if (!area) { area = document.createElement('div'); area.id = 'area-impressao'; area.style.display = 'none'; document.body.appendChild(area) }
-  area.innerHTML = html
-  document.body.classList.add('imprimindo')
-  const limpar = () => { document.body.classList.remove('imprimindo'); window.removeEventListener('afterprint', limpar) }
-  window.addEventListener('afterprint', limpar)
-  window.print()
-}
 
-async function iniciar() {
-  const perfil = exigirPapel('todos')
-  if (!perfil) return
-  if (!EMAILS_CHECKLIST.includes((perfil.email || '').toLowerCase())) { window.location.href = '/HTML/producao/admin.html'; return }
-  montarCabecalho(perfil.papel)
-  verLista()
-}
+app.get('*', (req, res) => {
+ res.sendFile(path.join(__dirname, 'index.html'))
+})
 
-iniciar()
+app.use((err, req, res, next) => {
+ console.error('Erro na requisição:', err && err.message ? err.message : err)
+ if (!res.headersSent) res.status(500).json({ erro: 'Erro no servidor. Tente novamente.' })
+})
+
+process.on('unhandledRejection', (err) => {
+ console.error('Erro não tratado (promise):', err && err.message ? err.message : err)
+})
+process.on('uncaughtException', (err) => {
+ console.error('Exceção não tratada:', err && err.message ? err.message : err)
+})
+
+const PORTA = process.env.PORT || 8080
+app.listen(PORTA, '0.0.0.0', () => console.log(`Servidor rodando na porta ${PORTA}`))
