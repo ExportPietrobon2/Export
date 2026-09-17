@@ -2,7 +2,7 @@ import { api } from '/JS/core/api.js'
 import { exigirPapel } from '/JS/core/auth.js'
 import { montarCabecalho } from '/JS/core/cabecalho.js'
 
-const EMAILS_CHECKLIST = ['export2@pietrobon.com.br', 'export@pietrobon.com.br']
+const EMAILS_CHECKLIST = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'export3@pietrobon.com.br']
 const EXPORTADOR = ['PIETROBON & CIA. LTDA.', 'Rua Osvaldo Cruz, 126', 'Tapejara - RS - Brasil', 'CNPJ 97.580.260/0001-15']
 
 let editId = null
@@ -211,7 +211,7 @@ function exportarPDF(d) {
 }
 
 async function iniciar() {
-  const perfil = exigirPapel(['admin'])
+  const perfil = exigirPapel('todos')
   if (!perfil) return
   if (!EMAILS_CHECKLIST.includes((perfil.email || '').toLowerCase())) { window.location.href = '/HTML/producao/admin.html'; return }
   montarCabecalho(perfil.papel)
