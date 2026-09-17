@@ -1721,7 +1721,7 @@ app.delete('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, re
 // ORDEM DE PRODUÇÃO (por PI) — restrito ao financeiro (export2, export, joaoantonio)
 // =============================================
 
-const EMAILS_CHECKLIST = ['export2@pietrobon.com.br', 'export@pietrobon.com.br']
+const EMAILS_CHECKLIST = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'export3@pietrobon.com.br']
 
 function autenticarChecklist() {
   const base = autenticar(['admin'])

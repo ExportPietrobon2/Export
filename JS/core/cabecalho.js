@@ -100,7 +100,8 @@ export function montarCabecalho(papel) {
   const temAcessoTarefas = EMAILS_TAREFAS.includes(emailAtual)
   const temAcessoChecklist = [
     'export2@pietrobon.com.br',
-    'export@pietrobon.com.br'
+    'export@pietrobon.com.br',
+    'export3@pietrobon.com.br'
   ].includes(emailAtual)
 
   const secoes = [
