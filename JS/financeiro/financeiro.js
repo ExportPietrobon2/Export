@@ -12,6 +12,8 @@ let editForn = null
 let editCt = null
 let editPag = null
 let custoImpSel = ''
+let custoIdSel = null
+let custosDaImp = []
 let custoCab = {}
 let custoDespesas = []
 let custoSt = []
@@ -442,7 +444,17 @@ function stRecolher(it) {
   const bc = ((parseFloat(it.base_icms) || 0) + (parseFloat(it.ipi_destacado) || 0)) * (parseFloat(it.mva) || 0)
   return bc * (parseFloat(it.aliquota) || 0) - (parseFloat(it.icms_proprio) || 0)
 }
+// Mercadoria do produto = invoice inteira (R$) × % do produto
+function mpProduto() {
+  const tot = parseFloat(custoCab.mp_total) || 0
+  const pct = (custoCab.percentual === '' || custoCab.percentual === undefined) ? 100 : (parseFloat(custoCab.percentual) || 0)
+  return tot > 0 ? Math.round(tot * pct / 100 * 100) / 100 : (parseFloat(custoCab.materia_prima) || 0)
+}
+function somaPctOutros() {
+  return custosDaImp.filter((c) => c.id !== custoIdSel).reduce((s, c) => s + (parseFloat(c.percentual) || 0), 0)
+}
 function calcCusto() {
+  custoCab.materia_prima = mpProduto()
   const despTotal = custoDespesas.reduce((s, d) => s + (parseFloat(d.valor) || 0), 0)
   const stCusto = custoSt.reduce((s, i) => s + stRecolher(i), 0)
   const g = (k) => parseFloat(custoCab[k]) || 0
@@ -450,23 +462,43 @@ function calcCusto() {
   const credito = g('icms') + g('ipi') + g('pis') + g('cofins')
   const custoCredito = total - credito
   const kg = g('quantidade_kg')
-  return { despTotal, stCusto, total, credito, custoCredito, custoKg: kg > 0 ? custoCredito / kg : 0 }
+  return { mp: g('materia_prima'), despTotal, stCusto, total, credito, custoCredito, custoKg: kg > 0 ? custoCredito / kg : 0 }
 }
 
-async function carregarCusto(impId) {
+function cabDe(d) {
+  const mpTot = d.mp_total != null && Number(d.mp_total) > 0 ? d.mp_total : (d.materia_prima ?? '')
+  return { nfe: d.nfe || '', produto: d.produto || '', mp_total: mpTot, percentual: d.percentual ?? 100, materia_prima: d.materia_prima ?? '',
+    imposto_importacao: d.imposto_importacao ?? '', ipi: d.ipi ?? '', pis: d.pis ?? '', cofins: d.cofins ?? '', icms: d.icms ?? '',
+    quantidade_kg: d.quantidade_kg ?? '', unidade: d.unidade || 'KG', obs: d.obs || '' }
+}
+function impSelecionada() { return resumo.importacoes.find((x) => String(x.id) === String(custoImpSel)) }
+
+function abrirProduto(c) {
+  custoIdSel = c.id
+  custoCab = cabDe(c)
+  custoDespesas = (c.despesas || []).map((x) => ({ nome: x.nome || '', valor: x.valor ?? '' }))
+  custoSt = (c.st || []).map((x) => ({ produto: x.produto || '', ncm: x.ncm || '', base_icms: x.base_icms ?? '', icms_proprio: x.icms_proprio ?? '', aliquota: x.aliquota ?? '', ipi_destacado: x.ipi_destacado ?? '', mva: x.mva ?? '' }))
+}
+function novoProduto() {
+  const imp = impSelecionada()
+  const restante = Math.max(0, Math.round((100 - somaPctOutros()) * 10000) / 10000)
+  custoIdSel = null
+  custoCab = { nfe: custosDaImp[0]?.nfe || '', produto: '', mp_total: custosDaImp[0]?.mp_total || imp?.valor_reais || '', percentual: custosDaImp.length ? restante : 100,
+    materia_prima: '', imposto_importacao: '', ipi: '', pis: '', cofins: '', icms: '', quantidade_kg: '', unidade: 'KG', obs: '' }
+  custoDespesas = []
+  custoSt = []
+}
+
+async function carregarCusto(impId, custoId) {
   custoImpSel = impId
+  custoIdSel = null
+  custosDaImp = []
   if (!impId) { custoCab = {}; custoDespesas = []; custoSt = []; renderCustos(); return }
-  const imp = resumo.importacoes.find((x) => String(x.id) === String(impId))
-  const d = await api.fin.custo(impId)
-  if (d && !d.erro) {
-    custoCab = { nfe: d.nfe || '', produto: d.produto || '', materia_prima: d.materia_prima ?? '', imposto_importacao: d.imposto_importacao ?? '', ipi: d.ipi ?? '', pis: d.pis ?? '', cofins: d.cofins ?? '', icms: d.icms ?? '', quantidade_kg: d.quantidade_kg ?? '', unidade: d.unidade || 'KG', obs: d.obs || '' }
-    custoDespesas = (d.despesas || []).map((x) => ({ nome: x.nome || '', valor: x.valor ?? '' }))
-    custoSt = (d.st || []).map((x) => ({ produto: x.produto || '', ncm: x.ncm || '', base_icms: x.base_icms ?? '', icms_proprio: x.icms_proprio ?? '', aliquota: x.aliquota ?? '', ipi_destacado: x.ipi_destacado ?? '', mva: x.mva ?? '' }))
-  } else {
-    custoCab = { nfe: imp?.invoice || '', produto: imp?.mercadoria || '', materia_prima: imp?.valor_reais ?? '', imposto_importacao: '', ipi: '', pis: '', cofins: '', icms: '', quantidade_kg: '', unidade: 'KG', obs: '' }
-    custoDespesas = []
-    custoSt = []
-  }
+  const lista = await api.fin.custosImp(impId)
+  custosDaImp = Array.isArray(lista) ? lista : []
+  const alvo = custosDaImp.find((c) => String(c.id) === String(custoId)) || custosDaImp[0]
+  if (alvo) abrirProduto(alvo)
+  else novoProduto()
   renderCustos()
 }
 
@@ -497,8 +529,15 @@ function renderCustos() {
     <td style="width:90px"><input type="number" step="any" class="form-control form-control-sm text-end" value="${s.mva ?? ''}" oninput="custoStInput(${i},'mva',this.value)" placeholder="1.66"></td>
     <td style="width:120px;text-align:right;font-weight:600" id="st-res-${i}">-</td>
     <td style="width:40px"><button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="custoDelSt(${i})">×</button></td></tr>`).join('')
+  const imp = impSelecionada()
+  const abas = custosDaImp.map((c) => `<button class="btn btn-sm ${c.id === custoIdSel ? 'btn-primary' : 'btn-outline-primary'} me-1 mb-1" onclick="custoAbrirProduto(${c.id})">${esc(c.produto || 'Produto #' + c.id)} <span class="opacity-75">(${numf(c.percentual, 2)}%)</span></button>`).join('')
+  const novoAtivo = custoIdSel === null
   $('area-fin').innerHTML = `
     <div class="card mb-3"><div class="card-body">
+      <div class="small text-muted mb-1">Produtos desta importação</div>
+      <div class="d-flex flex-wrap align-items-center mb-2">${abas}
+        <button class="btn btn-sm ${novoAtivo ? 'btn-success' : 'btn-outline-success'} mb-1" onclick="custoNovoProduto()">${novoAtivo ? '● Novo produto (não salvo)' : '+ Novo produto'}</button></div>
+      <div class="small mb-3" id="c-soma-pct"></div>
       <div class="row g-2 align-items-end mb-2">
         <div class="col-12 col-md-6"><label class="form-label small mb-0">Importação</label>
           <select class="form-select form-select-sm" onchange="custoSelImp(this.value)"><option value="">— selecione —</option>${optImp}</select></div>
@@ -507,9 +546,17 @@ function renderCustos() {
         <div class="col-6 col-md-4"><label class="form-label small mb-0">Quantidade</label><input type="number" step="any" class="form-control form-control-sm" value="${custoCab.quantidade_kg ?? ''}" oninput="custoCabInput('quantidade_kg',this.value)"></div>
         <div class="col-6 col-md-4"><label class="form-label small mb-0">Unidade</label><select class="form-select form-select-sm" onchange="custoCabInput('unidade',this.value)"><option value="KG" ${(custoCab.unidade || 'KG') === 'KG' ? 'selected' : ''}>KG</option><option value="UN" ${custoCab.unidade === 'UN' ? 'selected' : ''}>UN</option></select></div>
       </div>
-      <h6 class="secao-titulo-card mt-2 mb-2">Custos e impostos (R$)</h6>
+      <h6 class="secao-titulo-card mt-2 mb-2">Mercadoria</h6>
+      <div class="row g-2 align-items-end">
+        ${num('mp_total', 'Mercadoria total da invoice (R$)')}
+        ${num('percentual', '% deste produto na invoice')}
+        <div class="col-6 col-md-3"><label class="form-label small mb-0">Mercadoria deste produto (R$)</label><div class="form-control form-control-sm bg-light fw-semibold" id="c-mp-produto">${brl(mpProduto())}</div></div>
+        <div class="col-12 col-md-3 small text-muted">${imp ? `Invoice: <a href="#" onclick="custoUsarMp(${Number(imp.valor_reais) || 0});return false">${brl(imp.valor_reais)}</a><br>Pago: <a href="#" onclick="custoUsarMp(${Number(imp.pago) || 0});return false">${brl(imp.pago)}</a>` : ''}</div>
+      </div>
+      <div class="small text-muted mt-1 mb-3">% = valor do produto na NF ÷ total dos produtos da NF. Ex.: 105.978,14 ÷ 165.450,25 = 64,0544%.</div>
+      <h6 class="secao-titulo-card mt-2 mb-2">Impostos deste produto (R$)</h6>
       <div class="row g-2">
-        ${num('materia_prima', 'Matéria-prima')}${num('imposto_importacao', 'Imposto Importação')}${num('ipi', 'IPI')}${num('pis', 'PIS')}
+        ${num('imposto_importacao', 'Imposto Importação')}${num('ipi', 'IPI')}${num('pis', 'PIS')}
         ${num('cofins', 'COFINS')}${num('icms', 'ICMS')}
       </div>
     </div></div>
@@ -547,25 +594,34 @@ async function carregarCustosSalvos() {
   const lista = await api.fin.custos()
   if (!Array.isArray(lista) || !lista.length) { el.innerHTML = '<p class="text-muted fst-italic mb-0">Nenhum custo salvo ainda.</p>'; return }
   el.innerHTML = `<div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:.85rem">
-    <thead><tr><th>Invoice</th><th>Produto</th><th>Fornecedor</th><th class="text-end">Custo/un.</th><th class="text-end">Total pago</th><th></th></tr></thead>
-    <tbody>${lista.map((c) => `<tr class="${String(c.importacao_id) === String(custoImpSel) ? 'table-primary' : ''}">
-      <td class="fw-semibold">${esc(c.invoice || '-')}</td><td>${esc(c.produto || '-')}</td><td>${esc(c.fornecedor_nome || '-')}</td>
+    <thead><tr><th>Invoice</th><th>Produto</th><th class="text-end">%</th><th>Fornecedor</th><th class="text-end">Custo/un.</th><th class="text-end">Total pago</th><th></th></tr></thead>
+    <tbody>${lista.map((c) => `<tr class="${c.id === custoIdSel ? 'table-primary' : ''}">
+      <td class="fw-semibold">${esc(c.invoice || '-')}</td><td>${esc(c.produto || '-')}</td><td class="text-end">${numf(c.percentual ?? 100, 2)}%</td><td>${esc(c.fornecedor_nome || '-')}</td>
       <td class="text-end">${brl(c.calc ? c.calc.custoKg : 0)} <span class="text-muted">/${esc(c.unidade || 'KG')}</span></td>
       <td class="text-end">${brl(c.calc ? c.calc.total : 0)}</td>
-      <td class="text-end" style="white-space:nowrap"><button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="custoSelImp('${c.importacao_id}')">Abrir</button>
-        <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="excluirCustoSalvo('${c.importacao_id}')">🗑</button></td></tr>`).join('')}</tbody></table></div>`
+      <td class="text-end" style="white-space:nowrap"><button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="custoSelImp('${c.importacao_id}', ${c.id})">Abrir</button>
+        <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="excluirCustoSalvo('${c.importacao_id}', ${c.id})">🗑</button></td></tr>`).join('')}</tbody></table></div>`
 }
 
-window.excluirCustoSalvo = async (impId) => {
-  if (!confirm('Excluir este custo salvo?')) return
-  await api.fin.excluirCusto(impId)
-  if (String(custoImpSel) === String(impId)) { custoImpSel = ''; custoCab = {}; custoDespesas = []; custoSt = [] }
-  renderCustos()
+window.excluirCustoSalvo = async (impId, custoId) => {
+  if (!confirm('Excluir o custo deste produto?')) return
+  await api.fin.excluirCusto(impId, custoId)
+  if (String(custoImpSel) === String(impId)) await carregarCusto(impId)
+  else renderCustos()
 }
 
 function atualizarResumoCusto() {
   custoSt.forEach((s, i) => { const el = $('st-res-' + i); if (el) el.textContent = brl(stRecolher(s)) })
   const c = calcCusto()
+  const mpEl = $('c-mp-produto')
+  if (mpEl) mpEl.textContent = brl(c.mp)
+  const somaEl = $('c-soma-pct')
+  if (somaEl) {
+    const somaPct = somaPctOutros() + (parseFloat(custoCab.percentual) || 0)
+    const ok = Math.abs(somaPct - 100) < 0.01
+    somaEl.className = 'small mb-3 ' + (ok ? 'text-success' : 'text-danger fw-semibold')
+    somaEl.textContent = `Soma dos % dos produtos desta importação: ${numf(somaPct, 2)}%` + (ok ? ' ✓' : ' — deve fechar 100%')
+  }
   const el = $('c-resumo')
   if (!el) return
   const linha = (l, v, cls) => `<div class="d-flex justify-content-between py-1 ${cls || ''}"><span>${l}</span><strong>${v}</strong></div>`
@@ -580,7 +636,10 @@ function atualizarResumoCusto() {
     ${linha('CUSTO POR ' + (custoCab.unidade || 'KG'), brl(c.custoKg), 'fs-5 fw-bold text-primary')}`
 }
 
-window.custoSelImp = (v) => carregarCusto(v)
+window.custoSelImp = (v, custoId) => carregarCusto(v, custoId)
+window.custoAbrirProduto = (id) => { const c = custosDaImp.find((x) => x.id === id); if (c) { abrirProduto(c); renderCustos() } }
+window.custoNovoProduto = () => { novoProduto(); renderCustos() }
+window.custoUsarMp = (v) => { custoCab.mp_total = v; renderCustos() }
 window.custoCabInput = (k, v) => { custoCab[k] = v; atualizarResumoCusto() }
 window.custoDespInput = (i, k, v) => { custoDespesas[i][k] = v; atualizarResumoCusto() }
 window.custoStInput = (i, k, v) => { custoSt[i][k] = v; atualizarResumoCusto() }
@@ -590,10 +649,14 @@ window.custoAddSt = () => { custoSt.push({ produto: '', ncm: '', base_icms: '', 
 window.custoDelSt = (i) => { custoSt.splice(i, 1); renderCustos() }
 window.salvarCusto = async () => {
   if (!custoImpSel) { alert('Selecione uma importação.'); return }
+  if (!(custoCab.produto || '').trim()) { alert('Informe o nome do produto.'); return }
+  calcCusto()
   const dados = { ...custoCab, despesas: custoDespesas, st: custoSt }
-  const r = await api.fin.salvarCusto(custoImpSel, dados)
+  const r = custoIdSel ? await api.fin.salvarCusto(custoImpSel, custoIdSel, dados) : await api.fin.criarCusto(custoImpSel, dados)
   if (r?.erro) { alert(r.erro); return }
-  alert('Custos salvos.')
+  await carregarCusto(custoImpSel, r?.id || custoIdSel)
+  const somaPct = custosDaImp.reduce((s, c) => s + (parseFloat(c.percentual) || 0), 0)
+  alert('Custos salvos.' + (Math.abs(somaPct - 100) >= 0.01 ? `\n\nAtenção: a soma dos % desta importação está em ${numf(somaPct, 2)}%. Cadastre os outros produtos até fechar 100%.` : ''))
 }
 
 function carregarScriptFin(src) {
@@ -640,7 +703,7 @@ window.exportarCustoPDF = async () => {
   const tdR = (bg) => `background:${bg};color:#000;border:${BORDA};padding:4px 6px;font-size:10px;text-align:right`
   const g = (k) => parseFloat(custoCab[k]) || 0
   const zeb = (i) => i % 2 ? ZEBRA : '#fff'
-  const impLinhas = [['Matéria-prima', g('materia_prima')], ['Imposto Importação', g('imposto_importacao')], ['ST Custo', c.stCusto], ['IPI', g('ipi')], ['PIS', g('pis')], ['COFINS', g('cofins')], ['ICMS', g('icms')], ['Despesas', c.despTotal]]
+  const impLinhas = [[`Matéria-prima (${numf(custoCab.percentual ?? 100, 4)}% de ${brl(custoCab.mp_total)})`, c.mp], ['Imposto Importação', g('imposto_importacao')], ['ST Custo', c.stCusto], ['IPI', g('ipi')], ['PIS', g('pis')], ['COFINS', g('cofins')], ['ICMS', g('icms')], ['Despesas', c.despTotal]]
   const impRows = impLinhas.map(([l, v], i) => `<tr><td style="${tdL(zeb(i))}">${esc(l)}</td><td style="${tdR(zeb(i))}">${brl(v)}</td><td style="${tdR(zeb(i))}">${pct(v)}</td></tr>`).join('')
   const despLista = custoDespesas.filter((d) => (d.nome || '') || (parseFloat(d.valor) || 0))
   const despRows = despLista.length ? despLista.map((d, i) => `<tr><td style="${tdL(zeb(i))}">${esc(d.nome || '-')}</td><td style="${tdR(zeb(i))}">${brl(d.valor)}</td></tr>`).join('') : `<tr><td style="${tdL('#fff')}" colspan="2">—</td></tr>`
@@ -680,7 +743,7 @@ window.exportarCustoPDF = async () => {
     </table>
     <div style="font-size:9px;color:#555;margin-top:14px;text-align:center">Emitido em ${new Date().toLocaleDateString('pt-BR')} · Pietrobon &amp; Cia Ltda</div>
   </div>`
-  gerarPdfDeHtml(html, `Custo_${(imp?.invoice || 'importacao').replace(/\W+/g, '_')}.pdf`)
+  gerarPdfDeHtml(html, `Custo_${((imp?.invoice || 'importacao') + (custoCab.produto ? '_' + custoCab.produto : '')).replace(/\W+/g, '_')}.pdf`)
 }
 
 function montarInterface() {

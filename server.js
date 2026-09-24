@@ -1615,20 +1615,36 @@ app.delete('/api/fin/contratos/:id', autenticarContabil(), async (req, res) => {
 })
 
 // ---- Custos de Importação (nacionalização) ----
+// Uma importação pode ter VÁRIOS produtos. Cada produto recebe só a sua parte da
+// mercadoria: materia_prima = mp_total (invoice inteira em R$) × percentual / 100.
 async function inicializarCustos() {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS fin_custos (
-      id INT AUTO_INCREMENT PRIMARY KEY, importacao_id INT NULL UNIQUE, nfe VARCHAR(60), produto VARCHAR(200),
+      id INT AUTO_INCREMENT PRIMARY KEY, importacao_id INT NULL, nfe VARCHAR(60), produto VARCHAR(200),
+      mp_total DECIMAL(14,2) NULL, percentual DECIMAL(9,4) DEFAULT 100,
       materia_prima DECIMAL(14,2) DEFAULT 0, imposto_importacao DECIMAL(14,2) DEFAULT 0,
       ipi DECIMAL(14,2) DEFAULT 0, pis DECIMAL(14,2) DEFAULT 0, cofins DECIMAL(14,2) DEFAULT 0, icms DECIMAL(14,2) DEFAULT 0,
       quantidade_kg DECIMAL(14,3) DEFAULT 0, unidade VARCHAR(4) DEFAULT 'KG', obs VARCHAR(500),
-      atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`)
+      atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX idx_custos_imp (importacao_id))`)
     await pool.query(`CREATE TABLE IF NOT EXISTS fin_custo_despesas (
       id INT AUTO_INCREMENT PRIMARY KEY, custo_id INT NOT NULL, nome VARCHAR(160), valor DECIMAL(14,2) DEFAULT 0, INDEX(custo_id))`)
     await pool.query(`CREATE TABLE IF NOT EXISTS fin_custo_st (
       id INT AUTO_INCREMENT PRIMARY KEY, custo_id INT NOT NULL, produto VARCHAR(200), ncm VARCHAR(20),
       base_icms DECIMAL(14,2) DEFAULT 0, icms_proprio DECIMAL(14,2) DEFAULT 0, aliquota DECIMAL(6,4) DEFAULT 0,
       ipi_destacado DECIMAL(14,2) DEFAULT 0, mva DECIMAL(8,4) DEFAULT 0, INDEX(custo_id))`)
+
+    // Migração: tabelas antigas tinham importacao_id UNIQUE (1 produto por importação)
+    const [cols] = await pool.query('SHOW COLUMNS FROM fin_custos')
+    const nomes = cols.map((c) => c.Field)
+    if (!nomes.includes('mp_total')) await pool.query('ALTER TABLE fin_custos ADD COLUMN mp_total DECIMAL(14,2) NULL AFTER produto')
+    if (!nomes.includes('percentual')) await pool.query('ALTER TABLE fin_custos ADD COLUMN percentual DECIMAL(9,4) DEFAULT 100 AFTER mp_total')
+    const [uniq] = await pool.query("SHOW INDEX FROM fin_custos WHERE Column_name = 'importacao_id' AND Non_unique = 0")
+    for (const k of new Set(uniq.map((i) => i.Key_name))) {
+      await pool.query(`ALTER TABLE fin_custos DROP INDEX \`${k}\``)
+      console.log('fin_custos: removido índice único', k)
+    }
+    const [idx] = await pool.query("SHOW INDEX FROM fin_custos WHERE Column_name = 'importacao_id'")
+    if (!idx.length) await pool.query('ALTER TABLE fin_custos ADD INDEX idx_custos_imp (importacao_id)')
   } catch (e) { console.error('Erro init custos:', e.message) }
 }
 setTimeout(inicializarCustos, 6000)
@@ -1651,6 +1667,42 @@ function computarCusto(cab, despesas, st) {
   return { despTotal, stCusto, total, credito, custoCredito, custoKg: kg > 0 ? custoCredito / kg : 0 }
 }
 
+// Mercadoria do produto = parte dele na invoice
+function materiaPrimaProduto(b) {
+  const tot = Number(b.mp_total)
+  const pct = (b.percentual === '' || b.percentual === undefined || b.percentual === null) ? 100 : Number(b.percentual)
+  if (tot > 0) return Math.round(tot * pct / 100 * 100) / 100
+  return Number(b.materia_prima) || 0
+}
+
+async function custoCompleto(c) {
+  const [despesas] = await pool.query('SELECT * FROM fin_custo_despesas WHERE custo_id = ? ORDER BY id', [c.id])
+  const [st] = await pool.query('SELECT * FROM fin_custo_st WHERE custo_id = ? ORDER BY id', [c.id])
+  return { ...c, despesas, st, calc: computarCusto(c, despesas, st) }
+}
+
+async function salvarFilhosCusto(custoId, b) {
+  await pool.query('DELETE FROM fin_custo_despesas WHERE custo_id = ?', [custoId])
+  for (const d of (b.despesas || [])) {
+    if (!(d.nome || '').trim() && !(Number(d.valor) > 0)) continue
+    await pool.query('INSERT INTO fin_custo_despesas (custo_id, nome, valor) VALUES (?,?,?)', [custoId, d.nome || null, Number(d.valor) || 0])
+  }
+  await pool.query('DELETE FROM fin_custo_st WHERE custo_id = ?', [custoId])
+  for (const s of (b.st || [])) {
+    if (!(s.produto || '').trim() && !(Number(s.base_icms) > 0)) continue
+    await pool.query('INSERT INTO fin_custo_st (custo_id, produto, ncm, base_icms, icms_proprio, aliquota, ipi_destacado, mva) VALUES (?,?,?,?,?,?,?,?)',
+      [custoId, s.produto || null, s.ncm || null, Number(s.base_icms) || 0, Number(s.icms_proprio) || 0, Number(s.aliquota) || 0, Number(s.ipi_destacado) || 0, Number(s.mva) || 0])
+  }
+}
+
+function valoresCusto(b) {
+  const pct = (b.percentual === '' || b.percentual === undefined || b.percentual === null) ? 100 : Number(b.percentual) || 0
+  return [b.nfe || null, b.produto || null, Number(b.mp_total) > 0 ? Number(b.mp_total) : null, pct, materiaPrimaProduto(b),
+    Number(b.imposto_importacao) || 0, Number(b.ipi) || 0, Number(b.pis) || 0, Number(b.cofins) || 0, Number(b.icms) || 0,
+    Number(b.quantidade_kg) || 0, b.unidade || 'KG', b.obs || null]
+}
+
+// Todos os custos salvos (um por produto)
 app.get('/api/fin/custos', autenticarContabil(), async (req, res) => {
   const [rows] = await pool.query(`
     SELECT c.*, i.invoice, f.nome AS fornecedor_nome
@@ -1664,51 +1716,46 @@ app.get('/api/fin/custos', autenticarContabil(), async (req, res) => {
   res.json(rows.map((c) => ({ ...c, calc: computarCusto(c, dMap[c.id] || [], sMap[c.id] || []) })))
 })
 
+// Produtos (custos) de uma importação — devolve uma LISTA
 app.get('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, res) => {
   const impId = parseInt(req.params.importacaoId) || 0
-  const [[c]] = await pool.query('SELECT * FROM fin_custos WHERE importacao_id = ?', [impId])
-  if (!c) return res.json(null)
-  const [despesas] = await pool.query('SELECT * FROM fin_custo_despesas WHERE custo_id = ? ORDER BY id', [c.id])
-  const [st] = await pool.query('SELECT * FROM fin_custo_st WHERE custo_id = ? ORDER BY id', [c.id])
-  res.json({ ...c, despesas, st, calc: computarCusto(c, despesas, st) })
+  const [rows] = await pool.query('SELECT * FROM fin_custos WHERE importacao_id = ? ORDER BY id', [impId])
+  const lista = []
+  for (const c of rows) lista.push(await custoCompleto(c))
+  res.json(lista)
 })
 
-const CAMPOS_CUSTO = ['nfe', 'produto', 'materia_prima', 'imposto_importacao', 'ipi', 'pis', 'cofins', 'icms', 'quantidade_kg', 'unidade', 'obs']
-app.put('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, res) => {
+// Novo produto dentro da importação
+app.post('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, res) => {
   const impId = parseInt(req.params.importacaoId) || 0
   if (!impId) return res.status(400).json({ erro: 'Selecione uma importação.' })
-  const b = req.body
-  const [[existe]] = await pool.query('SELECT id FROM fin_custos WHERE importacao_id = ?', [impId])
-  let custoId
-  if (existe) {
-    custoId = existe.id
-    const sets = [], vals = []
-    for (const c of CAMPOS_CUSTO) { let v = b[c]; if (v === '' || v === undefined) v = (c === 'nfe' || c === 'obs' || c === 'produto') ? null : (c === 'unidade' ? 'KG' : 0); sets.push(`${c} = ?`); vals.push(v) }
-    vals.push(custoId)
-    await pool.query(`UPDATE fin_custos SET ${sets.join(', ')} WHERE id = ?`, vals)
-  } else {
-    const [r] = await pool.query(
-      'INSERT INTO fin_custos (importacao_id, nfe, produto, materia_prima, imposto_importacao, ipi, pis, cofins, icms, quantidade_kg, unidade, obs) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
-      [impId, b.nfe || null, b.produto || null, Number(b.materia_prima) || 0, Number(b.imposto_importacao) || 0, Number(b.ipi) || 0, Number(b.pis) || 0, Number(b.cofins) || 0, Number(b.icms) || 0, Number(b.quantidade_kg) || 0, b.unidade || 'KG', b.obs || null])
-    custoId = r.insertId
-  }
-  await pool.query('DELETE FROM fin_custo_despesas WHERE custo_id = ?', [custoId])
-  for (const d of (b.despesas || [])) {
-    if (!(d.nome || '').trim() && !(Number(d.valor) > 0)) continue
-    await pool.query('INSERT INTO fin_custo_despesas (custo_id, nome, valor) VALUES (?,?,?)', [custoId, d.nome || null, Number(d.valor) || 0])
-  }
-  await pool.query('DELETE FROM fin_custo_st WHERE custo_id = ?', [custoId])
-  for (const s of (b.st || [])) {
-    if (!(s.produto || '').trim() && !(Number(s.base_icms) > 0)) continue
-    await pool.query('INSERT INTO fin_custo_st (custo_id, produto, ncm, base_icms, icms_proprio, aliquota, ipi_destacado, mva) VALUES (?,?,?,?,?,?,?,?)',
-      [custoId, s.produto || null, s.ncm || null, Number(s.base_icms) || 0, Number(s.icms_proprio) || 0, Number(s.aliquota) || 0, Number(s.ipi_destacado) || 0, Number(s.mva) || 0])
-  }
-  res.json({ ok: true })
+  const b = req.body || {}
+  const [r] = await pool.query(
+    'INSERT INTO fin_custos (importacao_id, nfe, produto, mp_total, percentual, materia_prima, imposto_importacao, ipi, pis, cofins, icms, quantidade_kg, unidade, obs) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    [impId, ...valoresCusto(b)])
+  await salvarFilhosCusto(r.insertId, b)
+  res.json({ ok: true, id: r.insertId })
 })
 
-app.delete('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, res) => {
+// Atualiza um produto
+app.put('/api/fin/custos/:importacaoId/:custoId', autenticarContabil(), async (req, res) => {
   const impId = parseInt(req.params.importacaoId) || 0
-  const [[c]] = await pool.query('SELECT id FROM fin_custos WHERE importacao_id = ?', [impId])
+  const custoId = parseInt(req.params.custoId) || 0
+  const [[existe]] = await pool.query('SELECT id FROM fin_custos WHERE id = ? AND importacao_id = ?', [custoId, impId])
+  if (!existe) return res.status(404).json({ erro: 'Custo não encontrado.' })
+  const b = req.body || {}
+  await pool.query(
+    'UPDATE fin_custos SET nfe = ?, produto = ?, mp_total = ?, percentual = ?, materia_prima = ?, imposto_importacao = ?, ipi = ?, pis = ?, cofins = ?, icms = ?, quantidade_kg = ?, unidade = ?, obs = ? WHERE id = ?',
+    [...valoresCusto(b), custoId])
+  await salvarFilhosCusto(custoId, b)
+  res.json({ ok: true, id: custoId })
+})
+
+// Exclui um produto
+app.delete('/api/fin/custos/:importacaoId/:custoId', autenticarContabil(), async (req, res) => {
+  const impId = parseInt(req.params.importacaoId) || 0
+  const custoId = parseInt(req.params.custoId) || 0
+  const [[c]] = await pool.query('SELECT id FROM fin_custos WHERE id = ? AND importacao_id = ?', [custoId, impId])
   if (c) {
     await pool.query('DELETE FROM fin_custo_despesas WHERE custo_id = ?', [c.id])
     await pool.query('DELETE FROM fin_custo_st WHERE custo_id = ?', [c.id])

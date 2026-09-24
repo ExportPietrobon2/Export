@@ -190,9 +190,10 @@ export const api = {
     editarContrato: (id, dados) => requisitar('PATCH', `/api/fin/contratos/${id}`, dados),
     excluirContrato: (id) => requisitar('DELETE', `/api/fin/contratos/${id}`),
     custos: () => requisitar('GET', '/api/fin/custos'),
-    custo: (impId) => requisitar('GET', `/api/fin/custos/${impId}`),
-    salvarCusto: (impId, dados) => requisitar('PUT', `/api/fin/custos/${impId}`, dados),
-    excluirCusto: (impId) => requisitar('DELETE', `/api/fin/custos/${impId}`)
+    custosImp: (impId) => requisitar('GET', `/api/fin/custos/${impId}`),
+    criarCusto: (impId, dados) => requisitar('POST', `/api/fin/custos/${impId}`, dados),
+    salvarCusto: (impId, custoId, dados) => requisitar('PUT', `/api/fin/custos/${impId}/${custoId}`, dados),
+    excluirCusto: (impId, custoId) => requisitar('DELETE', `/api/fin/custos/${impId}/${custoId}`)
   },
 
 
