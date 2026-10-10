@@ -1,7 +1,7 @@
 {
-  "name": "Pietrobon · Controle de Insumos",
-  "short_name": "Pietrobon",
-  "description": "Controle de insumos e exportação Pietrobon",
+  "name": "Hub de Exportações Pietrobon",
+  "short_name": "Hub Exportações",
+  "description": "Hub de Exportações Pietrobon – gestão integrada do fluxo de exportação",
   "start_url": "/index.html",
   "display": "standalone",
   "background_color": "#ED3237",

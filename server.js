@@ -103,16 +103,16 @@ async function enviarEmail(assunto, corpo, papeis) {
  if (!destinatarios.length) return
 
  const html = `
- <div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;"><div style="background:linear-gradient(120deg,#ED3237,#C6242A);padding:24px 28px;border-radius:12px 12px 0 0;"><p style="color:#fff;font-size:1.2rem;font-weight:800;margin:0;">Pietrobon · Insumos</p></div><div style="background:#fff;padding:28px;border:1px solid #f0d0d0;border-top:none;border-radius:0 0 12px 12px;">
+ <div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;"><div style="background:linear-gradient(120deg,#ED3237,#C6242A);padding:24px 28px;border-radius:12px 12px 0 0;"><p style="color:#fff;font-size:1.2rem;font-weight:800;margin:0;">Hub de Exportações Pietrobon</p></div><div style="background:#fff;padding:28px;border:1px solid #f0d0d0;border-top:none;border-radius:0 0 12px 12px;">
  ${corpo}
- <hr style="border:none;border-top:1px solid #f0d0d0;margin:24px 0;"><p style="font-size:0.78rem;color:#8a6a6a;margin:0;">Pietrobon & Cia Ltda · Controle de Insumos Exportação<br>
+ <hr style="border:none;border-top:1px solid #f0d0d0;margin:24px 0;"><p style="font-size:0.78rem;color:#8a6a6a;margin:0;">Pietrobon & Cia Ltda · Hub de Exportações Pietrobon<br>
  ${MODO_TESTE ? '<strong style="color:#ED3237">Modo teste — notificação enviada apenas para ' + EMAIL_TESTE + '</strong>' : ''}</p></div></div>`
 
  const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
  method: 'POST',
  headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', 'accept': 'application/json' },
  body: JSON.stringify({
- sender: { email: EMAIL_REMETENTE, name: 'Pietrobon · Insumos' },
+ sender: { email: EMAIL_REMETENTE, name: 'Hub de Exportações Pietrobon' },
  to: destinatarios.map((email) => ({ email })),
  subject: assunto,
  htmlContent: html
@@ -137,15 +137,15 @@ async function enviarEmailPara(assunto, corpo, emails) {
  const destinatarios = MODO_TESTE ? [EMAIL_TESTE] : (emails || []).filter(Boolean)
  if (!destinatarios.length) return
  const html = `
- <div style="font-family:'Segoe UI',sans-serif;max-width:640px;margin:0 auto;"><div style="background:linear-gradient(120deg,#ED3237,#C6242A);padding:24px 28px;border-radius:12px 12px 0 0;"><p style="color:#fff;font-size:1.2rem;font-weight:800;margin:0;">Pietrobon · Insumos</p></div><div style="background:#fff;padding:28px;border:1px solid #f0d0d0;border-top:none;border-radius:0 0 12px 12px;">
+ <div style="font-family:'Segoe UI',sans-serif;max-width:640px;margin:0 auto;"><div style="background:linear-gradient(120deg,#ED3237,#C6242A);padding:24px 28px;border-radius:12px 12px 0 0;"><p style="color:#fff;font-size:1.2rem;font-weight:800;margin:0;">Hub de Exportações Pietrobon</p></div><div style="background:#fff;padding:28px;border:1px solid #f0d0d0;border-top:none;border-radius:0 0 12px 12px;">
  ${corpo}
- <hr style="border:none;border-top:1px solid #f0d0d0;margin:24px 0;"><p style="font-size:0.78rem;color:#8a6a6a;margin:0;">Pietrobon & Cia Ltda · Controle de Insumos Exportação<br>
+ <hr style="border:none;border-top:1px solid #f0d0d0;margin:24px 0;"><p style="font-size:0.78rem;color:#8a6a6a;margin:0;">Pietrobon & Cia Ltda · Hub de Exportações Pietrobon<br>
  ${MODO_TESTE ? '<strong style="color:#ED3237">Modo teste — enviado apenas para ' + EMAIL_TESTE + '</strong>' : ''}</p></div></div>`
  const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
  method: 'POST',
  headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', 'accept': 'application/json' },
  body: JSON.stringify({
- sender: { email: EMAIL_REMETENTE, name: 'Pietrobon · Insumos' },
+ sender: { email: EMAIL_REMETENTE, name: 'Hub de Exportações Pietrobon' },
  to: destinatarios.map((email) => ({ email })),
  subject: assunto,
  htmlContent: html

@@ -1,4 +1,4 @@
-const CACHE = 'pietrobon-v5'
+const CACHE = 'hub-exportacoes-v6'
 const ARQUIVOS = [
   '/index.html',
   '/CSS/style.css',
@@ -27,7 +27,7 @@ self.addEventListener('fetch', (e) => {
   )
 })
 self.addEventListener('push', (e) => {
-  let data = { titulo: 'Pietrobon · Insumos', corpo: 'Nova atualização no sistema.', url: '/' }
+  let data = { titulo: 'Hub de Exportações Pietrobon', corpo: 'Nova atualização no sistema.', url: '/' }
   try { if (e.data) data = { ...data, ...JSON.parse(e.data.text()) } } catch (_) {}
   e.waitUntil(
     self.registration.showNotification(data.titulo, {

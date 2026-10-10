@@ -166,7 +166,7 @@ export function montarCabecalho(papel) {
   nav.innerHTML = `
     <div class="container-fluid px-3">
       <a class="navbar-brand d-flex align-items-center gap-2" href="/HTML/producao/admin.html">
-        <img src="/logo.png" alt="Pietrobon" style="height:36px;object-fit:contain;">
+        <img src="/logo.png" alt="Hub de Exportações Pietrobon" style="height:36px;object-fit:contain;">
       </a>
       <div class="d-flex align-items-center gap-2 ms-auto">
         <button id="btn-notificacao" title="Ativar notificações"
