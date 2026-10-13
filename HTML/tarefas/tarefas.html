@@ -1,30 +1,133 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Check-list de Expedição · Hub de Exportações Pietrobon</title>
+  <title>Tarefas · Hub de Exportações Pietrobon</title>
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#ED3237">
-  <meta name="mobile-web-app-capable" content="yes">
-  <link rel="apple-touch-icon" href="/icon-192.png">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/CSS/style.css">
+  <style>
+    #board{display:flex;flex-direction:column;gap:20px}
+    .usuario-section{background:#f0f2f7;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,.06)}
+    .usuario-section-header{display:flex;align-items:center;gap:10px;padding:13px 18px;background:#e2e8f0}
+    .header-voce{background:#fde8e8}
+    .u-avatar{width:30px;height:30px;border-radius:50%;color:#fff;font-size:.72rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .u-nome{font-size:.85rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#334155;flex:1;display:flex;align-items:center;gap:6px}
+    .u-total{font-size:.72rem;font-weight:700;background:rgba(0,0,0,.1);color:#475569;border-radius:999px;padding:2px 9px}
+    .urgencia-columns{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px}
+    @media(max-width:900px){.urgencia-columns{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:540px){.urgencia-columns{grid-template-columns:1fr}}
+    .urgencia-col{background:#fff;border-radius:12px;overflow:hidden;border-top:3px solid var(--urg-cor);box-shadow:0 1px 3px rgba(15,23,42,.05);display:flex;flex-direction:column}
+    .urgencia-col-header{display:flex;align-items:center;gap:6px;padding:8px 12px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--urg-cor);background:var(--urg-bg);border-bottom:1px solid #f0f2f7}
+    .urgencia-dot{width:7px;height:7px;border-radius:50%;background:var(--urg-cor);flex-shrink:0}
+    .urgencia-count{margin-left:auto;background:rgba(0,0,0,.08);border-radius:999px;padding:1px 7px;font-size:.65rem}
+    .urgencia-cards{padding:8px;display:flex;flex-direction:column;gap:8px;flex:1}
+    .urgencia-vazia{text-align:center;color:#c8d0dc;font-size:.78rem;padding:12px 0;font-style:italic}
+    .tarefa-card{background:#fff;border:1px solid #e4e7ef;border-radius:10px;padding:11px 12px 9px;box-shadow:0 1px 2px rgba(15,23,42,.05);transition:box-shadow .15s,transform .15s}
+    .tarefa-card:hover{box-shadow:0 4px 12px rgba(15,23,42,.10);transform:translateY(-1px)}
+    .tarefa-card.concluida{opacity:.6}
+    .card-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:5px}
+    .card-titulo{font-size:.83rem;font-weight:700;color:#1c2230;line-height:1.4;flex:1}
+    .card-titulo.riscado{text-decoration:line-through;color:var(--muted)}
+    .card-desc{font-size:.75rem;color:#64748b;line-height:1.45;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .card-rodape{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}
+    .card-acoes{display:flex;gap:3px;opacity:0;transition:opacity .12s}
+    .tarefa-card:hover .card-acoes{opacity:1}
+    .btn-card{width:26px;height:26px;border:none;border-radius:6px;background:#f1f5f9;color:#64748b;font-size:.78rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .1s}
+    .btn-card:hover{background:#e2e8f0;color:#1c2230}
+    .btn-card.excluir:hover{background:#fef2f2;color:#b91c1c}
+    .btn-nova-tarefa{margin:4px 8px 8px;width:calc(100% - 16px);border:1.5px dashed #d0d8e4;border-radius:8px;background:transparent;color:#94a3b8;font-size:.78rem;font-weight:600;padding:6px;cursor:pointer;transition:all .12s}
+    .btn-nova-tarefa:hover{border-color:var(--red);color:var(--red);background:var(--red-light)}
+    .filtros-bar{background:#fff;border:1px solid #e4e7ef;border-radius:14px;padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(15,23,42,.05)}
+    .input-busca{flex:1;min-width:160px;border:1px solid #e4e7ef;border-radius:9px;padding:7px 12px;font-size:.875rem;outline:none;font-family:inherit}
+    .input-busca:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(232,49,58,.10)}
+    .filtro-select{border:1px solid #e4e7ef;border-radius:9px;padding:7px 28px 7px 10px;font-size:.82rem;font-weight:600;color:#475569;background:#f8fafc;outline:none;cursor:pointer;font-family:inherit;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2394a3b8'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
+    .grupo-voce{font-size:.62rem;background:rgba(232,49,58,.12);color:#E8313A;border-radius:999px;padding:1px 7px;font-weight:700;text-transform:none;letter-spacing:0}
+    .modal-content{border:none;border-radius:18px;box-shadow:0 20px 60px rgba(15,23,42,.18)}
+    .modal-header{border-bottom:1px solid #f0f2f7;padding:20px 24px 14px}
+    .modal-body{padding:20px 24px}
+    .modal-footer{border-top:1px solid #f0f2f7;padding:14px 24px 20px}
+  </style>
 </head>
-<body data-pagina="checklist.html">
+<body data-pagina="tarefas.html">
   <div id="cabecalho"></div>
   <div class="container py-4">
-    <div class="page-header no-print">
+    <div class="page-header">
       <div class="page-header-icon"></div>
       <div class="page-header-texto">
-        <h1 class="page-titulo">Check-list de Expedição</h1>
-        <p class="page-subtitulo">Monte o check-list da carga e gere o PDF para a expedição</p>
+        <h1 class="page-titulo">Tarefas Exportação</h1>
+        <p class="page-subtitulo">Tarefas do setor por responsável e prioridade</p>
+      </div>
+      <button class="btn btn-pietrobon ms-auto" onclick="abrirModal()">+ Nova Tarefa</button>
+    </div>
+    <div class="filtros-bar">
+      <input class="input-busca" type="text" id="busca" placeholder="🔍  Buscar tarefa..." oninput="renderizarBoard()">
+      <select class="filtro-select" id="filtro-responsavel" onchange="renderizarBoard()">
+        <option value="">Todos</option>
+        <option value="export@pietrobon.com.br">Diego Diniz</option>
+        <option value="export2@pietrobon.com.br">Kauã Mello</option>
+        <option value="joaoantonio@pietrobon.com.br">João Antonio</option>
+        <option value="export3@pietrobon.com.br">Bernardo</option>
+      </select>
+      <select class="filtro-select" id="filtro-status" onchange="renderizarBoard()">
+        <option value="">Todos os status</option>
+        <option value="a_fazer">A Fazer</option>
+        <option value="em_progresso">Em Progresso</option>
+        <option value="concluido">Concluído</option>
+      </select>
+    </div>
+    <div id="board"></div>
+  </div>
+  <div class="modal fade" id="modal-tarefa" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold" id="modal-titulo-label">Nova Tarefa</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="modal-id">
+          <div class="mb-3"><label class="form-label">Título <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="modal-titulo" placeholder="O que precisa ser feito?"></div>
+          <div class="mb-3"><label class="form-label">Descrição</label>
+            <textarea class="form-control" id="modal-descricao" rows="2" placeholder="Detalhes opcionais..."></textarea></div>
+          <div class="row g-3">
+            <div class="col-6"><label class="form-label">Prioridade</label>
+              <select class="form-select" id="modal-prioridade">
+                <option value="urgente">🔴 Urgente</option>
+                <option value="alta">🟠 Alta</option>
+                <option value="normal" selected>⚪ Normal</option>
+                <option value="baixa">🔵 Baixa</option>
+              </select></div>
+            <div class="col-6"><label class="form-label">Status</label>
+              <select class="form-select" id="modal-coluna">
+                <option value="a_fazer">A Fazer</option>
+                <option value="em_progresso">Em Progresso</option>
+                <option value="concluido">Concluído</option>
+              </select></div>
+          </div>
+          <div class="row g-3 mt-0">
+            <div class="col-6"><label class="form-label">Responsável <span class="text-danger">*</span></label>
+              <select class="form-select" id="modal-responsavel">
+                <option value="">Selecione...</option>
+                <option value="export@pietrobon.com.br">Diego Diniz</option>
+                <option value="export2@pietrobon.com.br">Kauã Mello</option>
+                <option value="joaoantonio@pietrobon.com.br">João Antonio</option>
+                <option value="export3@pietrobon.com.br">Bernardo</option>
+              </select></div>
+            <div class="col-6"><label class="form-label">Prazo</label>
+              <input type="date" class="form-control" id="modal-prazo"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-pietrobon" id="btn-salvar-tarefa" onclick="salvarTarefa()">Salvar</button>
+        </div>
       </div>
     </div>
-    <div id="conteudo-cl"><p class="text-muted">Carregando...</p></div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script type="module" src="/JS/producao/checklist.js"></script>
-  <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js') }</script>
+  <script type="module" src="/JS/tarefas/tarefas.js"></script>
 </body>
 </html>
