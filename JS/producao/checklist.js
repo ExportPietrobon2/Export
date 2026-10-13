@@ -1,6 +1,7 @@
 import { api } from '/JS/core/api.js'
 import { exigirPapel } from '/JS/core/auth.js'
 import { montarCabecalho } from '/JS/core/cabecalho.js'
+import { filtroPaisAno, paisDe, anoDe } from '/JS/core/pais-ano.js'
 
 const EMAILS_CHECKLIST = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'export3@pietrobon.com.br']
 const EXPORTADOR = ['PIETROBON & CIA. LTDA.', 'Rua Osvaldo Cruz, 126', 'Tapejara - RS - Brasil', 'CNPJ 97.580.260/0001-15']
@@ -31,7 +32,7 @@ async function verLista() {
     </div>
     ${rows.length ? `<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0">
       <thead><tr><th>Fatura</th><th>Pedido</th><th>Cliente</th><th>Destino</th><th>Data emb.</th><th></th></tr></thead>
-      <tbody>${rows.map((c) => `<tr>
+      <tbody>${rows.map((c) => `<tr data-pais="${esc(paisDe(c.destino))}" data-ano="${anoDe(c.data_emb)}">
         <td class="fw-semibold">${esc(c.fatura || '-')}</td><td>${esc(c.pedido || '-')}</td>
         <td>${esc(c.cliente_nome || '-')}</td><td>${esc(c.destino || '-')}</td><td>${dBR(c.data_emb)}</td>
         <td style="white-space:nowrap" class="text-end">
@@ -40,6 +41,8 @@ async function verLista() {
         </td></tr>`).join('')}</tbody></table></div></div>`
       : '<p class="text-muted fst-italic">Nenhum check-list cadastrado. Clique em "Novo check-list".</p>'}`
   $('btn-novo-cl').addEventListener('click', () => editar(null))
+  const tabela = cont.querySelector('tbody')
+  if (tabela) filtroPaisAno(tabela, { chave: 'checklist', antesDe: tabela.closest('.card') })
 }
 
 window.editarCl = (id) => editar(id)

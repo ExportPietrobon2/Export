@@ -35,9 +35,10 @@ function textoChave(titulo) {
 }
 
 function contarItens(corpo) {
-  const linhas = corpo.querySelectorAll('tbody tr').length
+  const visivel = (el) => el.style.display !== 'none'
+  const linhas = [...corpo.querySelectorAll('tbody tr')].filter(visivel).length
   if (linhas) return `${linhas} ${linhas === 1 ? 'linha' : 'linhas'}`
-  const cards = corpo.querySelectorAll(':scope > div > .card, :scope > .card, .lista-pi-item, .card-recebimento').length
+  const cards = [...corpo.querySelectorAll(':scope > div > .card, :scope > .card, .lista-pi-item, .card-recebimento, .pi-linha')].filter(visivel).length
   if (cards) return `${cards} ${cards === 1 ? 'item' : 'itens'}`
   return ''
 }
@@ -170,6 +171,8 @@ const observador = new MutationObserver(() => {
   agendado = true
   requestAnimationFrame(processar)
 })
+
+document.addEventListener('hub:filtro', recolocarSoltos)
 
 export function iniciarRecolhiveis() {
   processar()

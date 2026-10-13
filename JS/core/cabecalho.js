@@ -80,15 +80,15 @@ async function atualizarBotaoNotificacao(btn) {
     return
   }
 
-  if (Notification.permission === 'granted') {
-    btn.title = 'Notificações ativadas'
-    btn.innerHTML = '🔔'
-    btn.style.opacity = '1'
-  } else {
-    btn.title = 'Ativar notificações'
-    btn.innerHTML = '🔕'
-    btn.style.opacity = '0.7'
+  if (Notification.permission !== 'default') {
+    btn.style.display = 'none'
+    return
   }
+
+  btn.style.display = 'inline-block'
+  btn.title = 'Ativar notificações'
+  btn.innerHTML = '🔔'
+  btn.style.opacity = '1'
 }
 
 export function montarCabecalho(papel) {
@@ -202,7 +202,6 @@ export function montarCabecalho(papel) {
 
   const btnNotificacao = document.getElementById('btn-notificacao')
   if (btnNotificacao && 'Notification' in window && 'PushManager' in window) {
-    btnNotificacao.style.display = 'inline-block'
     atualizarBotaoNotificacao(btnNotificacao)
 
     if (Notification.permission === 'granted') {
@@ -210,12 +209,11 @@ export function montarCabecalho(papel) {
     }
 
     btnNotificacao.addEventListener('click', async () => {
-      if (Notification.permission === 'granted') return
+      if (Notification.permission !== 'default') return
       btnNotificacao.disabled = true
-      const ok = await registrarNotificacaoPush()
+      await registrarNotificacaoPush()
       btnNotificacao.disabled = false
       atualizarBotaoNotificacao(btnNotificacao)
-      if (ok) btnNotificacao.title = 'Notificações ativadas!'
     })
   }
 

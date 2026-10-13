@@ -7,14 +7,12 @@ import {
   piNaoDeclarada, bannerDeclaracaoHtml, resumoDeclaracaoHtml,
   seloPrazoDeclaracaoPiHtml, seloPrazoDeclaracaoHtml
 } from '/JS/core/alertas.js'
+import { filtroPaisAno, paisDe, anoDe } from '/JS/core/pais-ano.js'
+import { abrirPainel, corpoPainel, painelAbertoId, fecharPainel } from '/JS/core/painel.js'
 
 const containerPis   = document.getElementById('container-pis')
 const toggleConcluidas = document.getElementById('toggle-concluidas')
-const pisExpandidas  = new Set()
-const paisesAbertos  = new Set()
-const anosAbertos    = new Set()
 let pedidosCache     = []
-let primeiraVez      = true
 
 
 const ROTULO_INSUMO = {
@@ -30,33 +28,6 @@ function calcularStatusGeral(pedido) {
   return produtos.some((p) => calcularStatusProduto(p.insumos_produto || []) === 'NÃO PRODUZ')
     ? 'NÃO PRODUZ'
     : 'LIBERADO'
-}
-
-// ── Agrupamento ────────────────────────────────────────────────
-function extrarAno(d) { if (!d) return 'Sem data'; return String(new Date(String(d).slice(0,10)+'T00:00:00').getFullYear()) }
-function agruparPorPaisEAno(pedidos) {
-  const g = {}
-  for (const p of pedidos) {
-    const pais = (p.destino||'').trim()||'Sem destino'
-    const ano  = extrarAno(p.data_cadastro)
-    if (!g[pais]) g[pais] = {}
-    if (!g[pais][ano]) g[pais][ano] = []
-    g[pais][ano].push(p)
-  }
-  return g
-}
-function inicGrupos(grupos) {
-  if (!primeiraVez) return
-  primeiraVez = false
-}
-
-window.toggleGrupoPais = function(pais) {
-  if (paisesAbertos.has(pais)) paisesAbertos.delete(pais); else paisesAbertos.add(pais)
-  renderizarPis(pedidosCache)
-}
-window.toggleGrupoAno = function(chave) {
-  if (anosAbertos.has(chave)) anosAbertos.delete(chave); else anosAbertos.add(chave)
-  renderizarPis(pedidosCache)
 }
 
 async function concluirPi(piId, jaConcluida, btn) {
@@ -234,72 +205,75 @@ function gerarHtmlRecebimentosB2(recebimentos) {
   }).join('<hr class="my-2">')
 }
 
-function construirCard(pedido) {
+const dataBR = (v) => v ? new Date(String(v).slice(0, 10) + 'T00:00:00').toLocaleDateString('pt-BR') : ''
+
+function resumoPedido(pedido) {
   const status = calcularStatusGeral(pedido)
-  const liberado = status === 'LIBERADO'
-  const naoProducao = status === 'NÃO PRODUZ'
   const totalRecebimentos = (pedido.recebimentos_b2 || []).length
   const qtdRecebidos = (pedido.recebimentos_b2 || []).filter((r) => r.status_recebimento === 'recebido').length
-  const qtdVinculos = (pedido.vinculos_estoque || []).length
+  return {
+    status,
+    liberado: status === 'LIBERADO',
+    naoProducao: status === 'NÃO PRODUZ',
+    totalRecebimentos,
+    qtdRecebidos,
+    qtdVinculos: (pedido.vinculos_estoque || []).length,
+    emAlerta: piEmAlerta(pedido),
+    naoDeclarada: piNaoDeclarada(pedido)
+  }
+}
 
-  const emAlerta = piEmAlerta(pedido)
-  const naoDeclarada = piNaoDeclarada(pedido)
-  const expandido = pisExpandidas.has(String(pedido.id))
+function seloStatus(r) {
+  return `<span class="badge ${r.liberado ? 'bg-success' : r.naoProducao ? 'bg-danger' : 'bg-secondary'}">${r.status}</span>`
+}
 
-  const card = document.createElement('div')
-  card.className = [
-    'card card-pi-admin mb-3',
-    pedido.concluida ? 'pi-concluida' : '',
-    (!pedido.concluida && liberado) ? 'card-ok' : '',
-    emAlerta ? 'card-alerta-embarque' : '',
-    naoDeclarada ? 'card-alerta-declaracao' : ''
+function construirLinha(pedido) {
+  const r = resumoPedido(pedido)
+  const linha = document.createElement('button')
+  linha.type = 'button'
+  linha.className = [
+    'pi-linha',
+    pedido.concluida ? 'pi-linha-concluida' : '',
+    (!pedido.concluida && r.liberado) ? 'pi-linha-ok' : '',
+    r.emAlerta ? 'pi-linha-alerta' : '',
+    r.naoDeclarada ? 'pi-linha-declaracao' : ''
   ].filter(Boolean).join(' ')
+  linha.dataset.id = pedido.id
+  linha.dataset.pais = paisDe(pedido.destino)
+  linha.dataset.ano = anoDe(pedido.data_cadastro)
+  linha.innerHTML = `
+    <span class="pi-linha-num">PI ${pedido.numero_pi}</span>
+    <span class="pi-linha-info">
+      <span class="pi-linha-cliente">${pedido.cliente || '—'}</span>
+      <span class="pi-linha-meta">${paisDe(pedido.destino)}${pedido.data_embarque ? ' · Embarque ' + dataBR(pedido.data_embarque) : ' · Sem data de embarque'}</span>
+    </span>
+    <span class="pi-linha-selos">
+      ${r.emAlerta ? '<span class="badge bg-danger">Embarque próximo</span>' : ''}
+      ${r.naoDeclarada ? '<span class="badge bg-warning text-dark">Declaração pendente</span>' : ''}
+      ${r.totalRecebimentos > 0 ? `<span class="pi-linha-mini">B2 ${r.qtdRecebidos}/${r.totalRecebimentos}</span>` : ''}
+      ${seloStatus(r)}
+    </span>
+    <span class="pi-linha-seta" aria-hidden="true">›</span>`
+  return linha
+}
 
-  if (emAlerta) {
-    const banner = document.createElement('div')
-    banner.innerHTML = bannerAlertaHtml(pedido)
-    card.appendChild(banner.firstElementChild)
-  }
-
-  if (naoDeclarada) {
-    const banner = document.createElement('div')
-    banner.innerHTML = bannerDeclaracaoHtml(pedido)
-    card.appendChild(banner.firstElementChild)
-  }
-
-  const cabecalho = document.createElement('div')
-  cabecalho.className = 'card-body d-flex justify-content-between align-items-start flex-wrap gap-2'
-  cabecalho.innerHTML = `
-    <div>
-      <div class="fw-bold fs-6">PI ${pedido.numero_pi}</div>
-      <div class="text-muted small">
-        ${pedido.cliente || ''}
-        ${pedido.destino ? '· ' + pedido.destino : ''}
-        ${pedido.data_cadastro ? '· Cadastro ' + new Date(String(pedido.data_cadastro).slice(0, 10) + 'T00:00:00').toLocaleDateString('pt-BR') : ''}
-        ${pedido.data_embarque ? '· Embarque ' + new Date(String(pedido.data_embarque).slice(0, 10) + 'T00:00:00').toLocaleDateString('pt-BR') : ''}
-      </div>
-      <div class="mt-1 d-flex align-items-center gap-2 flex-wrap">
-        <span class="badge ${liberado ? 'bg-success' : naoProducao ? 'bg-danger' : 'bg-secondary'}">${status}</span>
-        ${seloPrazoDeclaracaoPiHtml(pedido)}
-        ${totalRecebimentos > 0 ? `<span class="small text-muted">Receb. PI: ${qtdRecebidos}/${totalRecebimentos}</span>` : ''}
-        ${qtdVinculos > 0 ? `<span class="small text-muted">${qtdVinculos} vínculo(s)</span>` : ''}
-      </div>
-    </div>
-    <div class="d-flex gap-2 flex-wrap">
-      <button class="btn btn-sm btn-outline-danger btn-expandir" data-id="${pedido.id}">
-        ${expandido ? 'Fechar ▴' : 'Ver detalhes ▾'}
-      </button>
-      ${!window._somente_leitura ? `
-        <button class="btn btn-sm ${pedido.concluida ? 'btn-outline-warning' : 'btn-outline-success'} btn-concluir"
-          data-id="${pedido.id}" data-concluida="${pedido.concluida ? 'true' : 'false'}">
-          ${pedido.concluida ? 'Reabrir' : 'Concluir'}
-        </button>` : ''}
-    </div>`
-
+function construirDetalhe(pedido) {
+  const r = resumoPedido(pedido)
   const detalhe = document.createElement('div')
-  detalhe.id = `detalhe-${pedido.id}`
-  detalhe.style.display = expandido ? 'block' : 'none'
-  detalhe.className = 'border-top px-3 pb-3'
+
+  if (r.emAlerta) detalhe.insertAdjacentHTML('beforeend', bannerAlertaHtml(pedido))
+  if (r.naoDeclarada) detalhe.insertAdjacentHTML('beforeend', bannerDeclaracaoHtml(pedido))
+
+  const info = document.createElement('div')
+  info.className = 'painel-info'
+  info.innerHTML = `
+    <div><span>Cliente</span><strong>${pedido.cliente || '—'}</strong></div>
+    <div><span>Destino</span><strong>${paisDe(pedido.destino)}</strong></div>
+    <div><span>Cadastro</span><strong>${dataBR(pedido.data_cadastro) || '—'}</strong></div>
+    <div><span>Embarque</span><strong>${dataBR(pedido.data_embarque) || '—'}</strong></div>
+    <div><span>Recebimentos B2</span><strong>${r.qtdRecebidos}/${r.totalRecebimentos}</strong></div>
+    <div><span>Vínculos de estoque</span><strong>${r.qtdVinculos}</strong></div>`
+  detalhe.appendChild(info)
 
   const secaoAlmox = document.createElement('div')
   secaoAlmox.className = 'mt-3'
@@ -341,10 +315,25 @@ function construirCard(pedido) {
   detalhe.appendChild(secaoAlmox)
   detalhe.appendChild(secaoEstoque)
   detalhe.appendChild(secaoB2)
+  return detalhe
+}
 
-  card.appendChild(cabecalho)
-  card.appendChild(detalhe)
-  return card
+function abrirDetalhe(id) {
+  const pedido = pedidosCache.find((p) => String(p.id) === String(id))
+  if (!pedido) return
+  const r = resumoPedido(pedido)
+  abrirPainel({
+    id: pedido.id,
+    titulo: `PI ${pedido.numero_pi}`,
+    subtitulo: `${pedido.cliente || ''}${pedido.destino ? ' · ' + paisDe(pedido.destino) : ''}`,
+    selos: `${seloStatus(r)} ${seloPrazoDeclaracaoPiHtml(pedido)}`,
+    conteudo: construirDetalhe(pedido),
+    rodape: window._somente_leitura ? '' : `
+      <button class="btn btn-sm ${pedido.concluida ? 'btn-outline-warning' : 'btn-outline-success'} btn-concluir"
+        data-id="${pedido.id}" data-concluida="${pedido.concluida ? 'true' : 'false'}">
+        ${pedido.concluida ? 'Reabrir PI' : 'Concluir PI'}
+      </button>`
+  })
 }
 
 window.salvarCobrancaEmbarque = async function (id) {
@@ -374,7 +363,6 @@ window.salvarCobrancaEmbarque = async function (id) {
 
 
 
-// ── Renderização com agrupamento ───────────────────────────────
 function renderizarPis(pedidos) {
   containerPis.innerHTML = ''
 
@@ -389,70 +377,17 @@ function renderizarPis(pedidos) {
     containerPis.appendChild(vazio); return
   }
 
-  const grupos = agruparPorPaisEAno(pedidos)
-  inicGrupos(grupos)
+  const ordenados = [...pedidos].sort((a, b) =>
+    paisDe(a.destino).localeCompare(paisDe(b.destino), 'pt-BR') ||
+    String(b.data_cadastro || '').localeCompare(String(a.data_cadastro || '')))
 
-  const wrap = document.createElement('div')
-  wrap.className = 'pi-grupos-wrap'
-
-  const paises = Object.keys(grupos).sort((a,b) => {
-    if (a === 'Sem destino') return 1; if (b === 'Sem destino') return -1
-    return a.localeCompare(b, 'pt-BR')
-  })
-
-  for (const pais of paises) {
-    const anosGrupo = grupos[pais]
-    const totalPais = Object.values(anosGrupo).flat().length
-    const abertoPais = paisesAbertos.has(pais)
-
-    const paisDiv = document.createElement('div')
-    paisDiv.className = 'pais-grupo' + (abertoPais ? ' pais-aberto' : '')
-
-    const btn = document.createElement('button')
-    btn.className = 'pais-cabecalho'
-    btn.onclick = () => window.toggleGrupoPais(pais)
-    btn.innerHTML = `<span class="pais-chevron">${abertoPais ? '▼' : '▶'}</span>
-      <span class="pais-nome">${pais}</span>
-      <div class="pais-badges"><span class="pais-qtd">${totalPais} PI${totalPais>1?'s':''}</span></div>`
-    paisDiv.appendChild(btn)
-
-    if (abertoPais) {
-      const paisCorpo = document.createElement('div')
-      paisCorpo.className = 'pais-corpo'
-
-      const anos = Object.keys(anosGrupo).sort((a,b) => Number(b)-Number(a))
-      for (const ano of anos) {
-        const chave = pais + '|||' + ano
-        const aberto = anosAbertos.has(chave)
-        const pisDdoAno = anosGrupo[ano]
-
-        const anoDiv = document.createElement('div')
-        anoDiv.className = 'ano-grupo' + (aberto ? ' ano-aberto' : '')
-
-        const anoBtn = document.createElement('button')
-        anoBtn.className = 'ano-cabecalho'
-        anoBtn.onclick = () => window.toggleGrupoAno(chave)
-        anoBtn.innerHTML = `<span class="ano-chevron">${aberto ? '▼' : '▶'}</span>
-          <span class="ano-label">${ano}</span>
-          <span class="ano-qtd">${pisDdoAno.length} PI${pisDdoAno.length>1?'s':''}</span>`
-        anoDiv.appendChild(anoBtn)
-
-        if (aberto) {
-          const anoCorpo = document.createElement('div')
-          anoCorpo.className = 'ano-corpo'
-          pisDdoAno.forEach(p => anoCorpo.appendChild(construirCard(p)))
-          anoDiv.appendChild(anoCorpo)
-        }
-        paisCorpo.appendChild(anoDiv)
-      }
-      paisDiv.appendChild(paisCorpo)
-    }
-    wrap.appendChild(paisDiv)
-  }
-  containerPis.appendChild(wrap)
+  const lista = document.createElement('div')
+  lista.className = 'pi-lista'
+  ordenados.forEach((p) => lista.appendChild(construirLinha(p)))
+  containerPis.appendChild(lista)
+  filtroPaisAno(lista, { chave: 'visao-geral' })
 }
 
-// ── Carregamento de dados ──────────────────────────────────────
 async function carregar() {
   const incluirConcluidas = toggleConcluidas.checked
   containerPis.innerHTML = '<p class="text-muted">Carregando...</p>'
@@ -482,20 +417,24 @@ async function carregar() {
   }
 
   renderizarPis(pedidos)
+  atualizarPainel()
+}
+
+function atualizarPainel() {
+  const id = painelAbertoId()
+  if (!id) return
+  const foco = document.activeElement
+  if (foco && corpoPainel().contains(foco) && /INPUT|TEXTAREA|SELECT/.test(foco.tagName)) return
+  if (pedidosCache.some((p) => String(p.id) === id)) abrirDetalhe(id)
+  else fecharPainel()
 }
 
 containerPis.addEventListener('click', (e) => {
-  const btnExpandir = e.target.closest('.btn-expandir')
-  if (btnExpandir) {
-    const id = btnExpandir.dataset.id
-    const detalhe = document.getElementById(`detalhe-${id}`)
-    if (!detalhe) return
-    const expandido = detalhe.style.display !== 'none'
-    detalhe.style.display = expandido ? 'none' : 'block'
-    btnExpandir.textContent = expandido ? 'Ver detalhes ▾' : 'Fechar ▴'
-    if (expandido) pisExpandidas.delete(String(id)); else pisExpandidas.add(String(id))
-    return
-  }
+  const linha = e.target.closest('.pi-linha')
+  if (linha) abrirDetalhe(linha.dataset.id)
+})
+
+corpoPainel().addEventListener('click', (e) => {
   const btnConcluir = e.target.closest('.btn-concluir')
   if (btnConcluir) concluirPi(btnConcluir.dataset.id, btnConcluir.dataset.concluida === 'true', btnConcluir)
 })

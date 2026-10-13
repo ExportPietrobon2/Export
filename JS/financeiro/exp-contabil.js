@@ -1,6 +1,7 @@
 import { api } from '/JS/core/api.js'
 import { exigirPapel } from '/JS/core/auth.js'
 import { montarCabecalho } from '/JS/core/cabecalho.js'
+import { filtroPaisAno, paisDe } from '/JS/core/pais-ano.js'
 
 const EMAILS_FINANCEIRO = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'joaoantonio@pietrobon.com.br']
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
@@ -163,6 +164,8 @@ window.abrirLancamentos = async function (entidadeId, nome) {
   $('l-data').value = new Date().toISOString().slice(0, 10)
   renderListaLanc(lancs)
   $('l-salvar').addEventListener('click', () => salvarLanc(entidadeId, nome))
+  const tabelaClientes = $('modal-ec-body').querySelector('tbody')
+  if (tabelaClientes) filtroPaisAno(tabelaClientes, { chave: 'ec-clientes', antesDe: tabelaClientes.closest('.table-responsive'), comAno: false })
   window._modalEc.show()
 }
 
@@ -217,7 +220,7 @@ window.excluirLanc = async function (id) {
 
 async function abrirCadastros() {
   const [clientes, fornecedores] = await Promise.all([api.ec.entidades('clientes'), api.ec.entidades('fornecedores')])
-  const linhaEnt = (e, tipo) => `<tr>
+  const linhaEnt = (e, tipo) => `<tr${tipo === 'clientes' ? ` data-pais="${esc(paisDe(e.pais))}"` : ''}>
     <td>${esc(e.nome)}</td>${tipo === 'clientes' ? `<td>${esc(e.pais || '-')}</td>` : ''}
     <td>${e.ativo ? '<span class="badge bg-success">Ativo</span>' : '<span class="badge bg-secondary">Inativo</span>'}</td>
     <td class="text-end"><button class="btn btn-sm ${e.ativo ? 'btn-outline-danger' : 'btn-outline-secondary'} py-0 px-2" onclick="toggleEnt(${e.id}, '${tipo}')">${e.ativo ? 'Desativar' : 'Ativar'}</button></td>
@@ -241,6 +244,8 @@ async function abrirCadastros() {
       </div>
       <div class="table-responsive"><table class="table table-sm mb-0" style="font-size:.85rem"><thead><tr><th>Nome</th><th>Status</th><th></th></tr></thead><tbody>${fornecedores.map((f) => linhaEnt(f, 'fornecedores')).join('')}</tbody></table></div>
     </div></div>`
+  const tabelaClientes = $('modal-ec-body').querySelector('tbody')
+  if (tabelaClientes) filtroPaisAno(tabelaClientes, { chave: 'ec-clientes', antesDe: tabelaClientes.closest('.table-responsive'), comAno: false })
   window._modalEc.show()
 }
 

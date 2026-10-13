@@ -1,6 +1,7 @@
 import { api } from '/JS/core/api.js'
 import { exigirPapel } from '/JS/core/auth.js'
 import { montarCabecalho } from '/JS/core/cabecalho.js'
+import { filtroPaisAno, paisDe, anoDe } from '/JS/core/pais-ano.js'
 
 const EMAILS_FINANCEIRO = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'joaoantonio@pietrobon.com.br']
 
@@ -107,7 +108,7 @@ function renderImportacoes() {
     </div></div>
     <div id="lista-importacoes">${imps.map((i) => {
       const pago = i.status === 'PAGO'
-      return `<div class="card mb-2 ${pago ? 'card-ok' : ''}" id="imp-card-${i.id}">
+      return `<div class="card mb-2 ${pago ? 'card-ok' : ''}" id="imp-card-${i.id}" data-pais="${esc(paisFornecedor(i.fornecedor_id))}" data-ano="${anoDe(i.data_invoice)}">
         <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2 py-2">
           <div class="d-flex align-items-center gap-2 flex-wrap">
             <span class="fw-bold">${esc(i.invoice)}</span>
@@ -154,6 +155,12 @@ function renderImportacoes() {
   }
   $('i-data_invoice').addEventListener('change', () => autoPtax('i-data_invoice', 'i-taxa_cambio', 'i-taxa-nota'))
   $('btn-nova-imp').addEventListener('click', ed ? salvarEdicaoImp : novaImportacao)
+  filtroPaisAno($('lista-importacoes'), { chave: 'importacoes' })
+}
+
+function paisFornecedor(id) {
+  const f = fornecedores.find((x) => String(x.id) === String(id))
+  return paisDe(f && f.pais)
 }
 
 function coletarImp() {
@@ -316,7 +323,7 @@ function renderFornecedores() {
     </div></div>
     <div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:.85rem">
       <thead><tr><th>Fornecedor</th><th>País</th><th>Moeda</th><th>Contato</th><th>E-mail</th><th>Observações</th><th></th></tr></thead>
-      <tbody>${fornecedores.map((f) => `<tr class="${f.id === editForn ? 'table-primary' : ''}"><td class="fw-semibold">${esc(f.nome)}</td><td>${esc(f.pais || '-')}</td><td>${esc(f.moeda || '-')}</td><td>${esc(f.contato || '-')}</td><td>${esc(f.email || '-')}</td><td>${esc(f.obs || '-')}</td>
+      <tbody>${fornecedores.map((f) => `<tr class="${f.id === editForn ? 'table-primary' : ''}" data-pais="${esc(paisDe(f.pais))}"><td class="fw-semibold">${esc(f.nome)}</td><td>${esc(f.pais || '-')}</td><td>${esc(f.moeda || '-')}</td><td>${esc(f.contato || '-')}</td><td>${esc(f.email || '-')}</td><td>${esc(f.obs || '-')}</td>
         <td class="text-end" style="white-space:nowrap"><button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="editarForn(${f.id})">Editar</button>
           <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="excluirForn(${f.id})">🗑</button></td></tr>`).join('')}</tbody>
     </table></div></div>`
@@ -325,6 +332,8 @@ function renderFornecedores() {
     $('btn-cancel-forn').addEventListener('click', () => { editForn = null; render() })
   }
   $('btn-novo-forn').addEventListener('click', ed ? salvarEdicaoForn : novoFornecedor)
+  const tabelaForn = $('area-fin').querySelector('tbody')
+  if (tabelaForn) filtroPaisAno(tabelaForn, { chave: 'fornecedores', antesDe: tabelaForn.closest('.card'), comAno: false })
 }
 
 function coletarForn() {
@@ -444,7 +453,6 @@ function stRecolher(it) {
   const bc = ((parseFloat(it.base_icms) || 0) + (parseFloat(it.ipi_destacado) || 0)) * (parseFloat(it.mva) || 0)
   return bc * (parseFloat(it.aliquota) || 0) - (parseFloat(it.icms_proprio) || 0)
 }
-// Mercadoria do produto = invoice inteira (R$) × % do produto
 function mpProduto() {
   const tot = parseFloat(custoCab.mp_total) || 0
   const pct = (custoCab.percentual === '' || custoCab.percentual === undefined) ? 100 : (parseFloat(custoCab.percentual) || 0)

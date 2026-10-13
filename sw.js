@@ -1,4 +1,4 @@
-const CACHE = 'hub-exportacoes-v7'
+const CACHE = 'hub-exportacoes-v8'
 const ARQUIVOS = [
   '/index.html',
   '/CSS/style.css',
