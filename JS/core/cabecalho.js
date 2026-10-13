@@ -1,6 +1,7 @@
 import { sair, getPerfil } from '/JS/core/auth.js'
 import { api } from '/JS/core/api.js'
 import { iniciarToast } from '/JS/core/toast.js'
+import { iniciarRecolhiveis } from '/JS/core/recolher.js'
 
 
 const EMAILS_TAREFAS = [
@@ -197,6 +198,7 @@ export function montarCabecalho(papel) {
   })
 
   carregarBadgesPendencias()
+  iniciarRecolhiveis()
 
   const btnNotificacao = document.getElementById('btn-notificacao')
   if (btnNotificacao && 'Notification' in window && 'PushManager' in window) {

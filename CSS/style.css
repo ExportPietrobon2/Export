@@ -1,13 +1,6 @@
-/* ============================================================
-   HUB DE EXPORTAÇÕES PIETROBON — Design System
-   Fonte: Inter | Paleta: Vermelho marca + Slate neutral
-   ============================================================ */
-
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-/* ── 1. Tokens ─────────────────────────────────────────────── */
 :root {
-  /* Marca */
   --red:        #E8313A;
   --red-dark:   #C12028;
   --red-light:  #fef2f2;
@@ -17,7 +10,6 @@
   --green-bg:   #f0fdf4;
   --green-ok:   #16a34a;
 
-  /* Neutros */
   --bg:         #f7f8fb;
   --bg-card:    #ffffff;
   --border:     #e4e7ef;
@@ -27,23 +19,19 @@
   --muted-light:#94a3b8;
   --slate:      #334155;
 
-  /* Sombras */
   --shadow-xs:  0 1px 2px rgba(15,23,42,.04);
   --shadow:     0 1px 3px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04);
   --shadow-md:  0 4px 16px rgba(15,23,42,.09), 0 2px 4px rgba(15,23,42,.04);
   --shadow-lg:  0 12px 32px rgba(15,23,42,.13), 0 4px 8px rgba(15,23,42,.06);
 
-  /* Radii */
   --r-sm: 8px;
   --r:    12px;
   --r-lg: 16px;
   --r-xl: 20px;
 
-  /* Marca – gradiente */
   --brand-grad: linear-gradient(110deg, #E8313A 0%, #F0503A 100%);
 }
 
-/* ── 2. Reset & Base ────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html { scroll-behavior: smooth; }
@@ -63,7 +51,6 @@ body {
   min-height: 100vh;
 }
 
-/* ── 3. Navbar ──────────────────────────────────────────────── */
 .navbar-pietrobon {
   background: var(--brand-grad) !important;
   box-shadow: 0 1px 0 rgba(0,0,0,.08), 0 4px 20px rgba(193,32,40,.20);
@@ -100,7 +87,6 @@ body {
   box-shadow: none !important;
 }
 
-/* Dropdown menu */
 #menu-principal {
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
@@ -151,7 +137,6 @@ body {
   border-color: var(--border-soft);
 }
 
-/* Ícones do menu por página */
 #menu-principal a[href$="admin.html"]::before        { content: "📊"; }
 #menu-principal a[href$="cadastro.html"]::before     { content: "📋"; }
 #menu-principal a[href$="almoxarifado.html"]::before { content: "📦"; }
@@ -167,14 +152,12 @@ body {
 #menu-principal a[href$="conferencia-nfse.html"]::before { content: "🔍"; }
 #menu-principal a[href$="tarefas.html"]::before          { content: "📌"; }
 
-/* ── 4. Layout ──────────────────────────────────────────────── */
 .container { max-width: 1160px; }
 .container.py-4 {
   padding-top: 24px !important;
   padding-bottom: 32px !important;
 }
 
-/* ── 5. Cabeçalho de página ─────────────────────────────────── */
 .page-header {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -200,7 +183,6 @@ body {
   box-shadow: 0 4px 12px rgba(232,49,58,.28);
 }
 
-/* Ícones por página */
 body[data-pagina="admin.html"] .page-header-icon::before        { content: "📊"; }
 body[data-pagina="cadastro.html"] .page-header-icon::before     { content: "📋"; }
 body[data-pagina="almoxarifado.html"] .page-header-icon::before { content: "📦"; }
@@ -237,7 +219,6 @@ body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "�
   line-height: 1.4;
 }
 
-/* ── 6. Cards ───────────────────────────────────────────────── */
 .card {
   background: var(--bg-card) !important;
   border: 1px solid var(--border) !important;
@@ -256,7 +237,6 @@ body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "�
   padding: 20px !important;
 }
 
-/* Card especial – destaque de PI */
 .card-pi-admin {
   border-left: 4px solid var(--orange) !important;
 }
@@ -275,7 +255,6 @@ body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "�
   opacity: .55;
 }
 
-/* ── 7. Botões ──────────────────────────────────────────────── */
 .btn {
   font-family: 'Inter', system-ui, sans-serif;
   font-weight: 600;
@@ -346,7 +325,6 @@ body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "�
   .btn-ok-grande { width: 100%; padding: 13px; }
 }
 
-/* ── 8. Formulários ─────────────────────────────────────────── */
 .form-control,
 .form-select {
   font-family: 'Inter', system-ui, sans-serif;
@@ -394,7 +372,6 @@ body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "�
   box-shadow: 0 0 0 3px rgba(232,49,58,.15) !important;
 }
 
-/* ── 9. Tabelas ─────────────────────────────────────────────── */
 .table {
   --bs-table-bg: transparent;
   font-size: .875rem;
@@ -440,7 +417,6 @@ body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "�
   background-color: #fafbfd;
 }
 
-/* ── 10. Abas (nav-tabs) ────────────────────────────────────── */
 .nav-tabs {
   border-bottom: 1px solid var(--border) !important;
   gap: 4px !important;
@@ -475,7 +451,6 @@ body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "�
   box-shadow: none !important;
 }
 
-/* Botões usados como abas (data-aba, data-aba-compra) */
 .btn.active[data-aba],
 .btn.active[data-aba-compra],
 [data-aba].active,
@@ -485,7 +460,6 @@ body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "�
   color: #fff !important;
 }
 
-/* ── 11. Badges ─────────────────────────────────────────────── */
 .badge {
   font-family: 'Inter', system-ui, sans-serif;
   font-weight: 600;
@@ -498,7 +472,6 @@ body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "�
   justify-content: center;
 }
 
-/* ── 12. Login ──────────────────────────────────────────────── */
 .tela-login {
   min-height: 100vh;
   background: linear-gradient(135deg, var(--red) 0%, #7a1218 100%);
@@ -542,7 +515,6 @@ body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "�
   padding: 32px 28px 28px;
 }
 
-/* ── 13. Almoxarifado ───────────────────────────────────────── */
 .card-insumo-almox {
   background: #fafbfd;
   border: 1px solid var(--border);
@@ -589,7 +561,6 @@ body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "�
   background: #fafbfd;
 }
 
-/* Saldos */
 .saldo-positivo, .saldo-negativo, .saldo-alerta {
   border-radius: var(--r-sm);
   padding: 8px 12px;
@@ -603,7 +574,6 @@ body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "�
 .saldo-negativo { background: var(--red-light); color: var(--red-dark); }
 .saldo-alerta   { background: #fffbeb; color: #b45309; }
 
-/* Indicadores */
 .indicador-ok, .indicador-nok {
   padding: 4px 12px;
   border-radius: 999px;
@@ -617,7 +587,6 @@ body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "�
 .indicador-ok  { background: var(--green-bg); color: var(--green); }
 .indicador-nok { background: var(--red-light); color: var(--red-dark); }
 
-/* ── 14. Status / helpers ───────────────────────────────────── */
 .texto-ok     { color: var(--green);    font-weight: 600; }
 .texto-erro   { color: var(--red);      font-weight: 600; }
 .texto-alerta { color: #b45309;         font-weight: 600; }
@@ -634,7 +603,6 @@ body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "�
   letter-spacing: -.01em;
 }
 
-/* ── 15. Fotos ──────────────────────────────────────────────── */
 .preview-foto {
   width: 100%;
   max-height: 180px;
@@ -689,7 +657,6 @@ body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "�
 .btn-foto:hover   { border-color: var(--orange); background: var(--orange-bg); }
 .btn-foto-ok      { border-color: var(--green) !important; color: var(--green) !important; background: var(--green-bg) !important; }
 
-/* ── 16. Alertas de embarque e declaração ───────────────────── */
 @keyframes pulseRed {
   0%, 100% { box-shadow: 0 0 0 0 rgba(232,49,58,.6); }
   50%      { box-shadow: 0 0 0 10px rgba(232,49,58,0); }
@@ -768,7 +735,6 @@ body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "�
   font-weight: 700;
 }
 
-/* Selos de prazo */
 .selo-prazo-declaracao {
   display: inline-block;
   background: #fefce8;
@@ -790,7 +756,6 @@ body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "�
   font-weight: 700;
 }
 
-/* ── 17. Skeleton Loading ───────────────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -400px 0; }
   100% { background-position: 400px 0; }
@@ -807,14 +772,12 @@ body[data-pagina="tarefas.html"] .page-header-icon::before         { content: "�
 .skeleton-title { height: 20px; width: 60%; margin-bottom: 12px; }
 .skeleton-card  { height: 80px; border-radius: var(--r-lg); margin-bottom: 14px; }
 
-/* Texto "Carregando..." estilizado */
 p.loading, p.vazio, p.text-muted:only-child {
   color: var(--muted);
   font-size: .875rem;
   padding: 20px 0;
 }
 
-/* ── 18. Tabelas especiais (almox/admin) ────────────────────── */
 .tabela-insumos-admin {
   border-radius: var(--r-sm);
   overflow: hidden;
@@ -838,7 +801,6 @@ p.loading, p.vazio, p.text-muted:only-child {
   border-color: var(--border-soft);
 }
 
-/* ── 19. Listas de PI ───────────────────────────────────────── */
 .lista-pi-item {
   border-left: 4px solid var(--orange);
   background: var(--bg-card);
@@ -874,7 +836,6 @@ p.loading, p.vazio, p.text-muted:only-child {
   color: var(--muted);
 }
 
-/* ── 20. Status cards especiais ─────────────────────────────── */
 .card-ok {
   background: var(--green-bg) !important;
   border: 1px solid #bbf7d0 !important;
@@ -883,7 +844,6 @@ p.loading, p.vazio, p.text-muted:only-child {
 
 .linha-ok { background: var(--green-bg) !important; }
 
-/* ── 21. Impressão / PDF ────────────────────────────────────── */
 @media print {
   #cabecalho, #chat-ia-botao, #chat-ia-painel, .no-print { display: none !important; }
   body { background: #fff !important; }
@@ -893,13 +853,11 @@ p.loading, p.vazio, p.text-muted:only-child {
   #area-impressao * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
 
-/* ── 22. Scrollbar personalizada (webkit) ───────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-/* ── 23. Responsivo ─────────────────────────────────────────── */
 @media (max-width: 768px) {
   .page-header { padding: 16px 18px; gap: 12px; }
   .page-titulo { font-size: 1.15rem; }
@@ -914,7 +872,6 @@ p.loading, p.vazio, p.text-muted:only-child {
   .nav-tabs .nav-link { padding: 8px 12px !important; font-size: .82rem; }
 }
 
-/* ── 24. Micro-animação de entrada ──────────────────────────── */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -925,7 +882,6 @@ p.loading, p.vazio, p.text-muted:only-child {
   animation: fadeInUp .25s ease both;
 }
 
-/* Respeita preferência de movimento reduzido */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important;
@@ -933,7 +889,6 @@ p.loading, p.vazio, p.text-muted:only-child {
   }
 }
 
-/* ── 25. Barra de progresso de carregamento ─────────────────── */
 #barra-progresso {
   position: fixed;
   top: 0;
@@ -948,7 +903,6 @@ p.loading, p.vazio, p.text-muted:only-child {
   box-shadow: 0 0 8px rgba(245,147,50,.6);
 }
 
-/* ── 26. Toast notifications ────────────────────────────────── */
 #toast-container {
   position: fixed;
   bottom: 24px;
@@ -1053,7 +1007,7 @@ p.loading, p.vazio, p.text-muted:only-child {
     transform: translateY(0);
   }
 }
-/* ── Agrupamento de PIs por País e Ano ──────────────────────── */
+
 .pi-grupos-wrap { display: flex; flex-direction: column; gap: 6px; }
 
 .pais-grupo { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--shadow); }
@@ -1092,3 +1046,107 @@ p.loading, p.vazio, p.text-muted:only-child {
 .ano-qtd      { font-size: .72rem; color: var(--muted); margin-left: auto; }
 
 .ano-corpo { padding: 6px 4px 4px 14px; display: flex; flex-direction: column; gap: 0; }
+
+:root {
+  --e1: 4px;  --e2: 8px;  --e3: 12px;  --e4: 16px;  --e5: 20px;  --e6: 24px;
+  --fs-xs: .72rem; --fs-sm: .8rem; --fs-md: .875rem; --fs-lg: 1rem; --fs-xl: 1.2rem;
+}
+
+body { font-size: var(--fs-md); line-height: 1.5; }
+
+.container { max-width: 1240px; }
+.container.py-4 { padding-top: var(--e5) !important; padding-bottom: var(--e6) !important; }
+
+.page-header { padding: var(--e4) var(--e5); margin-bottom: var(--e4); gap: var(--e3); flex-wrap: wrap; }
+.page-header-icon { width: 40px; height: 40px; font-size: 1.1rem; border-radius: 10px; }
+.page-titulo { font-size: var(--fs-xl); padding-left: var(--e3); }
+.page-subtitulo { font-size: var(--fs-sm); padding-left: calc(var(--e3) + 4px); }
+
+.card { margin-bottom: var(--e3); border-radius: var(--r) !important; }
+.card-body { padding: var(--e4) !important; }
+.card:hover { transform: none; }
+
+.table { font-size: var(--fs-sm); }
+.table thead tr th { padding: 8px 12px !important; font-size: .68rem !important; }
+.table tbody td { padding: 7px 12px; }
+.table td.text-end, .table th.text-end, .table .num { font-variant-numeric: tabular-nums; }
+.table-responsive { border-radius: var(--r-sm); }
+
+.form-label { font-size: var(--fs-xs); margin-bottom: 2px; }
+.form-control, .form-select { font-size: var(--fs-md); }
+.form-control-sm, .form-select-sm { font-size: var(--fs-sm); }
+.btn { font-size: var(--fs-sm); }
+.btn-sm { font-size: var(--fs-xs); }
+
+.badge { font-size: .68rem; padding: .3em .6em; }
+
+.recolher-titulo {
+  display: flex !important;
+  align-items: center;
+  gap: var(--e2);
+  cursor: pointer;
+  user-select: none;
+  border-radius: 6px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  padding-right: var(--e2);
+  margin-bottom: 0 !important;
+  transition: background .12s;
+}
+.recolher-linha .recolher-titulo { flex: 1; }
+.recolher-titulo:hover { background: var(--red-light); }
+.recolher-titulo:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+
+.recolher-seta {
+  display: inline-block;
+  width: 12px;
+  font-size: .7rem;
+  color: var(--muted-light);
+  transition: transform .18s ease, color .18s ease;
+  flex-shrink: 0;
+}
+.recolher-aberto .recolher-seta { transform: rotate(90deg); color: var(--red); }
+
+.recolher-resumo {
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--border-soft);
+  border-radius: 999px;
+  padding: 1px 9px;
+  white-space: nowrap;
+}
+.recolher-linha .recolher-resumo { margin-left: var(--e2); }
+
+.recolher-corpo { padding-top: var(--e3); }
+.recolher-corpo.recolher-fechado { display: none; }
+.recolher-linha { margin-bottom: 0 !important; }
+.recolher-linha + .recolher-corpo { padding-top: var(--e3); }
+.recolher-corpo + .recolher-titulo,
+.recolher-corpo + .recolher-linha { margin-top: var(--e3); }
+
+.recolher-barra { display: flex; gap: 6px; margin-left: auto; }
+.recolher-acao {
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--slate);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: border-color .12s, color .12s;
+}
+.recolher-acao:hover { border-color: var(--red); color: var(--red); }
+
+@media (max-width: 768px) {
+  .recolher-barra { width: 100%; margin-left: 0; }
+  .recolher-acao { flex: 1; }
+  .card-body { padding: var(--e3) !important; }
+}
+
+@media print {
+  .recolher-corpo.recolher-fechado { display: block !important; }
+  .recolher-seta, .recolher-resumo, .recolher-barra { display: none !important; }
+}
