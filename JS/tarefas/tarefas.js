@@ -160,7 +160,6 @@ window.renderizarBoard = function() {
     board.appendChild(section)
   })
 
-  // Sem responsável
   if (!filtroResp) {
     const semDono = filtradas.filter(t => !t.responsavel)
     if (semDono.length) {

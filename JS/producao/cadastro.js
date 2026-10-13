@@ -14,7 +14,6 @@ let piIdAtual       = null
 let produtoSelecionado = null
 let modalSeletor    = null
 
-// ── Agrupamento ─────────────────────────────────────────────────
 function extrarAno(d) {
   if (!d) return 'Sem data'
   return String(new Date(String(d).slice(0, 10) + 'T00:00:00').getFullYear())
@@ -50,7 +49,6 @@ window.togglePi = function(piId) {
   if (aberto) pisAbertos.delete(String(piId)); else pisAbertos.add(String(piId))
 }
 
-// ── Catálogo ─────────────────────────────────────────────────────
 async function carregarCatalogo() {
   const dados = await api.catalogoProdutos.listar()
   if (Array.isArray(dados)) { catalogo = dados; renderizarCatalogo() }
@@ -78,7 +76,6 @@ window.excluirDoCatalogo = async function(id) {
   renderizarCatalogo()
 }
 
-// ── Modal seletor de produto ──────────────────────────────────────
 function renderizarListaSeletor(busca) {
   const lista = document.getElementById('seletor-lista')
   const q     = (busca || '').toLowerCase().trim()
@@ -153,7 +150,6 @@ document.getElementById('btn-confirmar-produto').addEventListener('click', async
 
   if (resultado?.erro) { alert('Erro ao cadastrar produto.'); return }
 
-  // Salva no catálogo se novo
   if (!catalogo.some(p => p.nome.toLowerCase() === produtoSelecionado.toLowerCase())) {
     await api.catalogoProdutos.adicionar(produtoSelecionado)
     const novaLista = await api.catalogoProdutos.listar()
@@ -165,7 +161,6 @@ document.getElementById('btn-confirmar-produto').addEventListener('click', async
   renderizarLista(todosOsPedidos).catch(console.error)
 })
 
-// ── Card de PI colapsável ─────────────────────────────────────────
 function criarCardPi(pedido, produtos) {
   const aberto = pisAbertos.has(String(pedido.id))
   const bloco  = document.createElement('div')
@@ -244,7 +239,6 @@ function criarCardPi(pedido, produtos) {
   return bloco
 }
 
-// ── Renderização agrupada ────────────────────────────────────────
 async function renderizarLista(pedidos) {
   listaPedidos.innerHTML = ''
   if (!pedidos.length) {
@@ -328,7 +322,6 @@ async function carregarPedidos() {
   await renderizarLista(pedidos)
 }
 
-// ── Editar quantidade inline ─────────────────────────────────────
 async function editarQuantidade(produtoId, quantidadeAtual) {
   const btn   = document.querySelector(`.btn-editar-qtd[data-produto-id="${produtoId}"]`)
   const label = document.getElementById(`qtd-label-${produtoId}`)
@@ -372,7 +365,6 @@ async function excluirPi(piId, numeroPi) {
   primeiraVez = true; carregarPedidos()
 }
 
-// ── Form Nova PI ─────────────────────────────────────────────────
 document.getElementById('btn-toggle-nova-pi').addEventListener('click', () => {
   const wrap = document.getElementById('form-nova-pi-wrap')
   const v = wrap.style.display !== 'none'
@@ -403,7 +395,6 @@ document.getElementById('form-novo-pi').addEventListener('submit', async e => {
   primeiraVez = true; carregarPedidos()
 })
 
-// ── Toggle catálogo ───────────────────────────────────────────────
 document.getElementById('btn-toggle-catalogo')?.addEventListener('click', () => {
   const wrap = document.getElementById('catalogo-wrap')
   const btn  = document.getElementById('btn-toggle-catalogo')
@@ -412,7 +403,6 @@ document.getElementById('btn-toggle-catalogo')?.addEventListener('click', () => 
   btn.textContent = v ? '📦 Catálogo ▾' : '📦 Catálogo ▴'
 })
 
-// ── Iniciar ──────────────────────────────────────────────────────
 async function iniciar() {
   const perfil = exigirPapel('todos')
   if (!perfil) return

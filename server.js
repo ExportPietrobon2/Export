@@ -84,7 +84,6 @@ async function getDestinatarios(papeis) {
  return rows.map((r) => r.email)
 }
 
-// Evita reenvio de cobranças diárias a cada reinício: só permite 1x por dia por chave
 async function podeEnviarHoje(chave) {
  try {
  await pool.query('CREATE TABLE IF NOT EXISTS notif_log (chave VARCHAR(60) PRIMARY KEY, ultima_data DATE)')
@@ -130,7 +129,6 @@ async function enviarEmail(assunto, corpo, papeis) {
  }
 }
 
-// Envia para uma lista específica de e-mails (respeitando o modo teste).
 async function enviarEmailPara(assunto, corpo, emails) {
  try {
  if (!BREVO_API_KEY) return
@@ -186,7 +184,6 @@ function autenticar(papeis) {
 }
 
 const TODOS = ['admin', 'almoxarifado', 'deposito', 'convidado', 'gerente_producao', 'compras', 'compras_aromas', 'auxiliar']
-
 
 app.get('/api/push/vapid-public', (req, res) => res.json({ key: VAPID_PUBLIC }))
 
@@ -278,7 +275,6 @@ app.post('/api/pedidos', autenticar(['admin']), async (req, res) => {
  const piId = resultado.insertId
  const tiposRecebimento = ['embalagem', 'rotulo', 'caixa']
  res.json({ id: piId })
- // Notificar nova PI — push + e-mail (máx 3x/dia)
  const chaveNovaPi = `nova_pi_${new Date().toISOString().slice(0, 10)}`
  const tituloNovaPi = `Nova PI cadastrada — ${numero_pi}`
  const detalheNovaPi = [cliente && `Cliente: ${cliente}`, destino && `Destino: ${destino}`].filter(Boolean).join(' · ')
@@ -581,7 +577,6 @@ app.delete('/api/usuarios/:id', autenticar(['admin']), async (req, res) => {
  res.json({ ok: true })
 })
 
-
 app.post('/api/estoque/entrada', autenticar(['admin', 'deposito']), upload.fields([{ name: 'foto_produto', maxCount: 1 }, { name: 'foto_nota', maxCount: 1 }]), async (req, res) => {
  const { embalagem_kg, rotulo_kg, pallet_caixas, produto, localizacao } = req.body
  let fotoUrl = null
@@ -667,7 +662,6 @@ app.post('/api/estoque/vincular', autenticar(['admin', 'almoxarifado']), async (
 
  res.json({ ok: true })
 })
-
 
 app.delete('/api/estoque/entradas/:id', autenticar(['admin', 'deposito']), async (req, res) => {
  await pool.query('DELETE FROM estoque_insumos WHERE id = ?', [req.params.id])
@@ -830,10 +824,6 @@ app.get('/api/pendencias', autenticar(TODOS), async (req, res) => {
  }
 })
 
-// =============================================
-// COMPRAS
-// =============================================
-
 const tipoLabelCompra = { embalagem: 'Embalagem', rotulo: 'Rótulo', caixa: 'Caixa', etiqueta: 'Etiqueta', outro: 'Outro' }
 
 app.get('/api/compras', autenticar(TODOS), async (req, res) => {
@@ -994,10 +984,6 @@ async function verificarEmbarquesPendentes() {
 setTimeout(verificarEmbarquesPendentes, 150 * 1000)
 setInterval(verificarEmbarquesPendentes, 24 * 60 * 60 * 1000)
 
-// =============================================
-// DEMANDAS DE COMPRA
-// =============================================
-
 app.get('/api/demandas', autenticar(TODOS), async (req, res) => {
  const [rows] = await pool.query(`
  SELECT d.*, p.numero_pi, p.cliente
@@ -1063,10 +1049,6 @@ app.delete('/api/demandas/:id', autenticar(['admin', 'almoxarifado']), async (re
  res.json({ ok: true })
 })
 
-
-// =============================================
-// CONTÁBIL / FATURAMENTO NFe — restrito ao export2
-// =============================================
 const EMAILS_FINANCEIRO = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'joaoantonio@pietrobon.com.br']
 
 function autenticarContabil() {
@@ -1134,19 +1116,13 @@ app.delete('/api/contabil/:id', autenticarContabil(), async (req, res) => {
  res.json({ ok: true })
 })
 
-// =============================================
-// CONTABILIDADE DE EXPORTAÇÃO (baixas e saldos) — restrito ao export2
-// =============================================
 const NOMES_MESES_EC = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
-// Cria as tabelas e importa os dados de Junho/2026 automaticamente (uma vez)
 async function inicializarContabExportacao() {
   let ecSeed
   try {
     ecSeed = require('./ec_seed')
   } catch (e) {
-    // O arquivo ec_seed.js é usado só na 1ª importação. Depois pode ser
-    // removido do projeto — as tabelas e os dados já existem no banco.
     return
   }
   try {
@@ -1162,7 +1138,6 @@ async function inicializarContabExportacao() {
 }
 setTimeout(inicializarContabExportacao, 4000)
 
-// Cria as tabelas e importa os dados do Financeiro (Importações) automaticamente
 async function inicializarFinanceiro() {
   let seed
   try {
@@ -1189,7 +1164,6 @@ const EC_MOD = {
 }
 function ecCfg(modulo) { return EC_MOD[modulo] || null }
 
-// Períodos (meses)
 app.get('/api/ec/meses', autenticarContabil(), async (req, res) => {
   const [rows] = await pool.query('SELECT * FROM ec_meses ORDER BY ano DESC, mes DESC')
   res.json(rows)
@@ -1207,7 +1181,6 @@ app.delete('/api/ec/meses/:id', autenticarContabil(), async (req, res) => {
   res.json({ ok: true })
 })
 
-// Entidades (clientes / fornecedores)
 app.get('/api/ec/entidades', autenticarContabil(), async (req, res) => {
   const tabela = req.query.tipo === 'fornecedores' ? 'ec_fornecedores' : 'ec_clientes'
   const [rows] = await pool.query(`SELECT * FROM ${tabela} ORDER BY nome`)
@@ -1229,7 +1202,6 @@ app.patch('/api/ec/entidades/:id', autenticarContabil(), async (req, res) => {
   res.json({ ok: true })
 })
 
-// Saldos do mês por módulo
 app.get('/api/ec/saldos', autenticarContabil(), async (req, res) => {
   const cfg = ecCfg(req.query.modulo)
   const mesId = parseInt(req.query.mesId)
@@ -1254,7 +1226,6 @@ app.get('/api/ec/saldos', autenticarContabil(), async (req, res) => {
   res.json({ mes, temFatura: cfg.temFatura, linhas })
 })
 
-// Lançamentos de uma entidade no mês
 app.get('/api/ec/lancamentos', autenticarContabil(), async (req, res) => {
   const cfg = ecCfg(req.query.modulo)
   const mesId = parseInt(req.query.mesId), entidadeId = parseInt(req.query.entidadeId)
@@ -1287,9 +1258,6 @@ app.delete('/api/ec/lancamentos/:modulo/:id', autenticarContabil(), async (req, 
   res.json({ ok: true })
 })
 
-// =============================================
-// FINANCEIRO — IMPORTAÇÕES (pagamentos, câmbio, saldos) — restrito ao financeiro
-// =============================================
 function statusImportacao(valorReais, pago) {
   if (pago >= valorReais - 0.01) return 'PAGO'
   if (pago > 0.01) return 'PARCIAL'
@@ -1313,7 +1281,6 @@ async function importacoesComputadas() {
   })
 }
 
-// Migração: garante a coluna contrato_id em fin_pagamentos (vínculo com câmbio)
 async function migrarFinanceiro() {
   try {
     const [cols] = await pool.query("SHOW COLUMNS FROM fin_pagamentos LIKE 'contrato_id'")
@@ -1321,8 +1288,6 @@ async function migrarFinanceiro() {
       await pool.query('ALTER TABLE fin_pagamentos ADD COLUMN contrato_id INT NULL')
       console.log('fin_pagamentos.contrato_id adicionado.')
     }
-    // Backfill (1x): estima o valor em USD dos pagamentos antigos lançados só em R$,
-    // dividindo o R$ pago pela taxa da invoice. Guardado por flag para não repetir.
     const [[flag]] = await pool.query("SELECT chave FROM notif_log WHERE chave = 'backfill_pag_usd'")
     if (!flag) {
       await pool.query('CREATE TABLE IF NOT EXISTS notif_log (chave VARCHAR(60) PRIMARY KEY, ultima_data DATE)')
@@ -1333,18 +1298,16 @@ async function migrarFinanceiro() {
       await pool.query("INSERT INTO notif_log (chave, ultima_data) VALUES ('backfill_pag_usd', CURDATE()) ON DUPLICATE KEY UPDATE ultima_data = CURDATE()")
       console.log('Backfill USD dos pagamentos:', r.affectedRows, 'linhas.')
     }
-    // garante a coluna unidade em fin_custos (KG/UN)
     try {
       const [uc] = await pool.query("SHOW COLUMNS FROM fin_custos LIKE 'unidade'")
       if (!uc.length) await pool.query("ALTER TABLE fin_custos ADD COLUMN unidade VARCHAR(4) DEFAULT 'KG'")
       const [pc] = await pool.query("SHOW COLUMNS FROM fin_custos LIKE 'produto'")
       if (!pc.length) await pool.query("ALTER TABLE fin_custos ADD COLUMN produto VARCHAR(200)")
-    } catch (e) { /* tabela ainda não existe */ }
+    } catch (e) {}
   } catch (e) { console.error('Erro migração financeiro:', e.message) }
 }
 setTimeout(migrarFinanceiro, 7000)
 
-// ---- Resumo Semanal de Importação (e-mail) ----
 const EMAILS_RESUMO_IMPORT = ['joaoantonio@pietrobon.com.br', 'export2@pietrobon.com.br']
 function _brl(n) { return 'R$ ' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function _num2(n) { return (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
@@ -1352,8 +1315,6 @@ function _escEmail(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;')
 
 async function montarCorpoResumoImport() {
   const imps = await importacoesComputadas()
-  // valores em moeda (USD). Se o pagamento não foi lançado em USD, estima
-  // o pago em USD pelo R$ pago dividido pela taxa da invoice.
   imps.forEach((i) => {
     i._vm = Number(i.valor_moeda) || 0
     const smRegistrado = Number(i.saldo_moeda) || 0
@@ -1432,13 +1393,11 @@ async function enviarResumoSemanalImportacao(forcar = false) {
 setTimeout(() => enviarResumoSemanalImportacao(false), 200 * 1000)
 setInterval(() => enviarResumoSemanalImportacao(false), 24 * 60 * 60 * 1000)
 
-// Envio manual (para testar): dispara o resumo na hora
 app.post('/api/fin/resumo-semanal/enviar', autenticarContabil(), async (req, res) => {
   await enviarResumoSemanalImportacao(true)
   res.json({ ok: true })
 })
 
-// Painel + lista
 app.get('/api/fin/resumo', autenticarContabil(), async (req, res) => {
   const imps = await importacoesComputadas()
   const totalImportado = imps.reduce((s, i) => s + (Number(i.valor_reais) || 0), 0)
@@ -1461,8 +1420,6 @@ app.get('/api/fin/resumo', autenticarContabil(), async (req, res) => {
   })
 })
 
-// Cotação PTAX do dólar (Banco Central). Se não houver cotação na data
-// (fim de semana/feriado/ainda não publicada), retorna a última disponível.
 const _ptaxCache = {}
 function _fmtBCB(d) { const [y, m, dd] = d.split('-'); return `${m}-${dd}-${y}` }
 app.get('/api/fin/ptax', autenticarContabil(), async (req, res) => {
@@ -1488,7 +1445,6 @@ app.get('/api/fin/ptax', autenticarContabil(), async (req, res) => {
   }
 })
 
-// Fornecedores
 app.get('/api/fin/fornecedores', autenticarContabil(), async (req, res) => {
   const [rows] = await pool.query('SELECT * FROM fin_fornecedores ORDER BY nome')
   res.json(rows)
@@ -1514,7 +1470,6 @@ app.delete('/api/fin/fornecedores/:id', autenticarContabil(), async (req, res) =
   res.json({ ok: true })
 })
 
-// Importações
 const CAMPOS_IMP = ['fornecedor_id', 'invoice', 'data_invoice', 'mercadoria', 'moeda', 'valor_moeda', 'taxa_cambio', 'banco', 'obs']
 function calcValorReais(b) { return (parseFloat(b.valor_moeda) || 0) * (parseFloat(b.taxa_cambio) || 0) }
 app.post('/api/fin/importacoes', autenticarContabil(), async (req, res) => {
@@ -1544,7 +1499,6 @@ app.delete('/api/fin/importacoes/:id', autenticarContabil(), async (req, res) =>
   res.json({ ok: true })
 })
 
-// Pagamentos
 app.get('/api/fin/pagamentos', autenticarContabil(), async (req, res) => {
   const [rows] = await pool.query('SELECT * FROM fin_pagamentos WHERE importacao_id = ? ORDER BY data_pgto, id', [parseInt(req.query.importacaoId) || 0])
   res.json(rows)
@@ -1570,7 +1524,6 @@ app.delete('/api/fin/pagamentos/:id', autenticarContabil(), async (req, res) => 
   res.json({ ok: true })
 })
 
-// Contratos de câmbio
 app.get('/api/fin/contratos', autenticarContabil(), async (req, res) => {
   const cond = req.query.importacaoId ? 'WHERE c.importacao_id = ?' : ''
   const args = req.query.importacaoId ? [parseInt(req.query.importacaoId)] : []
@@ -1614,9 +1567,6 @@ app.delete('/api/fin/contratos/:id', autenticarContabil(), async (req, res) => {
   res.json({ ok: true })
 })
 
-// ---- Custos de Importação (nacionalização) ----
-// Uma importação pode ter VÁRIOS produtos. Cada produto recebe só a sua parte da
-// mercadoria: materia_prima = mp_total (invoice inteira em R$) × percentual / 100.
 async function inicializarCustos() {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS fin_custos (
@@ -1633,7 +1583,6 @@ async function inicializarCustos() {
       base_icms DECIMAL(14,2) DEFAULT 0, icms_proprio DECIMAL(14,2) DEFAULT 0, aliquota DECIMAL(6,4) DEFAULT 0,
       ipi_destacado DECIMAL(14,2) DEFAULT 0, mva DECIMAL(8,4) DEFAULT 0, INDEX(custo_id))`)
 
-    // Migração: tabelas antigas tinham importacao_id UNIQUE (1 produto por importação)
     const [cols] = await pool.query('SHOW COLUMNS FROM fin_custos')
     const nomes = cols.map((c) => c.Field)
     if (!nomes.includes('mp_total')) await pool.query('ALTER TABLE fin_custos ADD COLUMN mp_total DECIMAL(14,2) NULL AFTER produto')
@@ -1649,7 +1598,6 @@ async function inicializarCustos() {
 }
 setTimeout(inicializarCustos, 6000)
 
-// ST a recolher de um item: ((BaseICMS + IPI) * MVA) * Aliquota - ICMS Próprio
 function stARecolher(it) {
   const bcSt = ((Number(it.base_icms) || 0) + (Number(it.ipi_destacado) || 0)) * (Number(it.mva) || 0)
   return bcSt * (Number(it.aliquota) || 0) - (Number(it.icms_proprio) || 0)
@@ -1667,7 +1615,6 @@ function computarCusto(cab, despesas, st) {
   return { despTotal, stCusto, total, credito, custoCredito, custoKg: kg > 0 ? custoCredito / kg : 0 }
 }
 
-// Mercadoria do produto = parte dele na invoice
 function materiaPrimaProduto(b) {
   const tot = Number(b.mp_total)
   const pct = (b.percentual === '' || b.percentual === undefined || b.percentual === null) ? 100 : Number(b.percentual)
@@ -1702,7 +1649,6 @@ function valoresCusto(b) {
     Number(b.quantidade_kg) || 0, b.unidade || 'KG', b.obs || null]
 }
 
-// Todos os custos salvos (um por produto)
 app.get('/api/fin/custos', autenticarContabil(), async (req, res) => {
   const [rows] = await pool.query(`
     SELECT c.*, i.invoice, f.nome AS fornecedor_nome
@@ -1716,7 +1662,6 @@ app.get('/api/fin/custos', autenticarContabil(), async (req, res) => {
   res.json(rows.map((c) => ({ ...c, calc: computarCusto(c, dMap[c.id] || [], sMap[c.id] || []) })))
 })
 
-// Produtos (custos) de uma importação — devolve uma LISTA
 app.get('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, res) => {
   const impId = parseInt(req.params.importacaoId) || 0
   const [rows] = await pool.query('SELECT * FROM fin_custos WHERE importacao_id = ? ORDER BY id', [impId])
@@ -1725,7 +1670,6 @@ app.get('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, res) 
   res.json(lista)
 })
 
-// Novo produto dentro da importação
 app.post('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, res) => {
   const impId = parseInt(req.params.importacaoId) || 0
   if (!impId) return res.status(400).json({ erro: 'Selecione uma importação.' })
@@ -1737,7 +1681,6 @@ app.post('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, res)
   res.json({ ok: true, id: r.insertId })
 })
 
-// Atualiza um produto
 app.put('/api/fin/custos/:importacaoId/:custoId', autenticarContabil(), async (req, res) => {
   const impId = parseInt(req.params.importacaoId) || 0
   const custoId = parseInt(req.params.custoId) || 0
@@ -1751,7 +1694,6 @@ app.put('/api/fin/custos/:importacaoId/:custoId', autenticarContabil(), async (r
   res.json({ ok: true, id: custoId })
 })
 
-// Exclui um produto
 app.delete('/api/fin/custos/:importacaoId/:custoId', autenticarContabil(), async (req, res) => {
   const impId = parseInt(req.params.importacaoId) || 0
   const custoId = parseInt(req.params.custoId) || 0
@@ -1763,10 +1705,6 @@ app.delete('/api/fin/custos/:importacaoId/:custoId', autenticarContabil(), async
   }
   res.json({ ok: true })
 })
-
-// ==============================================
-// ORDEM DE PRODUÇÃO (por PI) — restrito ao financeiro (export2, export, joaoantonio)
-// =============================================
 
 const EMAILS_CHECKLIST = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'export3@pietrobon.com.br']
 
@@ -1842,10 +1780,6 @@ app.delete('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
   await pool.query('DELETE FROM checklist_exp WHERE id = ?', [req.params.id])
   res.json({ ok: true })
 })
-
-
-
-
 
 const EMAILS_TAREFAS = [
   'export@pietrobon.com.br',
@@ -1952,11 +1886,6 @@ app.delete('/api/tarefas/:id', autenticarTarefas(), async (req, res) => {
   }
 })
 
-
-// =============================================
-// CATÁLOGO DE PRODUTOS
-// =============================================
-
 async function inicializarCatalogoProdutos() {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS produtos_catalogo (
@@ -2002,7 +1931,6 @@ app.delete('/api/catalogo-produtos/:id', autenticar(['admin']), async (req, res)
     res.json({ ok: true })
   } catch (e) { res.status(500).json({ erro: e.message }) }
 })
-
 
 app.get('*', (req, res) => {
  res.sendFile(path.join(__dirname, 'index.html'))
