@@ -71,7 +71,7 @@ export function filtroPaisAno(lista, { chave, antesDe = lista, comAno = true, ao
     const linhaPaises = [chip('', 'Todos', itens.length, !estado.pais, 'pais')]
       .concat(Object.keys(paises).sort(ordenarPaises).map((p) => chip(p, p, paises[p], estado.pais === p, 'pais')))
       .join('')
-    const linhaAnos = comAno && Object.keys(anos).length > 1
+    const linhaAnos = comAno && Object.keys(anos).length > 0
       ? [chip('', 'Todos os anos', doPais.length, !estado.ano, 'ano')]
           .concat(Object.keys(anos).sort(ordenarAnos).map((a) => chip(a, a, anos[a], estado.ano === a, 'ano')))
           .join('')
