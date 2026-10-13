@@ -2,9 +2,9 @@ const DURACOES = { success: 3500, error: 6500, warning: 5000, info: 4000 }
 
 const ICONES = {
   success: `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-  error:   `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+  error: `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
   warning: `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2v5M6 9v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
-  info:    `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 5.5V9M6 3v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`
+  info: `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 5.5V9M6 3v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`
 }
 
 function criarContainer() {
@@ -40,12 +40,20 @@ function exibir(mensagem, tipo = 'info') {
   }
 
   const timer = setTimeout(remover, DURACOES[tipo] || 4000)
-  toast.querySelector('.toast-fechar').addEventListener('click', () => { clearTimeout(timer); remover() })
+  toast.querySelector('.toast-fechar').addEventListener('click', () => {
+    clearTimeout(timer)
+    remover()
+  })
   toast.addEventListener('mouseenter', () => clearTimeout(timer))
 }
 
 function detectarTipo(texto) {
-  if (/erro|error|falhou|falha|inválid|obrigatório|informe|selecione|sem (conexão|permissão)|token inválido|sessão expir/i.test(texto)) return 'error'
+  if (
+    /erro|error|falhou|falha|inválid|obrigatório|informe|selecione|sem (conexão|permissão)|token inválido|sessão expir/i.test(
+      texto
+    )
+  )
+    return 'error'
   if (/salvo!|sucesso|registrado!|enviado!|concluído|apagado|excluído|recebido|✓/i.test(texto)) return 'success'
   if (/atenção|aviso|certeza|risco/i.test(texto)) return 'warning'
   return 'info'
@@ -76,7 +84,10 @@ function iniciarBarraProgresso() {
     barra.style.width = '100%'
     setTimeout(() => {
       barra.style.opacity = '0'
-      setTimeout(() => { progresso = 0; barra.style.width = '0%' }, 400)
+      setTimeout(() => {
+        progresso = 0
+        barra.style.width = '0%'
+      }, 400)
     }, 250)
   }
 
@@ -98,8 +109,8 @@ export function iniciarToast() {
 
   window.toast = {
     success: (msg) => exibir(msg, 'success'),
-    error:   (msg) => exibir(msg, 'error'),
+    error: (msg) => exibir(msg, 'error'),
     warning: (msg) => exibir(msg, 'warning'),
-    info:    (msg) => exibir(msg, 'info'),
+    info: (msg) => exibir(msg, 'info')
   }
 }

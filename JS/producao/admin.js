@@ -3,17 +3,21 @@ import { calcularStatusProduto, formatarQuantidade, rotuloStatus } from '/JS/cor
 import { exigirPapel } from '/JS/core/auth.js'
 import { montarCabecalho } from '/JS/core/cabecalho.js'
 import {
-  piEmAlerta, bannerAlertaHtml, resumoAlertasHtml,
-  piNaoDeclarada, bannerDeclaracaoHtml, resumoDeclaracaoHtml,
-  seloPrazoDeclaracaoPiHtml, seloPrazoDeclaracaoHtml
+  piEmAlerta,
+  bannerAlertaHtml,
+  resumoAlertasHtml,
+  piNaoDeclarada,
+  bannerDeclaracaoHtml,
+  resumoDeclaracaoHtml,
+  seloPrazoDeclaracaoPiHtml,
+  seloPrazoDeclaracaoHtml
 } from '/JS/core/alertas.js'
 import { filtroPaisAno, paisDe, anoDe } from '/JS/core/pais-ano.js'
 import { abrirPainel, corpoPainel, painelAbertoId, fecharPainel } from '/JS/core/painel.js'
 
-const containerPis   = document.getElementById('container-pis')
+const containerPis = document.getElementById('container-pis')
 const toggleConcluidas = document.getElementById('toggle-concluidas')
-let pedidosCache     = []
-
+let pedidosCache = []
 
 const ROTULO_INSUMO = {
   embalagem: 'Embalagem',
@@ -38,53 +42,58 @@ async function concluirPi(piId, jaConcluida, btn) {
   carregar()
 }
 
-
-
 function gerarHtmlInsumosProduto(produtos) {
   if (!produtos || produtos.length === 0) {
     return '<p class="text-muted fst-italic small">Nenhum produto cadastrado.</p>'
   }
 
-  return produtos.map((produto) => {
-    const insumos = produto.insumos_produto || []
-    const status = calcularStatusProduto(insumos)
-    const liberado = status === 'LIBERADO'
+  return produtos
+    .map((produto) => {
+      const insumos = produto.insumos_produto || []
+      const status = calcularStatusProduto(insumos)
+      const liberado = status === 'LIBERADO'
 
-    const linhasInsumos = insumos.map((insumo) => {
-      let detalhe = ''
+      const linhasInsumos = insumos
+        .map((insumo) => {
+          let detalhe = ''
 
-      if (insumo.tipo === 'caixa') {
-        const sobra = Number(insumo.sobra) || 0
-        const necessario = Number(produto.quantidade) || 0
-        const suficiente = sobra >= necessario
-        detalhe = `Sobra: ${sobra} cx · ${suficiente
-          ? `<span class="texto-ok">✔ Suficiente (+${sobra - necessario} cx)</span>`
-          : `<span class="texto-erro">✗ Faltam ${necessario - sobra} cx</span>`}`
-      } else if (insumo.tipo === 'etiqueta') {
-        const sobra = Number(insumo.sobra) || 0
-        detalhe = sobra === 0
-          ? '<span class="texto-erro">✗ Sem estoque</span>'
-          : sobra < 100
-            ? `<span class="texto-alerta">⚠ Baixo (${sobra} un)</span>`
-            : `${sobra} unidades`
-      } else {
-        const sobra = Number(insumo.sobra) || 0
-        const pacotes = Number(insumo.quantidade_por_pacote) || 0
-        detalhe = `Sobra: ${sobra} kg${pacotes > 0 ? ` · ${pacotes} pacotes` : ''}`
-      }
+          if (insumo.tipo === 'caixa') {
+            const sobra = Number(insumo.sobra) || 0
+            const necessario = Number(produto.quantidade) || 0
+            const suficiente = sobra >= necessario
+            detalhe = `Sobra: ${sobra} cx · ${
+              suficiente
+                ? `<span class="texto-ok">✔ Suficiente (+${sobra - necessario} cx)</span>`
+                : `<span class="texto-erro">✗ Faltam ${necessario - sobra} cx</span>`
+            }`
+          } else if (insumo.tipo === 'etiqueta') {
+            const sobra = Number(insumo.sobra) || 0
+            detalhe =
+              sobra === 0
+                ? '<span class="texto-erro">✗ Sem estoque</span>'
+                : sobra < 100
+                  ? `<span class="texto-alerta">⚠ Baixo (${sobra} un)</span>`
+                  : `${sobra} unidades`
+          } else {
+            const sobra = Number(insumo.sobra) || 0
+            const pacotes = Number(insumo.quantidade_por_pacote) || 0
+            detalhe = `Sobra: ${sobra} kg${pacotes > 0 ? ` · ${pacotes} pacotes` : ''}`
+          }
 
-      const nomeInsumo = insumo.tipo === 'rotulo'
-        ? ('Rótulo' + (insumo.nome ? ' – ' + insumo.nome : ''))
-        : (ROTULO_INSUMO[insumo.tipo] || insumo.tipo)
+          const nomeInsumo =
+            insumo.tipo === 'rotulo'
+              ? 'Rótulo' + (insumo.nome ? ' – ' + insumo.nome : '')
+              : ROTULO_INSUMO[insumo.tipo] || insumo.tipo
 
-      return `<tr>
+          return `<tr>
         <td>${nomeInsumo}</td>
         <td>${insumo.confirmado ? '✔' : '✗'}</td>
         <td>${detalhe}</td>
       </tr>`
-    }).join('')
+        })
+        .join('')
 
-    return `
+      return `
       <div class="card border-0 bg-light rounded-3 p-3 mb-2">
         <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
           <strong>${produto.produto}</strong>
@@ -92,15 +101,18 @@ function gerarHtmlInsumosProduto(produtos) {
           <span class="badge ${liberado ? 'bg-success' : 'bg-danger'}">${rotuloStatus(status)}</span>
           ${seloPrazoDeclaracaoHtml(produto)}
         </div>
-        ${insumos.length > 0
-          ? `<table class="table table-sm table-bordered mb-0 tabela-insumos-admin">
+        ${
+          insumos.length > 0
+            ? `<table class="table table-sm table-bordered mb-0 tabela-insumos-admin">
                <thead><tr><th>Insumo</th><th>OK</th><th>Estoque</th></tr></thead>
                <tbody>${linhasInsumos}</tbody>
              </table>`
-          : '<p class="text-muted small mb-0 fst-italic">Sem dados do almoxarifado ainda.</p>'}
+            : '<p class="text-muted small mb-0 fst-italic">Sem dados do almoxarifado ainda.</p>'
+        }
         ${produto.observacoes ? `<div class="small text-muted mt-2">${produto.observacoes}</div>` : ''}
       </div>`
-  }).join('')
+    })
+    .join('')
 }
 
 function gerarHtmlEntradasB2(entradas) {
@@ -108,9 +120,10 @@ function gerarHtmlEntradasB2(entradas) {
     return '<p class="text-muted fst-italic small">Nenhuma entrada registrada pelo depósito B2.</p>'
   }
 
-  return entradas.map((e) => {
-    const dataHora = new Date(e.criado_em).toLocaleString('pt-BR')
-    return `
+  return entradas
+    .map((e) => {
+      const dataHora = new Date(e.criado_em).toLocaleString('pt-BR')
+      return `
       <div class="border rounded-3 p-3 mb-2 bg-light">
         <div class="d-flex justify-content-between flex-wrap gap-1 mb-1">
           <span class="${e.produto ? 'fw-semibold small' : 'text-muted small fst-italic'}">
@@ -124,13 +137,18 @@ function gerarHtmlEntradasB2(entradas) {
           ${e.rotulo_kg > 0 ? `<span class="badge bg-info text-dark">${e.rotulo_kg} kg rót.</span>` : ''}
           ${e.pallet_caixas > 0 ? `<span class="badge bg-secondary">${e.pallet_caixas} pallet(s)</span>` : ''}
         </div>
-        ${e.foto_url || e.foto_nota_url ? `
+        ${
+          e.foto_url || e.foto_nota_url
+            ? `
           <div class="d-flex gap-2 mt-2 flex-wrap">
             ${e.foto_url ? `<a href="${e.foto_url}" target="_blank"><img src="${e.foto_url}" class="foto-detalhe-img rounded-2" alt="Foto produto"></a>` : ''}
             ${e.foto_nota_url ? `<a href="${e.foto_nota_url}" target="_blank"><img src="${e.foto_nota_url}" class="foto-detalhe-img rounded-2" alt="Foto nota"></a>` : ''}
-          </div>` : ''}
+          </div>`
+            : ''
+        }
       </div>`
-  }).join('')
+    })
+    .join('')
 }
 
 function gerarHtmlVinculosEstoque(vinculos) {
@@ -138,16 +156,19 @@ function gerarHtmlVinculosEstoque(vinculos) {
     return '<p class="text-muted fst-italic small">Nenhum insumo do estoque geral vinculado a esta PI.</p>'
   }
 
-  return vinculos.map((v) => {
-    const dataEntrada = new Date(v.entrada_data).toLocaleString('pt-BR')
-    const dataVinculo = new Date(v.criado_em).toLocaleString('pt-BR')
+  return vinculos
+    .map((v) => {
+      const dataEntrada = new Date(v.entrada_data).toLocaleString('pt-BR')
+      const dataVinculo = new Date(v.criado_em).toLocaleString('pt-BR')
 
-    return `
+      return `
       <div class="border rounded-3 p-3 mb-2 bg-light">
         <div class="d-flex justify-content-between flex-wrap gap-1 mb-1">
-          ${v.produto_entrada
-            ? `<span class="fw-semibold small">${v.produto_entrada}</span>`
-            : '<span class="text-muted small">Produto não informado</span>'}
+          ${
+            v.produto_entrada
+              ? `<span class="fw-semibold small">${v.produto_entrada}</span>`
+              : '<span class="text-muted small">Produto não informado</span>'
+          }
           <span class="small text-muted">Vinculado em ${dataVinculo}</span>
         </div>
         <div class="d-flex gap-2 flex-wrap mb-1">
@@ -157,13 +178,18 @@ function gerarHtmlVinculosEstoque(vinculos) {
         </div>
         ${v.entrada_localizacao ? `<div class="small mb-1"><span class="fw-semibold">${v.entrada_localizacao}</span></div>` : ''}
         <div class="small text-muted">Entrada no B2: ${dataEntrada}</div>
-        ${v.entrada_foto || v.entrada_foto_nota ? `
+        ${
+          v.entrada_foto || v.entrada_foto_nota
+            ? `
           <div class="d-flex gap-2 mt-2 flex-wrap">
             ${v.entrada_foto ? `<a href="${v.entrada_foto}" target="_blank"><img src="${v.entrada_foto}" class="foto-detalhe-img rounded-2" alt="Foto produto"></a>` : ''}
             ${v.entrada_foto_nota ? `<a href="${v.entrada_foto_nota}" target="_blank"><img src="${v.entrada_foto_nota}" class="foto-detalhe-img rounded-2" alt="Foto nota"></a>` : ''}
-          </div>` : ''}
+          </div>`
+            : ''
+        }
       </div>`
-  }).join('')
+    })
+    .join('')
 }
 
 function gerarHtmlRecebimentosB2(recebimentos) {
@@ -178,15 +204,23 @@ function gerarHtmlRecebimentosB2(recebimentos) {
     porProduto[chave].push(r)
   })
 
-  return Object.entries(porProduto).map(([nomeProduto, itens]) => {
-    const linhas = itens.map((r) => {
-      const recebido = r.status_recebimento === 'recebido'
-      const fotos = [
-        r.foto_url ? `<a href="${r.foto_url}" target="_blank"><img src="${r.foto_url}" class="foto-detalhe-img rounded-2 me-1"></a>` : '',
-        r.foto_nota_url ? `<a href="${r.foto_nota_url}" target="_blank"><img src="${r.foto_nota_url}" class="foto-detalhe-img rounded-2"></a>` : ''
-      ].filter(Boolean).join('')
+  return Object.entries(porProduto)
+    .map(([nomeProduto, itens]) => {
+      const linhas = itens
+        .map((r) => {
+          const recebido = r.status_recebimento === 'recebido'
+          const fotos = [
+            r.foto_url
+              ? `<a href="${r.foto_url}" target="_blank"><img src="${r.foto_url}" class="foto-detalhe-img rounded-2 me-1"></a>`
+              : '',
+            r.foto_nota_url
+              ? `<a href="${r.foto_nota_url}" target="_blank"><img src="${r.foto_nota_url}" class="foto-detalhe-img rounded-2"></a>`
+              : ''
+          ]
+            .filter(Boolean)
+            .join('')
 
-      return `
+          return `
         <div class="d-flex align-items-start gap-2 flex-wrap mb-1">
           <span class="badge ${recebido ? 'bg-success' : 'bg-danger'}" style="min-width:90px;text-align:center">
             ${ROTULO_INSUMO[r.tipo] || r.tipo}
@@ -195,17 +229,19 @@ function gerarHtmlRecebimentosB2(recebimentos) {
           ${!recebido ? '<span class="text-muted small">Pendente</span>' : ''}
           ${fotos ? `<div class="d-flex">${fotos}</div>` : ''}
         </div>`
-    }).join('')
+        })
+        .join('')
 
-    return `
+      return `
       <div class="mb-2">
         <div class="small fw-bold text-secondary mb-1">• ${nomeProduto}</div>
         <div class="ps-2">${linhas}</div>
       </div>`
-  }).join('<hr class="my-2">')
+    })
+    .join('<hr class="my-2">')
 }
 
-const dataBR = (v) => v ? new Date(String(v).slice(0, 10) + 'T00:00:00').toLocaleDateString('pt-BR') : ''
+const dataBR = (v) => (v ? new Date(String(v).slice(0, 10) + 'T00:00:00').toLocaleDateString('pt-BR') : '')
 
 function resumoPedido(pedido) {
   const status = calcularStatusGeral(pedido)
@@ -234,10 +270,12 @@ function construirLinha(pedido) {
   linha.className = [
     'pi-linha',
     pedido.concluida ? 'pi-linha-concluida' : '',
-    (!pedido.concluida && r.liberado) ? 'pi-linha-ok' : '',
+    !pedido.concluida && r.liberado ? 'pi-linha-ok' : '',
     r.emAlerta ? 'pi-linha-alerta' : '',
     r.naoDeclarada ? 'pi-linha-declaracao' : ''
-  ].filter(Boolean).join(' ')
+  ]
+    .filter(Boolean)
+    .join(' ')
   linha.dataset.id = pedido.id
   linha.dataset.pais = paisDe(pedido.destino)
   linha.dataset.ano = anoDe(pedido.data_cadastro)
@@ -304,11 +342,15 @@ function construirDetalhe(pedido) {
           value="${(pedido.comentario_embarque || '').replace(/"/g, '&quot;')}">
         <button class="btn btn-outline-primary" onclick="salvarCobrancaEmbarque(${pedido.id})">Enviar</button>
       </div>
-      ${pedido.comentario_embarque ? `
+      ${
+        pedido.comentario_embarque
+          ? `
         <div class="alert alert-primary mt-2 mb-0 py-2 small">
           <strong>Comentário de:</strong> ${pedido.comentario_usuario || 'Admin'}<br>
           ${pedido.comentario_embarque}
-        </div>` : ''}`
+        </div>`
+          : ''
+      }`
     detalhe.appendChild(secaoComentario)
   }
 
@@ -328,7 +370,9 @@ function abrirDetalhe(id) {
     subtitulo: `${pedido.cliente || ''}${pedido.destino ? ' · ' + paisDe(pedido.destino) : ''}`,
     selos: `${seloStatus(r)} ${seloPrazoDeclaracaoPiHtml(pedido)}`,
     conteudo: construirDetalhe(pedido),
-    rodape: window._somente_leitura ? '' : `
+    rodape: window._somente_leitura
+      ? ''
+      : `
       <button class="btn btn-sm ${pedido.concluida ? 'btn-outline-warning' : 'btn-outline-success'} btn-concluir"
         data-id="${pedido.id}" data-concluida="${pedido.concluida ? 'true' : 'false'}">
         ${pedido.concluida ? 'Reabrir PI' : 'Concluir PI'}
@@ -358,10 +402,10 @@ window.salvarCobrancaEmbarque = async function (id) {
   }
 
   btn.textContent = 'Enviado'
-  setTimeout(() => { btn.textContent = textoOriginal }, 2000)
+  setTimeout(() => {
+    btn.textContent = textoOriginal
+  }, 2000)
 }
-
-
 
 function renderizarPis(pedidos) {
   containerPis.innerHTML = ''
@@ -373,13 +417,17 @@ function renderizarPis(pedidos) {
 
   if (!pedidos.length) {
     const vazio = document.createElement('p')
-    vazio.className = 'text-muted fst-italic'; vazio.textContent = 'Nenhuma PI cadastrada.'
-    containerPis.appendChild(vazio); return
+    vazio.className = 'text-muted fst-italic'
+    vazio.textContent = 'Nenhuma PI cadastrada.'
+    containerPis.appendChild(vazio)
+    return
   }
 
-  const ordenados = [...pedidos].sort((a, b) =>
-    paisDe(a.destino).localeCompare(paisDe(b.destino), 'pt-BR') ||
-    String(b.data_cadastro || '').localeCompare(String(a.data_cadastro || '')))
+  const ordenados = [...pedidos].sort(
+    (a, b) =>
+      paisDe(a.destino).localeCompare(paisDe(b.destino), 'pt-BR') ||
+      String(b.data_cadastro || '').localeCompare(String(a.data_cadastro || ''))
+  )
 
   const lista = document.createElement('div')
   lista.className = 'pi-lista'
@@ -400,8 +448,12 @@ async function carregar() {
 
   const ativas = pedidos.filter((p) => !p.concluida).length
   const concluidas = pedidos.filter((p) => p.concluida).length
-  document.getElementById('numero-liberados').textContent = pedidos.filter((p) => calcularStatusGeral(p) === 'LIBERADO' && !p.concluida).length
-  document.getElementById('numero-bloqueados').textContent = pedidos.filter((p) => calcularStatusGeral(p) === 'NÃO PRODUZ' && !p.concluida).length
+  document.getElementById('numero-liberados').textContent = pedidos.filter(
+    (p) => calcularStatusGeral(p) === 'LIBERADO' && !p.concluida
+  ).length
+  document.getElementById('numero-bloqueados').textContent = pedidos.filter(
+    (p) => calcularStatusGeral(p) === 'NÃO PRODUZ' && !p.concluida
+  ).length
   document.getElementById('numero-total').textContent = ativas
   document.getElementById('numero-concluidas').textContent = concluidas
 
@@ -441,7 +493,9 @@ corpoPainel().addEventListener('click', (e) => {
 
 toggleConcluidas.addEventListener('change', carregar)
 setInterval(carregar, 5 * 60 * 1000)
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') carregar() })
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') carregar()
+})
 
 async function iniciar() {
   const perfil = exigirPapel('todos')

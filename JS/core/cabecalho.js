@@ -3,7 +3,6 @@ import { api } from '/JS/core/api.js'
 import { iniciarToast } from '/JS/core/toast.js'
 import { iniciarRecolhiveis } from '/JS/core/recolher.js'
 
-
 const EMAILS_TAREFAS = [
   'export@pietrobon.com.br',
   'export2@pietrobon.com.br',
@@ -11,11 +10,7 @@ const EMAILS_TAREFAS = [
   'export3@pietrobon.com.br'
 ]
 
-const EMAILS_FINANCEIRO = [
-  'export2@pietrobon.com.br',
-  'export@pietrobon.com.br',
-  'joaoantonio@pietrobon.com.br'
-]
+const EMAILS_FINANCEIRO = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'joaoantonio@pietrobon.com.br']
 
 async function carregarBadgesPendencias() {
   try {
@@ -130,16 +125,13 @@ export function montarCabecalho(papel) {
       itens: [
         { href: '/HTML/financeiro/contabil.html', texto: 'Mensal Contabil' },
         { href: '/HTML/financeiro/exp-contabil.html', texto: 'Fechamento Contabil' },
-        { href: '/HTML/financeiro/financeiro.html', texto: 'Importações' },
+        { href: '/HTML/financeiro/financeiro.html', texto: 'Importações' }
       ]
-    }
-    ,
+    },
     {
       titulo: 'Tarefas Exportação',
       quando: temAcessoTarefas,
-      itens: [
-        { href: '/HTML/tarefas/tarefas.html', texto: 'Quadro de Tarefas' }
-      ]
+      itens: [{ href: '/HTML/tarefas/tarefas.html', texto: 'Quadro de Tarefas' }]
     }
   ]
 
@@ -149,18 +141,23 @@ export function montarCabecalho(papel) {
       const itens = s.itens.filter((it) => it.quando !== false)
       if (!itens.length) return ''
 
-      const linhas = itens.map((it) => `
+      const linhas = itens
+        .map(
+          (it) => `
         <li>
           <a class="dropdown-item ${it.href.endsWith(paginaAtual) ? 'active' : ''}" href="${it.href}">
             ${it.texto}
           </a>
-        </li>`).join('')
+        </li>`
+        )
+        .join('')
 
       return `
         <li><h6 class="dropdown-header text-uppercase fw-bold">${s.titulo}</h6></li>
         ${linhas}
         <li><hr class="dropdown-divider"></li>`
-    }).join('')
+    })
+    .join('')
 
   const nav = document.createElement('nav')
   nav.className = 'navbar navbar-pietrobon sticky-top'

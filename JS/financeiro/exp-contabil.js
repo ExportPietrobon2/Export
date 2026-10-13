@@ -4,12 +4,56 @@ import { montarCabecalho } from '/JS/core/cabecalho.js'
 import { filtroPaisAno, paisDe } from '/JS/core/pais-ano.js'
 
 const EMAILS_FINANCEIRO = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'joaoantonio@pietrobon.com.br']
-const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+const MESES = [
+  '',
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro'
+]
 
 const MODULOS = {
-  exterior: { titulo: 'Clientes Exterior', tipoEnt: 'clientes', rotA: 'Débito (fatura)', rotD: 'Baixa (recebimento)', tipoA: 'debito', tipoD: 'baixa', temFatura: true, colA: 'Débito do mês', colD: 'Baixa do mês' },
-  adiant_clientes: { titulo: 'Adiantamentos de Clientes', tipoEnt: 'clientes', rotA: 'Crédito (adiantamento)', rotD: 'Débito (uso)', tipoA: 'credito', tipoD: 'debito', temFatura: false, colA: 'Crédito do mês', colD: 'Débito do mês' },
-  adiant_fornecedores: { titulo: 'Adiantamentos a Fornecedores', tipoEnt: 'fornecedores', rotA: 'Débito (adiantado)', rotD: 'Pagamento (abatimento)', tipoA: 'debito', tipoD: 'pagamento', temFatura: false, colA: 'Débito do mês', colD: 'Pagamento do mês' }
+  exterior: {
+    titulo: 'Clientes Exterior',
+    tipoEnt: 'clientes',
+    rotA: 'Débito (fatura)',
+    rotD: 'Baixa (recebimento)',
+    tipoA: 'debito',
+    tipoD: 'baixa',
+    temFatura: true,
+    colA: 'Débito do mês',
+    colD: 'Baixa do mês'
+  },
+  adiant_clientes: {
+    titulo: 'Adiantamentos de Clientes',
+    tipoEnt: 'clientes',
+    rotA: 'Crédito (adiantamento)',
+    rotD: 'Débito (uso)',
+    tipoA: 'credito',
+    tipoD: 'debito',
+    temFatura: false,
+    colA: 'Crédito do mês',
+    colD: 'Débito do mês'
+  },
+  adiant_fornecedores: {
+    titulo: 'Adiantamentos a Fornecedores',
+    tipoEnt: 'fornecedores',
+    rotA: 'Débito (adiantado)',
+    rotD: 'Pagamento (abatimento)',
+    tipoA: 'debito',
+    tipoD: 'pagamento',
+    temFatura: false,
+    colA: 'Débito do mês',
+    colD: 'Pagamento do mês'
+  }
 }
 
 let meses = []
@@ -18,10 +62,23 @@ let modulo = 'exterior'
 let saldoCache = null
 
 const $ = (id) => document.getElementById(id)
-function money(n) { return 'R$ ' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
-function dISO(v) { return v ? String(v).slice(0, 10) : '' }
-function dBR(v) { const s = dISO(v); return s ? s.split('-').reverse().join('/') : '-' }
-function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') }
+function money(n) {
+  return 'R$ ' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function dISO(v) {
+  return v ? String(v).slice(0, 10) : ''
+}
+function dBR(v) {
+  const s = dISO(v)
+  return s ? s.split('-').reverse().join('/') : '-'
+}
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
 
 async function carregarMeses(selecionar) {
   meses = await api.ec.meses()
@@ -30,11 +87,15 @@ async function carregarMeses(selecionar) {
   if (!mesId && meses.length) mesId = meses[0].id
   renderTopo()
   if (mesId) carregarSaldos()
-  else $('area-saldos').innerHTML = '<div class="card"><div class="card-body text-muted">Crie um período (mês) acima para começar.</div></div>'
+  else
+    $('area-saldos').innerHTML =
+      '<div class="card"><div class="card-body text-muted">Crie um período (mês) acima para começar.</div></div>'
 }
 
 function renderTopo() {
-  const opts = meses.map((m) => `<option value="${m.id}" ${m.id === mesId ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')
+  const opts = meses
+    .map((m) => `<option value="${m.id}" ${m.id === mesId ? 'selected' : ''}>${esc(m.nome)}</option>`)
+    .join('')
   $('sel-mes').innerHTML = opts || '<option value="">Nenhum período</option>'
 }
 
@@ -42,11 +103,17 @@ async function carregarSaldos() {
   const area = $('area-saldos')
   area.innerHTML = '<p class="text-muted">Carregando...</p>'
   const r = await api.ec.saldos(modulo, mesId)
-  if (!r || r.erro) { area.innerHTML = `<p class="text-danger">${esc(r?.erro || 'Erro ao carregar.')}</p>`; return }
+  if (!r || r.erro) {
+    area.innerHTML = `<p class="text-danger">${esc(r?.erro || 'Erro ao carregar.')}</p>`
+    return
+  }
   saldoCache = r
   const cfg = MODULOS[modulo]
   const linhas = r.linhas
-  const t = linhas.reduce((a, l) => ({ ant: a.ant + l.anterior, au: a.au + l.aumenta, di: a.di + l.diminui, at: a.at + l.atual }), { ant: 0, au: 0, di: 0, at: 0 })
+  const t = linhas.reduce(
+    (a, l) => ({ ant: a.ant + l.anterior, au: a.au + l.aumenta, di: a.di + l.diminui, at: a.at + l.atual }),
+    { ant: 0, au: 0, di: 0, at: 0 }
+  )
 
   area.innerHTML = `
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
@@ -66,14 +133,18 @@ async function carregarSaldos() {
         <th class="no-print"></th>
       </tr></thead>
       <tbody>
-        ${linhas.map((l) => `<tr>
+        ${linhas
+          .map(
+            (l) => `<tr>
           <td>${esc(l.nome)}</td>
           <td class="text-end">${money(l.anterior)}</td>
           <td class="text-end">${money(l.aumenta)}</td>
           <td class="text-end">${money(l.diminui)}</td>
           <td class="text-end fw-semibold ${l.atual > 0 ? 'text-success' : 'text-muted'}">${money(l.atual)}</td>
           <td class="no-print text-end"><button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="abrirLancamentos(${l.id}, '${esc(l.nome).replace(/'/g, "\\'")}')">Lançar</button></td>
-        </tr>`).join('')}
+        </tr>`
+          )
+          .join('')}
         <tr class="fw-bold" style="background:#f8fafc">
           <td>TOTAL</td>
           <td class="text-end">${money(t.ant)}</td>
@@ -92,12 +163,18 @@ async function carregarSaldos() {
 function exportarPDF() {
   if (!saldoCache) return
   const cfg = MODULOS[modulo]
-  const CAB = '#404040', ZEBRA = '#f2f2f2', TOTAL = '#c9c9c9', BORDA = '1px solid #000'
+  const CAB = '#404040',
+    ZEBRA = '#f2f2f2',
+    TOTAL = '#c9c9c9',
+    BORDA = '1px solid #000'
   const th = `background:${CAB};color:#fff;font-weight:bold;border:${BORDA};padding:5px 6px;font-size:10px;text-align:center`
   const tdL = (bg) => `background:${bg};color:#000;border:${BORDA};padding:4px 6px;font-size:10px;text-align:left`
   const tdR = (bg) => `background:${bg};color:#000;border:${BORDA};padding:4px 6px;font-size:10px;text-align:right`
   const linhas = saldoCache.linhas
-  const t = linhas.reduce((a, l) => ({ ant: a.ant + l.anterior, au: a.au + l.aumenta, di: a.di + l.diminui, at: a.at + l.atual }), { ant: 0, au: 0, di: 0, at: 0 })
+  const t = linhas.reduce(
+    (a, l) => ({ ant: a.ant + l.anterior, au: a.au + l.aumenta, di: a.di + l.diminui, at: a.at + l.atual }),
+    { ant: 0, au: 0, di: 0, at: 0 }
+  )
 
   let html = `<h2 style="text-align:center;margin:0 0 12px">${cfg.titulo.toUpperCase()} — ${esc(saldoCache.mes.nome)}</h2>
     <table style="width:100%;border-collapse:collapse">
@@ -109,16 +186,18 @@ function exportarPDF() {
         <th style="${th}">Saldo atual</th>
       </tr></thead>
       <tbody>
-        ${linhas.map((l, idx) => {
-          const bg = idx % 2 ? ZEBRA : '#fff'
-          return `<tr>
+        ${linhas
+          .map((l, idx) => {
+            const bg = idx % 2 ? ZEBRA : '#fff'
+            return `<tr>
             <td style="${tdL(bg)}">${esc(l.nome)}</td>
             <td style="${tdR(bg)}">${money(l.anterior)}</td>
             <td style="${tdR(bg)}">${money(l.aumenta)}</td>
             <td style="${tdR(bg)}">${money(l.diminui)}</td>
             <td style="${tdR(bg)}">${money(l.atual)}</td>
           </tr>`
-        }).join('')}
+          })
+          .join('')}
         <tr>
           <td style="${tdL(TOTAL)};font-weight:bold">TOTAL</td>
           <td style="${tdR(TOTAL)};font-weight:bold">${money(t.ant)}</td>
@@ -130,10 +209,18 @@ function exportarPDF() {
     </table>`
 
   let area = document.getElementById('area-impressao')
-  if (!area) { area = document.createElement('div'); area.id = 'area-impressao'; area.style.display = 'none'; document.body.appendChild(area) }
+  if (!area) {
+    area = document.createElement('div')
+    area.id = 'area-impressao'
+    area.style.display = 'none'
+    document.body.appendChild(area)
+  }
   area.innerHTML = html
   document.body.classList.add('imprimindo')
-  const limpar = () => { document.body.classList.remove('imprimindo'); window.removeEventListener('afterprint', limpar) }
+  const limpar = () => {
+    document.body.classList.remove('imprimindo')
+    window.removeEventListener('afterprint', limpar)
+  }
   window.addEventListener('afterprint', limpar)
   window.print()
 }
@@ -165,44 +252,63 @@ window.abrirLancamentos = async function (entidadeId, nome) {
   renderListaLanc(lancs)
   $('l-salvar').addEventListener('click', () => salvarLanc(entidadeId, nome))
   const tabelaClientes = $('modal-ec-body').querySelector('tbody')
-  if (tabelaClientes) filtroPaisAno(tabelaClientes, { chave: 'ec-clientes', antesDe: tabelaClientes.closest('.table-responsive'), comAno: false })
+  if (tabelaClientes)
+    filtroPaisAno(tabelaClientes, {
+      chave: 'ec-clientes',
+      antesDe: tabelaClientes.closest('.table-responsive'),
+      comAno: false
+    })
   window._modalEc.show()
 }
 
 function renderListaLanc(lancs) {
   const cfg = MODULOS[modulo]
   const el = $('l-lista')
-  if (!lancs.length) { el.innerHTML = '<p class="text-muted fst-italic mb-0">Nenhum lançamento neste mês.</p>'; return }
+  if (!lancs.length) {
+    el.innerHTML = '<p class="text-muted fst-italic mb-0">Nenhum lançamento neste mês.</p>'
+    return
+  }
   const rot = { [cfg.tipoA]: cfg.rotA, [cfg.tipoD]: cfg.rotD }
   el.innerHTML = `<table class="table table-sm mb-0" style="font-size:.85rem">
     <thead><tr><th>Data</th><th>Tipo</th><th class="text-end">Valor</th>${cfg.temFatura ? '<th>Fatura</th>' : ''}<th>Obs.</th><th></th></tr></thead>
-    <tbody>${lancs.map((l) => `<tr>
+    <tbody>${lancs
+      .map(
+        (l) => `<tr>
       <td>${dBR(l.data_lanc)}</td>
       <td>${esc(rot[l.tipo] || l.tipo)}</td>
       <td class="text-end">${money(l.valor)}</td>
       ${cfg.temFatura ? `<td>${esc(l.fatura || '-')}</td>` : ''}
       <td>${esc(l.observacao || '-')}</td>
       <td class="text-end"><button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="excluirLanc(${l.id})">Excluir</button></td>
-    </tr>`).join('')}</tbody></table>`
+    </tr>`
+      )
+      .join('')}</tbody></table>`
 }
 
 async function salvarLanc(entidadeId, nome) {
   const cfg = MODULOS[modulo]
   const dados = {
-    modulo, mesId, entidadeId,
+    modulo,
+    mesId,
+    entidadeId,
     tipo: $('l-tipo').value,
     data_lanc: $('l-data').value,
     valor: $('l-valor').value,
     observacao: $('l-obs').value
   }
   if (cfg.temFatura) dados.fatura = $('l-fatura').value
-  const btn = $('l-salvar'); btn.disabled = true
+  const btn = $('l-salvar')
+  btn.disabled = true
   const r = await api.ec.criarLancamento(dados)
   btn.disabled = false
-  if (r?.erro) { alert(r.erro || 'Erro ao salvar.'); return }
+  if (r?.erro) {
+    alert(r.erro || 'Erro ao salvar.')
+    return
+  }
   const lr = await api.ec.lancamentos(modulo, mesId, entidadeId)
   renderListaLanc((lr && lr.lancamentos) || [])
-  $('l-valor').value = ''; $('l-obs').value = ''
+  $('l-valor').value = ''
+  $('l-obs').value = ''
   if (cfg.temFatura) $('l-fatura').value = ''
   carregarSaldos()
 }
@@ -245,7 +351,12 @@ async function abrirCadastros() {
       <div class="table-responsive"><table class="table table-sm mb-0" style="font-size:.85rem"><thead><tr><th>Nome</th><th>Status</th><th></th></tr></thead><tbody>${fornecedores.map((f) => linhaEnt(f, 'fornecedores')).join('')}</tbody></table></div>
     </div></div>`
   const tabelaClientes = $('modal-ec-body').querySelector('tbody')
-  if (tabelaClientes) filtroPaisAno(tabelaClientes, { chave: 'ec-clientes', antesDe: tabelaClientes.closest('.table-responsive'), comAno: false })
+  if (tabelaClientes)
+    filtroPaisAno(tabelaClientes, {
+      chave: 'ec-clientes',
+      antesDe: tabelaClientes.closest('.table-responsive'),
+      comAno: false
+    })
   window._modalEc.show()
 }
 
@@ -265,35 +376,71 @@ window.toggleEnt = async function (id, tipo) {
 async function exportarExcel() {
   if (!saldoCache) return
   const cfg = MODULOS[modulo]
-  
-  const CAB = 'FF404040'        
-  const LINHA_A = 'FFFFFFFF'     
-  const LINHA_B = 'FFF2F2F2'     
-  const TOTAL = 'FFC9C9C9'       
+
+  const CAB = 'FF404040'
+  const LINHA_A = 'FFFFFFFF'
+  const LINHA_B = 'FFF2F2F2'
+  const TOTAL = 'FFC9C9C9'
   const PRETO = 'FF000000'
   const BORDA = { style: 'thin', color: { argb: PRETO } }
   const b = { top: BORDA, left: BORDA, bottom: BORDA, right: BORDA }
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('Contab', { views: [{ showGridLines: false }] })
   ws.mergeCells(1, 1, 1, 5)
-  const t = ws.getCell(1, 1); t.value = `${cfg.titulo.toUpperCase()} — ${saldoCache.mes.nome}`; t.font = { bold: true, size: 14, color: { argb: PRETO } }; t.alignment = { horizontal: 'center' }
+  const t = ws.getCell(1, 1)
+  t.value = `${cfg.titulo.toUpperCase()} — ${saldoCache.mes.nome}`
+  t.font = { bold: true, size: 14, color: { argb: PRETO } }
+  t.alignment = { horizontal: 'center' }
   const head = ['Entidade', 'Saldo anterior', cfg.colA, cfg.colD, 'Saldo atual']
-  head.forEach((h, i) => { const c = ws.getCell(3, i + 1); c.value = h; c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CAB } }; c.border = b; c.alignment = { horizontal: 'center' } })
+  head.forEach((h, i) => {
+    const c = ws.getCell(3, i + 1)
+    c.value = h
+    c.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CAB } }
+    c.border = b
+    c.alignment = { horizontal: 'center' }
+  })
   let r = 4
   const tot = { ant: 0, au: 0, di: 0, at: 0 }
   saldoCache.linhas.forEach((l, idx) => {
     const cor = idx % 2 === 0 ? LINHA_A : LINHA_B
     const vals = [l.nome, l.anterior, l.aumenta, l.diminui, l.atual]
-    vals.forEach((v, i) => { const c = ws.getCell(r, i + 1); c.value = v; if (i > 0) c.numFmt = '#,##0.00'; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cor } }; c.border = b; c.font = { color: { argb: PRETO } }; if (i > 0) c.alignment = { horizontal: 'right' } })
-    tot.ant += l.anterior; tot.au += l.aumenta; tot.di += l.diminui; tot.at += l.atual; r++
+    vals.forEach((v, i) => {
+      const c = ws.getCell(r, i + 1)
+      c.value = v
+      if (i > 0) c.numFmt = '#,##0.00'
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cor } }
+      c.border = b
+      c.font = { color: { argb: PRETO } }
+      if (i > 0) c.alignment = { horizontal: 'right' }
+    })
+    tot.ant += l.anterior
+    tot.au += l.aumenta
+    tot.di += l.diminui
+    tot.at += l.atual
+    r++
   })
   const totv = ['TOTAL', tot.ant, tot.au, tot.di, tot.at]
-  totv.forEach((v, i) => { const c = ws.getCell(r, i + 1); c.value = v; if (i > 0) { c.numFmt = '#,##0.00'; c.alignment = { horizontal: 'right' } } c.font = { bold: true, color: { argb: PRETO } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TOTAL } }; c.border = b })
+  totv.forEach((v, i) => {
+    const c = ws.getCell(r, i + 1)
+    c.value = v
+    if (i > 0) {
+      c.numFmt = '#,##0.00'
+      c.alignment = { horizontal: 'right' }
+    }
+    c.font = { bold: true, color: { argb: PRETO } }
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TOTAL } }
+    c.border = b
+  })
   ws.columns = [{ width: 42 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }]
   const buf = await wb.xlsx.writeBuffer()
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-  const url = URL.createObjectURL(blob); const a = document.createElement('a')
-  a.href = url; a.download = `Contabilidade_${saldoCache.mes.nome.replace(/\s+/g, '_')}_${modulo}.xlsx`; a.click(); URL.revokeObjectURL(url)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `Contabilidade_${saldoCache.mes.nome.replace(/\s+/g, '_')}_${modulo}.xlsx`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 function montarInterface() {
@@ -325,14 +472,23 @@ function montarInterface() {
 
   window._modalEc = new bootstrap.Modal($('modal-ec'))
 
-  $('sel-mes').addEventListener('change', (e) => { mesId = parseInt(e.target.value); carregarSaldos() })
+  $('sel-mes').addEventListener('change', (e) => {
+    mesId = parseInt(e.target.value)
+    carregarSaldos()
+  })
   $('btn-novo-mes').addEventListener('click', async () => {
     const ano = parseInt(prompt('Ano do período:', String(new Date().getFullYear())))
     if (!ano) return
     const mes = parseInt(prompt('Mês (1 a 12):', String(new Date().getMonth() + 1)))
-    if (!(mes >= 1 && mes <= 12)) { alert('Mês inválido.'); return }
+    if (!(mes >= 1 && mes <= 12)) {
+      alert('Mês inválido.')
+      return
+    }
     const r = await api.ec.criarMes(ano, mes)
-    if (r?.erro) { alert(r.erro); return }
+    if (r?.erro) {
+      alert(r.erro)
+      return
+    }
     carregarMeses(r.id)
   })
   $('btn-excluir-mes').addEventListener('click', async () => {
@@ -359,7 +515,10 @@ function montarInterface() {
 async function iniciar() {
   const perfil = exigirPapel(['admin'])
   if (!perfil) return
-  if (!EMAILS_FINANCEIRO.includes((perfil.email || '').toLowerCase())) { window.location.href = '/HTML/producao/admin.html'; return }
+  if (!EMAILS_FINANCEIRO.includes((perfil.email || '').toLowerCase())) {
+    window.location.href = '/HTML/producao/admin.html'
+    return
+  }
   montarCabecalho(perfil.papel)
   montarInterface()
   carregarMeses()

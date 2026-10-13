@@ -4,42 +4,72 @@ import { montarCabecalho } from '/JS/core/cabecalho.js'
 import { filtroPaisAno, paisDe, anoDe } from '/JS/core/pais-ano.js'
 
 const EMAILS_CHECKLIST = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'export3@pietrobon.com.br']
-const EXPORTADOR = ['PIETROBON & CIA. LTDA.', 'Rua Osvaldo Cruz, 126', 'Tapejara - RS - Brasil', 'CNPJ 97.580.260/0001-15']
+const EXPORTADOR = [
+  'PIETROBON & CIA. LTDA.',
+  'Rua Osvaldo Cruz, 126',
+  'Tapejara - RS - Brasil',
+  'CNPJ 97.580.260/0001-15'
+]
 
 let editId = null
 const $ = (id) => document.getElementById(id)
-const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-const dISO = (v) => v ? String(v).slice(0, 10) : ''
-const dBR = (v) => { const s = dISO(v); return s ? s.split('-').reverse().join('/') : '' }
+const esc = (s) =>
+  String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+const dISO = (v) => (v ? String(v).slice(0, 10) : '')
+const dBR = (v) => {
+  const s = dISO(v)
+  return s ? s.split('-').reverse().join('/') : ''
+}
 function somaCaixas(itens) {
   return itens.reduce((s, it) => {
-    const n = parseFloat(String(it.qtd_cx || '').replace(/\./g, '').replace(',', '.')) || 0
+    const n =
+      parseFloat(
+        String(it.qtd_cx || '')
+          .replace(/\./g, '')
+          .replace(',', '.')
+      ) || 0
     return s + n
   }, 0)
 }
-function fmtInt(n) { return (Number(n) || 0).toLocaleString('pt-BR') }
+function fmtInt(n) {
+  return (Number(n) || 0).toLocaleString('pt-BR')
+}
 
 async function verLista() {
   editId = null
   const cont = $('conteudo-cl')
   cont.innerHTML = '<p class="text-muted">Carregando...</p>'
   const rows = await api.checklist.listar()
-  if (!Array.isArray(rows)) { cont.innerHTML = '<p class="text-danger">Erro ao carregar.</p>'; return }
+  if (!Array.isArray(rows)) {
+    cont.innerHTML = '<p class="text-danger">Erro ao carregar.</p>'
+    return
+  }
   cont.innerHTML = `
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
       <h5 class="secao-titulo-card mb-0">Check-lists cadastrados</h5>
       <button class="btn btn-ok-grande" id="btn-novo-cl">+ Novo check-list</button>
     </div>
-    ${rows.length ? `<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0">
+    ${
+      rows.length
+        ? `<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0">
       <thead><tr><th>Fatura</th><th>Pedido</th><th>Cliente</th><th>Destino</th><th>Data emb.</th><th></th></tr></thead>
-      <tbody>${rows.map((c) => `<tr data-pais="${esc(paisDe(c.destino))}" data-ano="${anoDe(c.data_emb)}">
+      <tbody>${rows
+        .map(
+          (c) => `<tr data-pais="${esc(paisDe(c.destino))}" data-ano="${anoDe(c.data_emb)}">
         <td class="fw-semibold">${esc(c.fatura || '-')}</td><td>${esc(c.pedido || '-')}</td>
         <td>${esc(c.cliente_nome || '-')}</td><td>${esc(c.destino || '-')}</td><td>${dBR(c.data_emb)}</td>
         <td style="white-space:nowrap" class="text-end">
           <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="editarCl(${c.id})">Abrir</button>
           <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="excluirCl(${c.id})">🗑</button>
-        </td></tr>`).join('')}</tbody></table></div></div>`
-      : '<p class="text-muted fst-italic">Nenhum check-list cadastrado. Clique em "Novo check-list".</p>'}`
+        </td></tr>`
+        )
+        .join('')}</tbody></table></div></div>`
+        : '<p class="text-muted fst-italic">Nenhum check-list cadastrado. Clique em "Novo check-list".</p>'
+    }`
   $('btn-novo-cl').addEventListener('click', () => editar(null))
   const tabela = cont.querySelector('tbody')
   if (tabela) filtroPaisAno(tabela, { chave: 'checklist', antesDe: tabela.closest('.card') })
@@ -67,7 +97,10 @@ function linhaItemHtml(it) {
 async function editar(id) {
   editId = id
   let d = { itens: [{}, {}, {}] }
-  if (id) { d = await api.checklist.obter(id); if (!d.itens || !d.itens.length) d.itens = [{}] }
+  if (id) {
+    d = await api.checklist.obter(id)
+    if (!d.itens || !d.itens.length) d.itens = [{}]
+  }
   const cont = $('conteudo-cl')
   cont.innerHTML = `
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
@@ -124,31 +157,70 @@ async function editar(id) {
     </div>`
 
   $('btn-voltar').addEventListener('click', verLista)
-  $('btn-add-item').addEventListener('click', () => { $('cl-itens').insertAdjacentHTML('beforeend', linhaItemHtml({})) })
-  $('cl-itens').addEventListener('click', (e) => { const b = e.target.closest('.btn-rem-item'); if (b) b.closest('tr').remove() })
-  $('btn-salvar-cl').addEventListener('click', async () => { const r = await salvar(); if (r) verLista() })
-  $('btn-pdf-cl').addEventListener('click', async () => { const r = await salvar(); if (r) exportarPDF(r) })
+  $('btn-add-item').addEventListener('click', () => {
+    $('cl-itens').insertAdjacentHTML('beforeend', linhaItemHtml({}))
+  })
+  $('cl-itens').addEventListener('click', (e) => {
+    const b = e.target.closest('.btn-rem-item')
+    if (b) b.closest('tr').remove()
+  })
+  $('btn-salvar-cl').addEventListener('click', async () => {
+    const r = await salvar()
+    if (r) verLista()
+  })
+  $('btn-pdf-cl').addEventListener('click', async () => {
+    const r = await salvar()
+    if (r) exportarPDF(r)
+  })
 }
 
 function coletar() {
   const dados = {}
-  ;['fatura', 'pedido', 'data_emb', 'cliente_nome', 'cliente_endereco', 'cliente_contato', 'embarque', 'descarga', 'destino', 'peso_liquido', 'peso_bruto', 'volume', 'observacoes'].forEach((k) => { dados[k] = $('c-' + k).value })
-  dados.itens = [...document.querySelectorAll('#cl-itens .cl-item')].map((tr) => ({
-    produto: tr.querySelector('.it-produto').value,
-    gramatura: tr.querySelector('.it-gramatura').value,
-    qtd_cx: tr.querySelector('.it-qtd_cx').value,
-    lote: tr.querySelector('.it-lote').value,
-    validade: tr.querySelector('.it-validade').value
-  })).filter((it) => it.produto || it.gramatura || it.qtd_cx)
+  ;[
+    'fatura',
+    'pedido',
+    'data_emb',
+    'cliente_nome',
+    'cliente_endereco',
+    'cliente_contato',
+    'embarque',
+    'descarga',
+    'destino',
+    'peso_liquido',
+    'peso_bruto',
+    'volume',
+    'observacoes'
+  ].forEach((k) => {
+    dados[k] = $('c-' + k).value
+  })
+  dados.itens = [...document.querySelectorAll('#cl-itens .cl-item')]
+    .map((tr) => ({
+      produto: tr.querySelector('.it-produto').value,
+      gramatura: tr.querySelector('.it-gramatura').value,
+      qtd_cx: tr.querySelector('.it-qtd_cx').value,
+      lote: tr.querySelector('.it-lote').value,
+      validade: tr.querySelector('.it-validade').value
+    }))
+    .filter((it) => it.produto || it.gramatura || it.qtd_cx)
   return dados
 }
 
 async function salvar() {
   const dados = coletar()
   let r
-  if (editId) { r = await api.checklist.editar(editId, dados); if (r?.erro) { alert(r.erro); return null } return { id: editId, ...dados } }
+  if (editId) {
+    r = await api.checklist.editar(editId, dados)
+    if (r?.erro) {
+      alert(r.erro)
+      return null
+    }
+    return { id: editId, ...dados }
+  }
   r = await api.checklist.criar(dados)
-  if (r?.erro) { alert(r.erro); return null }
+  if (r?.erro) {
+    alert(r.erro)
+    return null
+  }
   editId = r.id
   return { id: r.id, ...dados }
 }
@@ -159,7 +231,8 @@ function exportarPDF(d) {
   const bloco = (titulo, linhas) => `<td style="border:1px solid #000;padding:6px 8px;vertical-align:top;width:33%">
     <div style="font-weight:bold;font-size:10px;text-transform:uppercase;margin-bottom:4px">${titulo}</div>
     <div style="font-size:10px;line-height:1.5">${linhas}</div></td>`
-  const th = 'border:1px solid #000;padding:4px 5px;font-size:9.5px;font-weight:bold;background:#e6e6e6;text-align:center'
+  const th =
+    'border:1px solid #000;padding:4px 5px;font-size:9.5px;font-weight:bold;background:#e6e6e6;text-align:center'
   const td = (al) => `border:1px solid #000;padding:4px 5px;font-size:9.5px;text-align:${al}`
 
   const html = `
@@ -179,7 +252,9 @@ function exportarPDF(d) {
           <th style="${th}">GRAMATURA</th><th style="${th}">QTD (cx)</th><th style="${th}">LOTE</th><th style="${th}">VALID.</th><th style="${th}">CONF.</th>
         </tr></thead>
         <tbody>
-          ${itens.map((it, i) => `<tr>
+          ${itens
+            .map(
+              (it, i) => `<tr>
             <td style="${td('center')};font-size:12px">&#9744;</td>
             <td style="${td('center')}">${i + 1}</td>
             <td style="${td('left')}">${esc(it.produto || '')}</td>
@@ -188,7 +263,9 @@ function exportarPDF(d) {
             <td style="${td('center')}">${esc(it.lote || '')}</td>
             <td style="${td('center')}">${esc(it.validade || '')}</td>
             <td style="${td('center')}"></td>
-          </tr>`).join('')}
+          </tr>`
+            )
+            .join('')}
           <tr style="background:#f0f0f0;font-weight:bold">
             <td colspan="4" style="${td('right')}">TOTAL DE ITENS: ${itens.length}</td>
             <td style="${td('center')}">${fmtInt(totalCx)} cx</td>
@@ -205,10 +282,18 @@ function exportarPDF(d) {
     </div>`
 
   let area = document.getElementById('area-impressao')
-  if (!area) { area = document.createElement('div'); area.id = 'area-impressao'; area.style.display = 'none'; document.body.appendChild(area) }
+  if (!area) {
+    area = document.createElement('div')
+    area.id = 'area-impressao'
+    area.style.display = 'none'
+    document.body.appendChild(area)
+  }
   area.innerHTML = html
   document.body.classList.add('imprimindo')
-  const limpar = () => { document.body.classList.remove('imprimindo'); window.removeEventListener('afterprint', limpar) }
+  const limpar = () => {
+    document.body.classList.remove('imprimindo')
+    window.removeEventListener('afterprint', limpar)
+  }
   window.addEventListener('afterprint', limpar)
   window.print()
 }
@@ -216,7 +301,10 @@ function exportarPDF(d) {
 async function iniciar() {
   const perfil = exigirPapel('todos')
   if (!perfil) return
-  if (!EMAILS_CHECKLIST.includes((perfil.email || '').toLowerCase())) { window.location.href = '/HTML/producao/admin.html'; return }
+  if (!EMAILS_CHECKLIST.includes((perfil.email || '').toLowerCase())) {
+    window.location.href = '/HTML/producao/admin.html'
+    return
+  }
   montarCabecalho(perfil.papel)
   verLista()
 }

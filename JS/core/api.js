@@ -55,10 +55,8 @@ export const api = {
 
   pendencias: () => requisitar('GET', '/api/pendencias'),
 
-
   pedidos: {
-    listar: (incluirConcluidas = false) =>
-      requisitar('GET', `/api/pedidos?incluirConcluidas=${incluirConcluidas}`),
+    listar: (incluirConcluidas = false) => requisitar('GET', `/api/pedidos?incluirConcluidas=${incluirConcluidas}`),
     completo: (incluirConcluidas = false) =>
       requisitar('GET', `/api/pedidos/completo?incluirConcluidas=${incluirConcluidas}`),
     criar: (dados) => requisitar('POST', '/api/pedidos', dados),
@@ -73,11 +71,9 @@ export const api = {
   produtos: {
     listar: (piId) => requisitar('GET', `/api/pedidos/${piId}/produtos`),
     criar: (dados) => requisitar('POST', '/api/produtos', dados),
-    editarQuantidade: (id, quantidade) =>
-      requisitar('PATCH', `/api/produtos/${id}/quantidade`, { quantidade }),
+    editarQuantidade: (id, quantidade) => requisitar('PATCH', `/api/produtos/${id}/quantidade`, { quantidade }),
     insumos: (produtoId) => requisitar('GET', `/api/produtos/${produtoId}/insumos`),
-    salvarInsumos: (produtoId, dados) =>
-      requisitar('PATCH', `/api/produtos/${produtoId}/insumos`, dados)
+    salvarInsumos: (produtoId, dados) => requisitar('PATCH', `/api/produtos/${produtoId}/insumos`, dados)
   },
 
   recebimentos: {
@@ -109,8 +105,7 @@ export const api = {
     editarVinculo: (id, dados) => requisitar('PATCH', `/api/estoque/vinculos/${id}`, dados),
     excluirVinculo: (id) => requisitar('DELETE', `/api/estoque/vinculos/${id}`),
     excluirEntrada: (id) => requisitar('DELETE', `/api/estoque/entradas/${id}`),
-    editarProdutoEntrada: (id, produto) =>
-      requisitar('PATCH', `/api/estoque/entradas/${id}/produto`, { produto }),
+    editarProdutoEntrada: (id, produto) => requisitar('PATCH', `/api/estoque/entradas/${id}/produto`, { produto }),
     editarLocalizacaoEntrada: (id, localizacao) =>
       requisitar('PATCH', `/api/estoque/entradas/${id}/localizacao`, { localizacao }),
     registrarEntrada: (produto, embalagemKg, rotuloKg, palletCaixas, fotoProduto, fotoNota, localizacao) => {
@@ -132,8 +127,7 @@ export const api = {
     criar: (dados) => requisitar('POST', '/api/compras', dados),
     editar: (id, dados) => requisitar('PATCH', `/api/compras/${id}`, dados),
     receber: (id) => requisitar('PATCH', `/api/compras/${id}/receber`),
-    observacao: (id, observacoes) =>
-      requisitar('PATCH', `/api/compras/${id}/observacao`, { observacoes }),
+    observacao: (id, observacoes) => requisitar('PATCH', `/api/compras/${id}/observacao`, { observacoes }),
     excluir: (id) => requisitar('DELETE', `/api/compras/${id}`)
   },
 
@@ -159,13 +153,11 @@ export const api = {
     entidades: (tipo) => requisitar('GET', `/api/ec/entidades?tipo=${tipo}`),
     criarEntidade: (dados) => requisitar('POST', '/api/ec/entidades', dados),
     toggleEntidade: (id, tipo) => requisitar('PATCH', `/api/ec/entidades/${id}`, { tipo }),
-    saldos: (modulo, mesId) =>
-      requisitar('GET', `/api/ec/saldos?modulo=${modulo}&mesId=${mesId}`),
+    saldos: (modulo, mesId) => requisitar('GET', `/api/ec/saldos?modulo=${modulo}&mesId=${mesId}`),
     lancamentos: (modulo, mesId, entidadeId) =>
       requisitar('GET', `/api/ec/lancamentos?modulo=${modulo}&mesId=${mesId}&entidadeId=${entidadeId}`),
     criarLancamento: (dados) => requisitar('POST', '/api/ec/lancamentos', dados),
-    excluirLancamento: (modulo, id) =>
-      requisitar('DELETE', `/api/ec/lancamentos/${modulo}/${id}`)
+    excluirLancamento: (modulo, id) => requisitar('DELETE', `/api/ec/lancamentos/${modulo}/${id}`)
   },
 
   fin: {
@@ -179,8 +171,7 @@ export const api = {
     criarImportacao: (dados) => requisitar('POST', '/api/fin/importacoes', dados),
     editarImportacao: (id, dados) => requisitar('PATCH', `/api/fin/importacoes/${id}`, dados),
     excluirImportacao: (id) => requisitar('DELETE', `/api/fin/importacoes/${id}`),
-    pagamentos: (importacaoId) =>
-      requisitar('GET', `/api/fin/pagamentos?importacaoId=${importacaoId}`),
+    pagamentos: (importacaoId) => requisitar('GET', `/api/fin/pagamentos?importacaoId=${importacaoId}`),
     criarPagamento: (dados) => requisitar('POST', '/api/fin/pagamentos', dados),
     editarPagamento: (id, dados) => requisitar('PATCH', `/api/fin/pagamentos/${id}`, dados),
     excluirPagamento: (id) => requisitar('DELETE', `/api/fin/pagamentos/${id}`),
@@ -196,11 +187,10 @@ export const api = {
     excluirCusto: (impId, custoId) => requisitar('DELETE', `/api/fin/custos/${impId}/${custoId}`)
   },
 
-
   catalogoProdutos: {
-    listar:    ()     => requisitar('GET',    '/api/catalogo-produtos'),
-    adicionar: (nome) => requisitar('POST',   '/api/catalogo-produtos', { nome }),
-    excluir:   (id)   => requisitar('DELETE', `/api/catalogo-produtos/${id}`)
+    listar: () => requisitar('GET', '/api/catalogo-produtos'),
+    adicionar: (nome) => requisitar('POST', '/api/catalogo-produtos', { nome }),
+    excluir: (id) => requisitar('DELETE', `/api/catalogo-produtos/${id}`)
   },
 
   checklist: {

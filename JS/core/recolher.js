@@ -2,10 +2,16 @@ const SELETOR_TITULO = '.secao-titulo-card, h5.fw-bold'
 const CHAVE = 'hub-secoes:' + (document.body.dataset.pagina || location.pathname)
 
 let estado = {}
-try { estado = JSON.parse(localStorage.getItem(CHAVE) || '{}') } catch (_) { estado = {} }
+try {
+  estado = JSON.parse(localStorage.getItem(CHAVE) || '{}')
+} catch (_) {
+  estado = {}
+}
 
 function salvarEstado() {
-  try { localStorage.setItem(CHAVE, JSON.stringify(estado)) } catch (_) {}
+  try {
+    localStorage.setItem(CHAVE, JSON.stringify(estado))
+  } catch (_) {}
 }
 
 function ehTitulo(el) {
@@ -26,7 +32,8 @@ function inicioDeSecao(el) {
 function ignorar(titulo) {
   if (titulo.dataset.recolhivel) return true
   if (titulo.tagName === 'SUMMARY') return true
-  if (titulo.closest('.modal, .dropdown-menu, summary, details, .no-recolher, table, .page-header, .toast-pietrobon')) return true
+  if (titulo.closest('.modal, .dropdown-menu, summary, details, .no-recolher, table, .page-header, .toast-pietrobon'))
+    return true
   return false
 }
 
@@ -38,7 +45,9 @@ function contarItens(corpo) {
   const visivel = (el) => el.style.display !== 'none'
   const linhas = [...corpo.querySelectorAll('tbody tr')].filter(visivel).length
   if (linhas) return `${linhas} ${linhas === 1 ? 'linha' : 'linhas'}`
-  const cards = [...corpo.querySelectorAll(':scope > div > .card, :scope > .card, .lista-pi-item, .card-recebimento, .pi-linha')].filter(visivel).length
+  const cards = [
+    ...corpo.querySelectorAll(':scope > div > .card, :scope > .card, .lista-pi-item, .card-recebimento, .pi-linha')
+  ].filter(visivel).length
   if (cards) return `${cards} ${cards === 1 ? 'item' : 'itens'}`
   return ''
 }
@@ -66,8 +75,12 @@ function aplicar(titulo, corpo, aberto) {
 
 function montar(titulo) {
   if (ignorar(titulo)) return
-  const linha = titulo.parentElement && titulo.parentElement.classList.contains('d-flex') &&
-    titulo.parentElement.firstElementChild === titulo ? titulo.parentElement : null
+  const linha =
+    titulo.parentElement &&
+    titulo.parentElement.classList.contains('d-flex') &&
+    titulo.parentElement.firstElementChild === titulo
+      ? titulo.parentElement
+      : null
   const cabeca = linha || titulo
   const conteudo = []
   let irmao = cabeca.nextElementSibling
@@ -109,17 +122,28 @@ function montar(titulo) {
     salvarEstado()
     aplicar(titulo, corpo, novo)
   }
-  titulo.addEventListener('click', (e) => { e.preventDefault(); alternar() })
+  titulo.addEventListener('click', (e) => {
+    e.preventDefault()
+    alternar()
+  })
   titulo.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar() }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      alternar()
+    }
   })
 }
 
 function recolocarSoltos() {
   document.querySelectorAll('.recolher-corpo').forEach((corpo) => {
     let irmao = corpo.nextElementSibling
-    while (irmao && !inicioDeSecao(irmao) && !irmao.classList.contains('recolher-corpo') &&
-           irmao.tagName !== 'SCRIPT' && !irmao.classList.contains('modal')) {
+    while (
+      irmao &&
+      !inicioDeSecao(irmao) &&
+      !irmao.classList.contains('recolher-corpo') &&
+      irmao.tagName !== 'SCRIPT' &&
+      !irmao.classList.contains('modal')
+    ) {
       const proximo = irmao.nextElementSibling
       corpo.appendChild(irmao)
       irmao = proximo

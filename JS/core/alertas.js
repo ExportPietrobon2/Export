@@ -50,7 +50,7 @@ export function produtoPendenteDeclaracao(produto) {
   if (!produto || produto.declarado_em) return false
   if (!produto.criado_em) return false
   if (temEstoqueDeclarado(produto)) return false
-  return (Date.now() - new Date(produto.criado_em).getTime()) >= PRAZO_DECLARACAO_MS
+  return Date.now() - new Date(produto.criado_em).getTime() >= PRAZO_DECLARACAO_MS
 }
 
 export function piNaoDeclarada(pedido) {
@@ -91,10 +91,12 @@ export function resumoDeclaracaoHtml(pedidos) {
   const emAtraso = (pedidos || []).filter(piNaoDeclarada)
   if (!emAtraso.length) return ''
 
-  const chips = emAtraso.map((p) => {
-    const qtd = (p.produtos_pi || []).filter(produtoPendenteDeclaracao).length
-    return `<span class="pi-chip">PI ${p.numero_pi} — ${qtd} produto(s)</span>`
-  }).join('')
+  const chips = emAtraso
+    .map((p) => {
+      const qtd = (p.produtos_pi || []).filter(produtoPendenteDeclaracao).length
+      return `<span class="pi-chip">PI ${p.numero_pi} — ${qtd} produto(s)</span>`
+    })
+    .join('')
 
   return `
     <div class="resumo-alerta-declaracao-topo">
@@ -111,10 +113,12 @@ export function resumoAlertasHtml(pedidos) {
 
   if (!emAlerta.length) return ''
 
-  const chips = emAlerta.map((p) => {
-    const dias = diasParaEmbarque(p.data_embarque)
-    return `<span class="pi-chip">PI ${p.numero_pi} — ${textoPrazoEmbarque(dias)}</span>`
-  }).join('')
+  const chips = emAlerta
+    .map((p) => {
+      const dias = diasParaEmbarque(p.data_embarque)
+      return `<span class="pi-chip">PI ${p.numero_pi} — ${textoPrazoEmbarque(dias)}</span>`
+    })
+    .join('')
 
   return `
     <div class="resumo-alerta-topo">

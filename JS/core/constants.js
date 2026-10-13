@@ -22,7 +22,7 @@ export function calcularStatusProduto(insumos) {
 }
 
 const ROTULOS_STATUS = {
-  'LIBERADO': 'Liberado',
+  LIBERADO: 'Liberado',
   'NÃO PRODUZ': 'Não está pronto',
   'SEM PRODUTOS': 'Sem produtos'
 }

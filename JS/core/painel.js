@@ -21,7 +21,9 @@ function garantir() {
     <div class="painel-rodape"></div>`
   document.body.appendChild(painel)
   instancia = window.bootstrap ? new window.bootstrap.Offcanvas(painel) : null
-  painel.addEventListener('hidden.bs.offcanvas', () => { idAtual = null })
+  painel.addEventListener('hidden.bs.offcanvas', () => {
+    idAtual = null
+  })
   return painel
 }
 

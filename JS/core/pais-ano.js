@@ -14,11 +14,17 @@ export function paisDe(valor) {
 }
 
 function lerEstado(chave) {
-  try { return JSON.parse(localStorage.getItem('hub-filtro:' + chave) || '{}') } catch (_) { return {} }
+  try {
+    return JSON.parse(localStorage.getItem('hub-filtro:' + chave) || '{}')
+  } catch (_) {
+    return {}
+  }
 }
 
 function gravarEstado(chave, estado) {
-  try { localStorage.setItem('hub-filtro:' + chave, JSON.stringify(estado)) } catch (_) {}
+  try {
+    localStorage.setItem('hub-filtro:' + chave, JSON.stringify(estado))
+  } catch (_) {}
 }
 
 function ordenarPaises(a, b) {
@@ -35,21 +41,26 @@ function ordenarAnos(a, b) {
 
 function contar(itens, campo) {
   const mapa = {}
-  itens.forEach((el) => { const v = el.dataset[campo]; mapa[v] = (mapa[v] || 0) + 1 })
+  itens.forEach((el) => {
+    const v = el.dataset[campo]
+    mapa[v] = (mapa[v] || 0) + 1
+  })
   return mapa
 }
 
 const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 function chip(valor, rotulo, qtd, ativo, tipo) {
-  valor = esc(valor); rotulo = esc(rotulo)
+  valor = esc(valor)
+  rotulo = esc(rotulo)
   return `<button type="button" class="filtro-chip${ativo ? ' ativo' : ''}" data-tipo="${tipo}" data-valor="${valor}">
     <span>${rotulo}</span><span class="filtro-chip-qtd">${qtd}</span></button>`
 }
 
 export function filtroPaisAno(lista, { chave, antesDe = lista, comAno = true, aoMudar } = {}) {
   if (!lista) return
-  const anterior = antesDe.parentElement && antesDe.parentElement.querySelector(`:scope > .filtro-pais-ano[data-chave="${chave}"]`)
+  const anterior =
+    antesDe.parentElement && antesDe.parentElement.querySelector(`:scope > .filtro-pais-ano[data-chave="${chave}"]`)
   if (anterior) anterior.remove()
 
   const itens = [...lista.querySelectorAll('[data-pais]')]
@@ -69,13 +80,22 @@ export function filtroPaisAno(lista, { chave, antesDe = lista, comAno = true, ao
     if (estado.ano && !anos[estado.ano]) estado.ano = ''
 
     const linhaPaises = [chip('', 'Todos', itens.length, !estado.pais, 'pais')]
-      .concat(Object.keys(paises).sort(ordenarPaises).map((p) => chip(p, p, paises[p], estado.pais === p, 'pais')))
+      .concat(
+        Object.keys(paises)
+          .sort(ordenarPaises)
+          .map((p) => chip(p, p, paises[p], estado.pais === p, 'pais'))
+      )
       .join('')
-    const linhaAnos = comAno && Object.keys(anos).length > 0
-      ? [chip('', 'Todos os anos', doPais.length, !estado.ano, 'ano')]
-          .concat(Object.keys(anos).sort(ordenarAnos).map((a) => chip(a, a, anos[a], estado.ano === a, 'ano')))
-          .join('')
-      : ''
+    const linhaAnos =
+      comAno && Object.keys(anos).length > 0
+        ? [chip('', 'Todos os anos', doPais.length, !estado.ano, 'ano')]
+            .concat(
+              Object.keys(anos)
+                .sort(ordenarAnos)
+                .map((a) => chip(a, a, anos[a], estado.ano === a, 'ano'))
+            )
+            .join('')
+        : ''
 
     barra.innerHTML = `
       <div class="filtro-linha"><span class="filtro-rotulo">País</span><div class="filtro-chips">${linhaPaises}</div></div>
@@ -94,7 +114,10 @@ export function filtroPaisAno(lista, { chave, antesDe = lista, comAno = true, ao
   barra.addEventListener('click', (e) => {
     const b = e.target.closest('.filtro-chip')
     if (!b) return
-    if (b.dataset.tipo === 'pais') { estado.pais = b.dataset.valor; estado.ano = '' } else estado.ano = b.dataset.valor
+    if (b.dataset.tipo === 'pais') {
+      estado.pais = b.dataset.valor
+      estado.ano = ''
+    } else estado.ano = b.dataset.valor
     gravarEstado(chave, estado)
     desenhar()
   })

@@ -13,14 +13,15 @@ app.use(express.urlencoded({ limit: '20mb', extended: true }))
 app.use(express.static(path.join(__dirname, '.')))
 
 cloudinary.config({
- cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
- api_key: process.env.CLOUDINARY_API_KEY,
- api_secret: process.env.CLOUDINARY_API_SECRET
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
 })
 
 const upload = multer({ storage: multer.memoryStorage() })
 
-const VAPID_PUBLIC  = process.env.VAPID_PUBLIC  || 'BBKXW9q8UQm07c-duKRqEFyyXEbDwQz4AeXipuuTOsPpcKB9nn7wJmXgTHE68GhjxUZej0YsGln4Cafu61_0slE'
+const VAPID_PUBLIC =
+  process.env.VAPID_PUBLIC || 'BBKXW9q8UQm07c-duKRqEFyyXEbDwQz4AeXipuuTOsPpcKB9nn7wJmXgTHE68GhjxUZej0YsGln4Cafu61_0slE'
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE || 'APBGcOONkbNs6Bf0KNqNj-T9hJMsdVdUpxXKWg4JgF0'
 webpush.setVapidDetails('mailto:export2@pietrobon.com.br', VAPID_PUBLIC, VAPID_PRIVATE)
 
@@ -42,10 +43,15 @@ async function podeEnviarPush(chave) {
       if (r.contador >= 3) return false
       await pool.query('UPDATE push_log SET contador = contador + 1 WHERE chave = ?', [chave])
     } else {
-      await pool.query('INSERT INTO push_log (chave, data_ref, contador) VALUES (?, CURDATE(), 1) ON DUPLICATE KEY UPDATE data_ref = CURDATE(), contador = 1', [chave])
+      await pool.query(
+        'INSERT INTO push_log (chave, data_ref, contador) VALUES (?, CURDATE(), 1) ON DUPLICATE KEY UPDATE data_ref = CURDATE(), contador = 1',
+        [chave]
+      )
     }
     return true
-  } catch (e) { return true }
+  } catch (e) {
+    return true
+  }
 }
 
 async function enviarPush(titulo, corpo, url, chave) {
@@ -54,16 +60,20 @@ async function enviarPush(titulo, corpo, url, chave) {
     await garantirTabelaPush()
     const [subs] = await pool.query('SELECT endpoint, p256dh, auth FROM push_subscriptions')
     const payload = JSON.stringify({ titulo, corpo, url: url || '/' })
-    await Promise.allSettled(subs.map(async (s) => {
-      try {
-        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload)
-      } catch (e) {
-        if (e.statusCode === 410 || e.statusCode === 404) {
-          await pool.query('DELETE FROM push_subscriptions WHERE endpoint = ?', [s.endpoint])
+    await Promise.allSettled(
+      subs.map(async (s) => {
+        try {
+          await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload)
+        } catch (e) {
+          if (e.statusCode === 410 || e.statusCode === 404) {
+            await pool.query('DELETE FROM push_subscriptions WHERE endpoint = ?', [s.endpoint])
+          }
         }
-      }
-    }))
-  } catch (e) { console.error('Erro enviarPush:', e.message) }
+      })
+    )
+  } catch (e) {
+    console.error('Erro enviarPush:', e.message)
+  }
 }
 
 const EMAIL_TESTE = process.env.EMAIL_TESTE || 'pietrobonexport2@gmail.com'
@@ -75,115 +85,136 @@ const EMAIL_REMETENTE = process.env.EMAIL_REMETENTE || 'export2@pietrobon.com.br
 if (!BREVO_API_KEY) console.warn('BREVO_API_KEY não configurada — e-mails não serão enviados.')
 
 async function getDestinatarios(papeis) {
- if (MODO_TESTE) return [EMAIL_TESTE]
- if (papeis && papeis.length) {
- const [rows] = await pool.query('SELECT email FROM usuarios WHERE papel IN (?) AND recebe_email = 1', [papeis])
- return rows.map((r) => r.email)
- }
- const [rows] = await pool.query('SELECT email FROM usuarios WHERE recebe_email = 1')
- return rows.map((r) => r.email)
+  if (MODO_TESTE) return [EMAIL_TESTE]
+  if (papeis && papeis.length) {
+    const [rows] = await pool.query('SELECT email FROM usuarios WHERE papel IN (?) AND recebe_email = 1', [papeis])
+    return rows.map((r) => r.email)
+  }
+  const [rows] = await pool.query('SELECT email FROM usuarios WHERE recebe_email = 1')
+  return rows.map((r) => r.email)
 }
 
 async function podeEnviarHoje(chave) {
- try {
- await pool.query('CREATE TABLE IF NOT EXISTS notif_log (chave VARCHAR(60) PRIMARY KEY, ultima_data DATE)')
- const [[r]] = await pool.query('SELECT ultima_data FROM notif_log WHERE chave = ?', [chave])
- const hoje = new Date().toISOString().slice(0, 10)
- if (r && r.ultima_data && new Date(r.ultima_data).toISOString().slice(0, 10) === hoje) return false
- await pool.query('INSERT INTO notif_log (chave, ultima_data) VALUES (?, CURDATE()) ON DUPLICATE KEY UPDATE ultima_data = CURDATE()', [chave])
- return true
- } catch (e) { return true }
+  try {
+    await pool.query('CREATE TABLE IF NOT EXISTS notif_log (chave VARCHAR(60) PRIMARY KEY, ultima_data DATE)')
+    const [[r]] = await pool.query('SELECT ultima_data FROM notif_log WHERE chave = ?', [chave])
+    const hoje = new Date().toISOString().slice(0, 10)
+    if (r && r.ultima_data && new Date(r.ultima_data).toISOString().slice(0, 10) === hoje) return false
+    await pool.query(
+      'INSERT INTO notif_log (chave, ultima_data) VALUES (?, CURDATE()) ON DUPLICATE KEY UPDATE ultima_data = CURDATE()',
+      [chave]
+    )
+    return true
+  } catch (e) {
+    return true
+  }
 }
 
 async function enviarEmail(assunto, corpo, papeis) {
- try {
- if (!BREVO_API_KEY) return
- const destinatarios = await getDestinatarios(papeis)
- if (!destinatarios.length) return
+  try {
+    if (!BREVO_API_KEY) return
+    const destinatarios = await getDestinatarios(papeis)
+    if (!destinatarios.length) return
 
- const html = `
+    const html = `
  <div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;"><div style="background:linear-gradient(120deg,#ED3237,#C6242A);padding:24px 28px;border-radius:12px 12px 0 0;"><p style="color:#fff;font-size:1.2rem;font-weight:800;margin:0;">Hub de Exportações Pietrobon</p></div><div style="background:#fff;padding:28px;border:1px solid #f0d0d0;border-top:none;border-radius:0 0 12px 12px;">
  ${corpo}
  <hr style="border:none;border-top:1px solid #f0d0d0;margin:24px 0;"><p style="font-size:0.78rem;color:#8a6a6a;margin:0;">Pietrobon & Cia Ltda · Hub de Exportações Pietrobon<br>
  ${MODO_TESTE ? '<strong style="color:#ED3237">Modo teste — notificação enviada apenas para ' + EMAIL_TESTE + '</strong>' : ''}</p></div></div>`
 
- const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
- method: 'POST',
- headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', 'accept': 'application/json' },
- body: JSON.stringify({
- sender: { email: EMAIL_REMETENTE, name: 'Hub de Exportações Pietrobon' },
- to: destinatarios.map((email) => ({ email })),
- subject: assunto,
- htmlContent: html
- })
- })
+    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({
+        sender: { email: EMAIL_REMETENTE, name: 'Hub de Exportações Pietrobon' },
+        to: destinatarios.map((email) => ({ email })),
+        subject: assunto,
+        htmlContent: html
+      })
+    })
 
- if (!resp.ok) {
- const txt = await resp.text()
- console.error('Erro Brevo:', resp.status, txt)
- } else {
- console.log('Email enviado:', assunto)
- }
- } catch (e) {
- console.error('Erro ao enviar email:', e.message)
- }
+    if (!resp.ok) {
+      const txt = await resp.text()
+      console.error('Erro Brevo:', resp.status, txt)
+    } else {
+      console.log('Email enviado:', assunto)
+    }
+  } catch (e) {
+    console.error('Erro ao enviar email:', e.message)
+  }
 }
 
 async function enviarEmailPara(assunto, corpo, emails) {
- try {
- if (!BREVO_API_KEY) return
- const destinatarios = MODO_TESTE ? [EMAIL_TESTE] : (emails || []).filter(Boolean)
- if (!destinatarios.length) return
- const html = `
+  try {
+    if (!BREVO_API_KEY) return
+    const destinatarios = MODO_TESTE ? [EMAIL_TESTE] : (emails || []).filter(Boolean)
+    if (!destinatarios.length) return
+    const html = `
  <div style="font-family:'Segoe UI',sans-serif;max-width:640px;margin:0 auto;"><div style="background:linear-gradient(120deg,#ED3237,#C6242A);padding:24px 28px;border-radius:12px 12px 0 0;"><p style="color:#fff;font-size:1.2rem;font-weight:800;margin:0;">Hub de Exportações Pietrobon</p></div><div style="background:#fff;padding:28px;border:1px solid #f0d0d0;border-top:none;border-radius:0 0 12px 12px;">
  ${corpo}
  <hr style="border:none;border-top:1px solid #f0d0d0;margin:24px 0;"><p style="font-size:0.78rem;color:#8a6a6a;margin:0;">Pietrobon & Cia Ltda · Hub de Exportações Pietrobon<br>
  ${MODO_TESTE ? '<strong style="color:#ED3237">Modo teste — enviado apenas para ' + EMAIL_TESTE + '</strong>' : ''}</p></div></div>`
- const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
- method: 'POST',
- headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', 'accept': 'application/json' },
- body: JSON.stringify({
- sender: { email: EMAIL_REMETENTE, name: 'Hub de Exportações Pietrobon' },
- to: destinatarios.map((email) => ({ email })),
- subject: assunto,
- htmlContent: html
- })
- })
- if (!resp.ok) { const txt = await resp.text(); console.error('Erro Brevo:', resp.status, txt) } else { console.log('Email enviado:', assunto) }
- } catch (e) { console.error('Erro ao enviar email:', e.message) }
+    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({
+        sender: { email: EMAIL_REMETENTE, name: 'Hub de Exportações Pietrobon' },
+        to: destinatarios.map((email) => ({ email })),
+        subject: assunto,
+        htmlContent: html
+      })
+    })
+    if (!resp.ok) {
+      const txt = await resp.text()
+      console.error('Erro Brevo:', resp.status, txt)
+    } else {
+      console.log('Email enviado:', assunto)
+    }
+  } catch (e) {
+    console.error('Erro ao enviar email:', e.message)
+  }
 }
 
 const pool = mysql.createPool({
- host: process.env.MYSQLHOST,
- port: process.env.MYSQLPORT,
- database: process.env.MYSQLDATABASE,
- user: process.env.MYSQLUSER,
- password: process.env.MYSQLPASSWORD,
- waitForConnections: true,
- connectionLimit: 10
+  host: process.env.MYSQLHOST,
+  port: process.env.MYSQLPORT,
+  database: process.env.MYSQLDATABASE,
+  user: process.env.MYSQLUSER,
+  password: process.env.MYSQLPASSWORD,
+  waitForConnections: true,
+  connectionLimit: 10
 })
 
 const JWT_SECRET = process.env.JWT_SECRET || 'segredo-trocar-em-producao'
 
 function autenticar(papeis) {
- return (req, res, next) => {
- const cabecalho = req.headers.authorization
- if (!cabecalho) return res.status(401).json({ erro: 'Não autenticado' })
- const token = cabecalho.replace('Bearer ', '')
- try {
- const payload = jwt.verify(token, JWT_SECRET)
- if (papeis && !papeis.includes(payload.papel)) {
- return res.status(403).json({ erro: 'Sem permissão' })
- }
- req.usuario = payload
- next()
- } catch {
- return res.status(401).json({ erro: 'Token inválido' })
- }
- }
+  return (req, res, next) => {
+    const cabecalho = req.headers.authorization
+    if (!cabecalho) return res.status(401).json({ erro: 'Não autenticado' })
+    const token = cabecalho.replace('Bearer ', '')
+    try {
+      const payload = jwt.verify(token, JWT_SECRET)
+      if (papeis && !papeis.includes(payload.papel)) {
+        return res.status(403).json({ erro: 'Sem permissão' })
+      }
+      req.usuario = payload
+      next()
+    } catch {
+      return res.status(401).json({ erro: 'Token inválido' })
+    }
+  }
 }
 
-const TODOS = ['admin', 'almoxarifado', 'deposito', 'convidado', 'gerente_producao', 'compras', 'compras_aromas', 'auxiliar']
+const TODOS = [
+  'admin',
+  'almoxarifado',
+  'deposito',
+  'convidado',
+  'gerente_producao',
+  'compras',
+  'compras_aromas',
+  'auxiliar'
+]
 
 app.get('/api/push/vapid-public', (req, res) => res.json({ key: VAPID_PUBLIC }))
 
@@ -197,60 +228,58 @@ app.post('/api/push/subscribe', autenticar(TODOS), async (req, res) => {
       [req.usuario?.id || null, endpoint, keys.p256dh, keys.auth]
     )
     res.json({ ok: true })
-  } catch (e) { res.status(500).json({ erro: e.message }) }
+  } catch (e) {
+    res.status(500).json({ erro: e.message })
+  }
 })
 
 app.post('/api/login', async (req, res) => {
- const { email, senha } = req.body
- const [rows] = await pool.query('SELECT * FROM usuarios WHERE email = ?', [email])
- if (rows.length === 0) return res.status(401).json({ erro: 'E-mail ou senha incorretos.' })
- const usuario = rows[0]
- const senhaCorreta = await bcrypt.compare(senha, usuario.senha)
- if (!senhaCorreta) return res.status(401).json({ erro: 'E-mail ou senha incorretos.' })
- const expiracao = '30d'
- const token = jwt.sign(
- { id: usuario.id, nome: usuario.nome, papel: usuario.papel, email: usuario.email },
- JWT_SECRET,
- { expiresIn: expiracao }
- )
- res.json({ token, papel: usuario.papel, nome: usuario.nome })
+  const { email, senha } = req.body
+  const [rows] = await pool.query('SELECT * FROM usuarios WHERE email = ?', [email])
+  if (rows.length === 0) return res.status(401).json({ erro: 'E-mail ou senha incorretos.' })
+  const usuario = rows[0]
+  const senhaCorreta = await bcrypt.compare(senha, usuario.senha)
+  if (!senhaCorreta) return res.status(401).json({ erro: 'E-mail ou senha incorretos.' })
+  const expiracao = '30d'
+  const token = jwt.sign(
+    { id: usuario.id, nome: usuario.nome, papel: usuario.papel, email: usuario.email },
+    JWT_SECRET,
+    { expiresIn: expiracao }
+  )
+  res.json({ token, papel: usuario.papel, nome: usuario.nome })
 })
 
 app.get('/api/pedidos', autenticar(TODOS), async (req, res) => {
- const incluirConcluidas = req.query.incluirConcluidas === 'true'
- const condicao = incluirConcluidas ? '' : 'WHERE concluida = 0'
- const [pedidos] = await pool.query(`SELECT * FROM pedidos ${condicao} ORDER BY numero_pi DESC`)
- res.json(pedidos)
+  const incluirConcluidas = req.query.incluirConcluidas === 'true'
+  const condicao = incluirConcluidas ? '' : 'WHERE concluida = 0'
+  const [pedidos] = await pool.query(`SELECT * FROM pedidos ${condicao} ORDER BY numero_pi DESC`)
+  res.json(pedidos)
 })
 
 app.get('/api/pedidos/completo', autenticar(TODOS), async (req, res) => {
- const incluirConcluidas = req.query.incluirConcluidas === 'true'
- const condicao = incluirConcluidas ? '' : 'WHERE p.concluida = 0'
- const [pedidos] = await pool.query(`SELECT * FROM pedidos p ${condicao} ORDER BY p.numero_pi DESC`)
+  const incluirConcluidas = req.query.incluirConcluidas === 'true'
+  const condicao = incluirConcluidas ? '' : 'WHERE p.concluida = 0'
+  const [pedidos] = await pool.query(`SELECT * FROM pedidos p ${condicao} ORDER BY p.numero_pi DESC`)
 
- for (const pedido of pedidos) {
- const [produtos] = await pool.query(
- 'SELECT * FROM produtos_pi WHERE pi_id = ?', [pedido.id]
- )
- for (const produto of produtos) {
- const [insumos] = await pool.query(
- 'SELECT * FROM insumos_produto WHERE produto_id = ?', [produto.id]
- )
- produto.insumos_produto = insumos
- }
- pedido.produtos_pi = produtos
- const [recebimentos] = await pool.query(
- `SELECT r.tipo, r.status_recebimento, r.foto_url, r.foto_nota_url, r.quantidade_recebida,
+  for (const pedido of pedidos) {
+    const [produtos] = await pool.query('SELECT * FROM produtos_pi WHERE pi_id = ?', [pedido.id])
+    for (const produto of produtos) {
+      const [insumos] = await pool.query('SELECT * FROM insumos_produto WHERE produto_id = ?', [produto.id])
+      produto.insumos_produto = insumos
+    }
+    pedido.produtos_pi = produtos
+    const [recebimentos] = await pool.query(
+      `SELECT r.tipo, r.status_recebimento, r.foto_url, r.foto_nota_url, r.quantidade_recebida,
  r.produto_id, pr.produto as nome_produto
  FROM recebimentos_b2 r
  LEFT JOIN produtos_pi pr ON pr.id = r.produto_id
  WHERE r.pi_id = ?`,
- [pedido.id]
- )
- pedido.recebimentos_b2 = recebimentos
+      [pedido.id]
+    )
+    pedido.recebimentos_b2 = recebimentos
 
- const [vinculosEstoque] = await pool.query(
- `SELECT v.*, e.produto as produto_entrada, e.embalagem_kg as entrada_emb,
+    const [vinculosEstoque] = await pool.query(
+      `SELECT v.*, e.produto as produto_entrada, e.embalagem_kg as entrada_emb,
  e.rotulo_kg as entrada_rot, e.pallet_caixas as entrada_pal,
  e.foto_url as entrada_foto, e.foto_nota_url as entrada_foto_nota,
  e.localizacao as entrada_localizacao,
@@ -259,212 +288,246 @@ app.get('/api/pedidos/completo', autenticar(TODOS), async (req, res) => {
  JOIN estoque_insumos e ON e.id = v.entrada_id
  WHERE v.pi_id = ?
  ORDER BY v.criado_em DESC`,
- [pedido.id]
- )
- pedido.vinculos_estoque = vinculosEstoque
- }
- res.json(pedidos)
+      [pedido.id]
+    )
+    pedido.vinculos_estoque = vinculosEstoque
+  }
+  res.json(pedidos)
 })
 
 app.post('/api/pedidos', autenticar(['admin']), async (req, res) => {
- const { numero_pi, data_cadastro, cliente, destino } = req.body
- const [resultado] = await pool.query(
- 'INSERT INTO pedidos (numero_pi, data_cadastro, cliente, destino) VALUES (?, ?, ?, ?)',
- [numero_pi, data_cadastro || null, cliente || null, destino || null]
- )
- const piId = resultado.insertId
- const tiposRecebimento = ['embalagem', 'rotulo', 'caixa']
- res.json({ id: piId })
- const chaveNovaPi = `nova_pi_${new Date().toISOString().slice(0, 10)}`
- const tituloNovaPi = `Nova PI cadastrada — ${numero_pi}`
- const detalheNovaPi = [cliente && `Cliente: ${cliente}`, destino && `Destino: ${destino}`].filter(Boolean).join(' · ')
- enviarPush(tituloNovaPi, detalheNovaPi || 'Acesse o sistema para ver os detalhes.', '/HTML/producao/admin.html', chaveNovaPi).catch(() => {})
- enviarEmail(
-   tituloNovaPi,
-   `<h2 style="color:#ED3237;margin:0 0 16px">Nova PI Cadastrada</h2>
+  const { numero_pi, data_cadastro, cliente, destino } = req.body
+  const [resultado] = await pool.query(
+    'INSERT INTO pedidos (numero_pi, data_cadastro, cliente, destino) VALUES (?, ?, ?, ?)',
+    [numero_pi, data_cadastro || null, cliente || null, destino || null]
+  )
+  const piId = resultado.insertId
+  const tiposRecebimento = ['embalagem', 'rotulo', 'caixa']
+  res.json({ id: piId })
+  const chaveNovaPi = `nova_pi_${new Date().toISOString().slice(0, 10)}`
+  const tituloNovaPi = `Nova PI cadastrada — ${numero_pi}`
+  const detalheNovaPi = [cliente && `Cliente: ${cliente}`, destino && `Destino: ${destino}`].filter(Boolean).join(' · ')
+  enviarPush(
+    tituloNovaPi,
+    detalheNovaPi || 'Acesse o sistema para ver os detalhes.',
+    '/HTML/producao/admin.html',
+    chaveNovaPi
+  ).catch(() => {})
+  enviarEmail(
+    tituloNovaPi,
+    `<h2 style="color:#ED3237;margin:0 0 16px">Nova PI Cadastrada</h2>
    <table style="width:100%;border-collapse:collapse;">
      <tr><td style="padding:8px 0;color:#8a6a6a;width:140px">Número</td><td style="padding:8px 0;font-weight:700">${numero_pi}</td></tr>
      ${cliente ? `<tr><td style="padding:8px 0;color:#8a6a6a">Cliente</td><td style="padding:8px 0;font-weight:600">${cliente}</td></tr>` : ''}
      ${destino ? `<tr><td style="padding:8px 0;color:#8a6a6a">Destino</td><td style="padding:8px 0;font-weight:600">${destino}</td></tr>` : ''}
    </table>`,
-   ['admin', 'almoxarifado']
- ).catch(() => {})
+    ['admin', 'almoxarifado']
+  ).catch(() => {})
 })
 
 app.patch('/api/pedidos/:id/embarque', autenticar(['admin', 'gerente_producao']), async (req, res) => {
- const { data_embarque } = req.body
- await pool.query('UPDATE pedidos SET data_embarque = ? WHERE id = ?', [data_embarque || null, req.params.id])
+  const { data_embarque } = req.body
+  await pool.query('UPDATE pedidos SET data_embarque = ? WHERE id = ?', [data_embarque || null, req.params.id])
 
- const [[pi]] = await pool.query('SELECT numero_pi, cliente, destino FROM pedidos WHERE id = ?', [req.params.id])
- if (pi) {
- const dataFmt = data_embarque ? new Date(data_embarque + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
- enviarPush(`Data de embarque — PI ${pi.numero_pi}`, `${pi.cliente || ''} · ${dataFmt}`, '/HTML/estoque/embarques.html', `embarque_def_${pi.numero_pi}`).catch(() => {})
- enviarEmail(
- `Data de embarque definida — PI ${pi.numero_pi}`,
- `<h2 style="color:#1565C0;margin:0 0 16px">Data de Embarque Definida</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:160px">PI</td><td style="padding:8px 0;font-weight:600">${pi.numero_pi}</td></tr>
+  const [[pi]] = await pool.query('SELECT numero_pi, cliente, destino FROM pedidos WHERE id = ?', [req.params.id])
+  if (pi) {
+    const dataFmt = data_embarque ? new Date(data_embarque + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
+    enviarPush(
+      `Data de embarque — PI ${pi.numero_pi}`,
+      `${pi.cliente || ''} · ${dataFmt}`,
+      '/HTML/estoque/embarques.html',
+      `embarque_def_${pi.numero_pi}`
+    ).catch(() => {})
+    enviarEmail(
+      `Data de embarque definida — PI ${pi.numero_pi}`,
+      `<h2 style="color:#1565C0;margin:0 0 16px">Data de Embarque Definida</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:160px">PI</td><td style="padding:8px 0;font-weight:600">${pi.numero_pi}</td></tr>
  ${pi.cliente ? `<tr><td style="padding:8px 0;color:#8a6a6a">Cliente</td><td style="padding:8px 0;font-weight:600">${pi.cliente}</td></tr>` : ''}
  ${pi.destino ? `<tr><td style="padding:8px 0;color:#8a6a6a">Destino</td><td style="padding:8px 0;font-weight:600">${pi.destino}</td></tr>` : ''}
  <tr><td style="padding:8px 0;color:#8a6a6a">Data de embarque</td><td style="padding:8px 0;font-weight:600;color:#1565C0">${dataFmt}</td></tr></table>`,
- ['admin', 'gerente_producao', 'almoxarifado']
- )
- }
- res.json({ ok: true })
+      ['admin', 'gerente_producao', 'almoxarifado']
+    )
+  }
+  res.json({ ok: true })
 })
 
 app.patch('/api/pedidos/:id/comentario-embarque', autenticar(['admin']), async (req, res) => {
- const { comentario } = req.body
- const nomeUsuario = req.usuario?.nome || req.usuario?.email || 'Admin'
- await pool.query(
-   'UPDATE pedidos SET comentario_embarque = ?, comentario_usuario = ? WHERE id = ?',
-   [comentario || null, comentario ? nomeUsuario : null, req.params.id]
- )
- const [[pi]] = await pool.query('SELECT numero_pi, cliente FROM pedidos WHERE id = ?', [req.params.id])
- if (pi && comentario && comentario.trim()) {
- enviarPush(`Comentário na PI ${pi.numero_pi}`, `${nomeUsuario}: ${comentario.slice(0, 80)}`, '/HTML/estoque/embarques.html', `comentario_emb_${pi.numero_pi}`).catch(() => {})
- enviarEmail(
- `Cobrança de embarque — PI ${pi.numero_pi}`,
- `<h2 style="color:#1565C0;margin:0 0 16px">Comentário do Admin — Data de Embarque</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:140px">PI</td><td style="padding:8px 0;font-weight:600">${pi.numero_pi}</td></tr>
+  const { comentario } = req.body
+  const nomeUsuario = req.usuario?.nome || req.usuario?.email || 'Admin'
+  await pool.query('UPDATE pedidos SET comentario_embarque = ?, comentario_usuario = ? WHERE id = ?', [
+    comentario || null,
+    comentario ? nomeUsuario : null,
+    req.params.id
+  ])
+  const [[pi]] = await pool.query('SELECT numero_pi, cliente FROM pedidos WHERE id = ?', [req.params.id])
+  if (pi && comentario && comentario.trim()) {
+    enviarPush(
+      `Comentário na PI ${pi.numero_pi}`,
+      `${nomeUsuario}: ${comentario.slice(0, 80)}`,
+      '/HTML/estoque/embarques.html',
+      `comentario_emb_${pi.numero_pi}`
+    ).catch(() => {})
+    enviarEmail(
+      `Cobrança de embarque — PI ${pi.numero_pi}`,
+      `<h2 style="color:#1565C0;margin:0 0 16px">Comentário do Admin — Data de Embarque</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:140px">PI</td><td style="padding:8px 0;font-weight:600">${pi.numero_pi}</td></tr>
  ${pi.cliente ? `<tr><td style="padding:8px 0;color:#8a6a6a">Cliente</td><td style="padding:8px 0;font-weight:600">${pi.cliente}</td></tr>` : ''}
  <tr><td style="padding:8px 0;color:#8a6a6a">Comentário</td><td style="padding:8px 0;font-weight:600">${comentario}</td></tr></table><p style="margin:16px 0 0;color:#1565C0;font-weight:600">Gerente: por favor, defina a data de embarque desta PI.</p>`,
- ['admin', 'gerente_producao']
- )
- }
- res.json({ ok: true })
+      ['admin', 'gerente_producao']
+    )
+  }
+  res.json({ ok: true })
 })
 
 app.patch('/api/pedidos/:id/concluir', autenticar(['admin']), async (req, res) => {
- const { concluida } = req.body
- await pool.query('UPDATE pedidos SET concluida = ? WHERE id = ?', [concluida ? 1 : 0, req.params.id])
- res.json({ ok: true })
+  const { concluida } = req.body
+  await pool.query('UPDATE pedidos SET concluida = ? WHERE id = ?', [concluida ? 1 : 0, req.params.id])
+  res.json({ ok: true })
 })
 
 app.delete('/api/pedidos/:id', autenticar(['admin']), async (req, res) => {
- await pool.query('DELETE FROM pedidos WHERE id = ?', [req.params.id])
- res.json({ ok: true })
+  await pool.query('DELETE FROM pedidos WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
 })
 
 app.patch('/api/produtos/:id/quantidade', autenticar(['admin']), async (req, res) => {
- const { quantidade } = req.body
- await pool.query('UPDATE produtos_pi SET quantidade = ? WHERE id = ?', [quantidade, req.params.id])
- res.json({ ok: true })
+  const { quantidade } = req.body
+  await pool.query('UPDATE produtos_pi SET quantidade = ? WHERE id = ?', [quantidade, req.params.id])
+  res.json({ ok: true })
 })
 
 app.get('/api/pedidos/:piId/produtos', autenticar(TODOS), async (req, res) => {
- const [produtos] = await pool.query(
- 'SELECT * FROM produtos_pi WHERE pi_id = ?', [req.params.piId]
- )
- res.json(produtos)
+  const [produtos] = await pool.query('SELECT * FROM produtos_pi WHERE pi_id = ?', [req.params.piId])
+  res.json(produtos)
 })
 
 app.post('/api/produtos', autenticar(['admin']), async (req, res) => {
- const { pi_id, produto, quantidade, observacoes } = req.body
- const [resultado] = await pool.query(
- 'INSERT INTO produtos_pi (pi_id, produto, quantidade, observacoes) VALUES (?, ?, ?, ?)',
- [pi_id, produto, quantidade, observacoes || null]
- )
- const produtoId = resultado.insertId
- const tiposInsumo = ['embalagem', 'rotulo', 'caixa', 'etiqueta']
- for (const tipo of tiposInsumo) {
- await pool.query(
- 'INSERT INTO insumos_produto (produto_id, tipo, confirmado, sobra, quantidade_por_pacote) VALUES (?, ?, 0, 0, 0)',
- [produtoId, tipo]
- )
- }
- const tiposRecebimento = ['embalagem', 'rotulo', 'caixa']
- const piId = req.body.pi_id
- for (const tipo of tiposRecebimento) {
- await pool.query(
- 'INSERT INTO recebimentos_b2 (pi_id, produto_id, tipo, status_recebimento) VALUES (?, ?, ?, ?)',
- [piId, produtoId, tipo, 'pendente']
- )
- }
- res.json({ id: produtoId })
+  const { pi_id, produto, quantidade, observacoes } = req.body
+  const [resultado] = await pool.query(
+    'INSERT INTO produtos_pi (pi_id, produto, quantidade, observacoes) VALUES (?, ?, ?, ?)',
+    [pi_id, produto, quantidade, observacoes || null]
+  )
+  const produtoId = resultado.insertId
+  const tiposInsumo = ['embalagem', 'rotulo', 'caixa', 'etiqueta']
+  for (const tipo of tiposInsumo) {
+    await pool.query(
+      'INSERT INTO insumos_produto (produto_id, tipo, confirmado, sobra, quantidade_por_pacote) VALUES (?, ?, 0, 0, 0)',
+      [produtoId, tipo]
+    )
+  }
+  const tiposRecebimento = ['embalagem', 'rotulo', 'caixa']
+  const piId = req.body.pi_id
+  for (const tipo of tiposRecebimento) {
+    await pool.query('INSERT INTO recebimentos_b2 (pi_id, produto_id, tipo, status_recebimento) VALUES (?, ?, ?, ?)', [
+      piId,
+      produtoId,
+      tipo,
+      'pendente'
+    ])
+  }
+  res.json({ id: produtoId })
 })
 
 app.get('/api/produtos/:produtoId/insumos', autenticar(TODOS), async (req, res) => {
- const [produto] = await pool.query('SELECT * FROM produtos_pi WHERE id = ?', [req.params.produtoId])
- const [insumos] = await pool.query('SELECT * FROM insumos_produto WHERE produto_id = ?', [req.params.produtoId])
- res.json({ produto: produto[0], insumos })
+  const [produto] = await pool.query('SELECT * FROM produtos_pi WHERE id = ?', [req.params.produtoId])
+  const [insumos] = await pool.query('SELECT * FROM insumos_produto WHERE produto_id = ?', [req.params.produtoId])
+  res.json({ produto: produto[0], insumos })
 })
 
 app.patch('/api/produtos/:produtoId/insumos', autenticar(['admin', 'almoxarifado']), async (req, res) => {
   try {
- const { insumos, rotulos, observacoes, quantidade } = req.body
+    const { insumos, rotulos, observacoes, quantidade } = req.body
 
- const [antesInsumos] = await pool.query('SELECT tipo, confirmado FROM insumos_produto WHERE produto_id = ?', [req.params.produtoId])
- const antesSemEtiqueta = antesInsumos.filter((i) => i.tipo !== 'etiqueta')
- const eraLiberado = antesSemEtiqueta.length > 0 && antesSemEtiqueta.every((i) => i.confirmado)
+    const [antesInsumos] = await pool.query('SELECT tipo, confirmado FROM insumos_produto WHERE produto_id = ?', [
+      req.params.produtoId
+    ])
+    const antesSemEtiqueta = antesInsumos.filter((i) => i.tipo !== 'etiqueta')
+    const eraLiberado = antesSemEtiqueta.length > 0 && antesSemEtiqueta.every((i) => i.confirmado)
 
- for (const insumo of (insumos || [])) {
- if (insumo.tipo === 'rotulo') continue
- let confirmado = 0
- if (insumo.tipo === 'etiqueta') {
- confirmado = 1
- } else if (insumo.tipo === 'caixa') {
- confirmado = Number(insumo.sobra) >= Number(quantidade) ? 1 : 0
- } else {
- confirmado = Number(insumo.sobra) > 0 ? 1 : 0
- }
- await pool.query(
- 'UPDATE insumos_produto SET sobra = ?, quantidade_por_pacote = ?, confirmado = ? WHERE produto_id = ? AND tipo = ?',
-        [parseFloat(insumo.sobra) || 0, parseFloat(insumo.quantidade_por_pacote) || 0, confirmado, req.params.produtoId, insumo.tipo]
- )
- }
+    for (const insumo of insumos || []) {
+      if (insumo.tipo === 'rotulo') continue
+      let confirmado = 0
+      if (insumo.tipo === 'etiqueta') {
+        confirmado = 1
+      } else if (insumo.tipo === 'caixa') {
+        confirmado = Number(insumo.sobra) >= Number(quantidade) ? 1 : 0
+      } else {
+        confirmado = Number(insumo.sobra) > 0 ? 1 : 0
+      }
+      await pool.query(
+        'UPDATE insumos_produto SET sobra = ?, quantidade_por_pacote = ?, confirmado = ? WHERE produto_id = ? AND tipo = ?',
+        [
+          parseFloat(insumo.sobra) || 0,
+          parseFloat(insumo.quantidade_por_pacote) || 0,
+          confirmado,
+          req.params.produtoId,
+          insumo.tipo
+        ]
+      )
+    }
 
- if (Array.isArray(rotulos)) {
- await pool.query('DELETE FROM insumos_produto WHERE produto_id = ? AND tipo = ?', [req.params.produtoId, 'rotulo'])
- for (const r of rotulos) {
- const confirmado = Number(r.sobra) > 0 ? 1 : 0
- await pool.query(
- 'INSERT INTO insumos_produto (produto_id, tipo, nome, confirmado, sobra, quantidade_por_pacote) VALUES (?, ?, ?, ?, ?, ?)',
- [req.params.produtoId, 'rotulo', r.nome || null, confirmado, r.sobra || 0, r.quantidade_por_pacote || 0]
- )
- }
- }
+    if (Array.isArray(rotulos)) {
+      await pool.query('DELETE FROM insumos_produto WHERE produto_id = ? AND tipo = ?', [
+        req.params.produtoId,
+        'rotulo'
+      ])
+      for (const r of rotulos) {
+        const confirmado = Number(r.sobra) > 0 ? 1 : 0
+        await pool.query(
+          'INSERT INTO insumos_produto (produto_id, tipo, nome, confirmado, sobra, quantidade_por_pacote) VALUES (?, ?, ?, ?, ?, ?)',
+          [req.params.produtoId, 'rotulo', r.nome || null, confirmado, r.sobra || 0, r.quantidade_por_pacote || 0]
+        )
+      }
+    }
 
- if (observacoes !== undefined) {
- await pool.query('UPDATE produtos_pi SET observacoes = ? WHERE id = ?', [observacoes, req.params.produtoId])
- }
+    if (observacoes !== undefined) {
+      await pool.query('UPDATE produtos_pi SET observacoes = ? WHERE id = ?', [observacoes, req.params.produtoId])
+    }
 
- await pool.query('UPDATE produtos_pi SET declarado_em = NOW() WHERE id = ? AND declarado_em IS NULL', [req.params.produtoId])
+    await pool.query('UPDATE produtos_pi SET declarado_em = NOW() WHERE id = ? AND declarado_em IS NULL', [
+      req.params.produtoId
+    ])
 
- const [produtoInfo] = await pool.query(
- 'SELECT pp.pi_id, pp.produto, p.numero_pi, p.cliente FROM produtos_pi pp JOIN pedidos p ON p.id = pp.pi_id WHERE pp.id = ?',
- [req.params.produtoId]
- )
- const [todosInsumos] = await pool.query(
- 'SELECT tipo, confirmado, sobra FROM insumos_produto WHERE produto_id = ?',
- [req.params.produtoId]
- )
+    const [produtoInfo] = await pool.query(
+      'SELECT pp.pi_id, pp.produto, p.numero_pi, p.cliente FROM produtos_pi pp JOIN pedidos p ON p.id = pp.pi_id WHERE pp.id = ?',
+      [req.params.produtoId]
+    )
+    const [todosInsumos] = await pool.query(
+      'SELECT tipo, confirmado, sobra FROM insumos_produto WHERE produto_id = ?',
+      [req.params.produtoId]
+    )
 
- if (produtoInfo[0]) {
- const { pi_id, numero_pi, cliente } = produtoInfo[0]
+    if (produtoInfo[0]) {
+      const { pi_id, numero_pi, cliente } = produtoInfo[0]
 
- const semEtiqueta = todosInsumos.filter((i) => i.tipo !== 'etiqueta')
- const produtoLiberado = semEtiqueta.length > 0 && semEtiqueta.every((i) => i.confirmado)
+      const semEtiqueta = todosInsumos.filter((i) => i.tipo !== 'etiqueta')
+      const produtoLiberado = semEtiqueta.length > 0 && semEtiqueta.every((i) => i.confirmado)
 
- const [outros] = await pool.query(
- `SELECT SUM(CASE WHEN ip.tipo <> 'etiqueta' AND ip.confirmado = 0 THEN 1 ELSE 0 END) as pendentes
+      const [outros] = await pool.query(
+        `SELECT SUM(CASE WHEN ip.tipo <> 'etiqueta' AND ip.confirmado = 0 THEN 1 ELSE 0 END) as pendentes
  FROM produtos_pi pp JOIN insumos_produto ip ON ip.produto_id = pp.id
  WHERE pp.pi_id = ? AND pp.id <> ?
  GROUP BY pp.id`,
- [pi_id, req.params.produtoId]
- )
- const outrosLiberados = outros.every((o) => Number(o.pendentes) === 0)
- const piEraLiberada = outrosLiberados && eraLiberado
- const piEstaLiberada = outrosLiberados && produtoLiberado
+        [pi_id, req.params.produtoId]
+      )
+      const outrosLiberados = outros.every((o) => Number(o.pendentes) === 0)
+      const piEraLiberada = outrosLiberados && eraLiberado
+      const piEstaLiberada = outrosLiberados && produtoLiberado
 
- if (piEstaLiberada && !piEraLiberada) {
- enviarPush(`✅ PI Liberada — ${numero_pi}`, `${cliente || ''} — todos os insumos confirmados.`, '/HTML/producao/admin.html', `pi_liberada_${numero_pi}`).catch(() => {})
- enviarEmail(
- `PI Liberada para Produção — ${numero_pi}`,
- `<h2 style="color:#2E7D32;margin:0 0 16px">PI Liberada para Produção</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:140px">PI</td><td style="padding:8px 0;font-weight:600">${numero_pi}</td></tr><tr><td style="padding:8px 0;color:#8a6a6a">Cliente</td><td style="padding:8px 0;font-weight:600">${cliente || '—'}</td></tr></table><p style="margin:16px 0 0;color:#2E7D32;font-weight:600">Todos os produtos desta PI estão com os insumos disponíveis para produção.</p>`,
- ['admin', 'gerente_producao', 'almoxarifado']
- )
- }
- }
+      if (piEstaLiberada && !piEraLiberada) {
+        enviarPush(
+          `✅ PI Liberada — ${numero_pi}`,
+          `${cliente || ''} — todos os insumos confirmados.`,
+          '/HTML/producao/admin.html',
+          `pi_liberada_${numero_pi}`
+        ).catch(() => {})
+        enviarEmail(
+          `PI Liberada para Produção — ${numero_pi}`,
+          `<h2 style="color:#2E7D32;margin:0 0 16px">PI Liberada para Produção</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:140px">PI</td><td style="padding:8px 0;font-weight:600">${numero_pi}</td></tr><tr><td style="padding:8px 0;color:#8a6a6a">Cliente</td><td style="padding:8px 0;font-weight:600">${cliente || '—'}</td></tr></table><p style="margin:16px 0 0;color:#2E7D32;font-weight:600">Todos os produtos desta PI estão com os insumos disponíveis para produção.</p>`,
+          ['admin', 'gerente_producao', 'almoxarifado']
+        )
+      }
+    }
 
-  res.json({ ok: true })
+    res.json({ ok: true })
   } catch (e) {
     console.error('Erro ao salvar insumos:', e.message)
     if (!res.headersSent) res.status(500).json({ erro: 'Erro ao salvar. Tente novamente.' })
@@ -472,7 +535,7 @@ app.patch('/api/produtos/:produtoId/insumos', autenticar(['admin', 'almoxarifado
 })
 
 app.get('/api/recebimentos/pendentes', autenticar(TODOS), async (req, res) => {
- const [pedidos] = await pool.query(`
+  const [pedidos] = await pool.query(`
  SELECT DISTINCT p.id, p.numero_pi, p.cliente
  FROM pedidos p
  JOIN recebimentos_b2 r ON r.pi_id = p.id
@@ -480,284 +543,348 @@ app.get('/api/recebimentos/pendentes', autenticar(TODOS), async (req, res) => {
  ORDER BY p.numero_pi ASC
  `)
 
- for (const pedido of pedidos) {
- const [produtos] = await pool.query(
- 'SELECT id, produto FROM produtos_pi WHERE pi_id = ? ORDER BY criado_em',
- [pedido.id]
- )
- for (const produto of produtos) {
- const [insumos] = await pool.query(
- 'SELECT id, tipo, status_recebimento, quantidade_recebida, foto_url, foto_nota_url FROM recebimentos_b2 WHERE pi_id = ? AND produto_id = ?',
- [pedido.id, produto.id]
- )
- produto.insumos = insumos
- }
- pedido.produtos = produtos
- }
+  for (const pedido of pedidos) {
+    const [produtos] = await pool.query('SELECT id, produto FROM produtos_pi WHERE pi_id = ? ORDER BY criado_em', [
+      pedido.id
+    ])
+    for (const produto of produtos) {
+      const [insumos] = await pool.query(
+        'SELECT id, tipo, status_recebimento, quantidade_recebida, foto_url, foto_nota_url FROM recebimentos_b2 WHERE pi_id = ? AND produto_id = ?',
+        [pedido.id, produto.id]
+      )
+      produto.insumos = insumos
+    }
+    pedido.produtos = produtos
+  }
 
- res.json(pedidos)
+  res.json(pedidos)
 })
 
-app.patch('/api/recebimentos/:id', autenticar(['admin', 'deposito']), upload.fields([{ name: 'foto_produto', maxCount: 1 }, { name: 'foto_nota', maxCount: 1 }]), async (req, res) => {
- const { quantidade_recebida } = req.body
- let fotoProdutoUrl = null
- let fotoNotaUrl = null
+app.patch(
+  '/api/recebimentos/:id',
+  autenticar(['admin', 'deposito']),
+  upload.fields([
+    { name: 'foto_produto', maxCount: 1 },
+    { name: 'foto_nota', maxCount: 1 }
+  ]),
+  async (req, res) => {
+    const { quantidade_recebida } = req.body
+    let fotoProdutoUrl = null
+    let fotoNotaUrl = null
 
- async function uploadFoto(buffer, pasta) {
- return new Promise((resolve, reject) => {
- cloudinary.uploader.upload_stream(
- { folder: pasta, resource_type: 'image' },
- (erro, resultado) => erro ? reject(erro) : resolve(resultado.secure_url)
- ).end(buffer)
- })
- }
+    async function uploadFoto(buffer, pasta) {
+      return new Promise((resolve, reject) => {
+        cloudinary.uploader
+          .upload_stream({ folder: pasta, resource_type: 'image' }, (erro, resultado) =>
+            erro ? reject(erro) : resolve(resultado.secure_url)
+          )
+          .end(buffer)
+      })
+    }
 
- if (req.files?.foto_produto?.[0]) {
- fotoProdutoUrl = await uploadFoto(req.files.foto_produto[0].buffer, 'recebimentos/produtos')
- }
- if (req.files?.foto_nota?.[0]) {
- fotoNotaUrl = await uploadFoto(req.files.foto_nota[0].buffer, 'recebimentos/notas')
- }
+    if (req.files?.foto_produto?.[0]) {
+      fotoProdutoUrl = await uploadFoto(req.files.foto_produto[0].buffer, 'recebimentos/produtos')
+    }
+    if (req.files?.foto_nota?.[0]) {
+      fotoNotaUrl = await uploadFoto(req.files.foto_nota[0].buffer, 'recebimentos/notas')
+    }
 
- await pool.query(
- 'UPDATE recebimentos_b2 SET status_recebimento = ?, recebido_em = NOW(), quantidade_recebida = ?, foto_url = ?, foto_nota_url = ? WHERE id = ?',
- ['recebido', quantidade_recebida || null, fotoProdutoUrl, fotoNotaUrl, req.params.id]
- )
+    await pool.query(
+      'UPDATE recebimentos_b2 SET status_recebimento = ?, recebido_em = NOW(), quantidade_recebida = ?, foto_url = ?, foto_nota_url = ? WHERE id = ?',
+      ['recebido', quantidade_recebida || null, fotoProdutoUrl, fotoNotaUrl, req.params.id]
+    )
 
- res.json({ ok: true })
-})
+    res.json({ ok: true })
+  }
+)
 
 app.patch('/api/recebimentos/:id/excluir-foto', autenticar(['admin']), async (req, res) => {
- const { campo } = req.body
- if (!['foto_url', 'foto_nota_url'].includes(campo)) {
- return res.status(400).json({ erro: 'Campo inválido' })
- }
+  const { campo } = req.body
+  if (!['foto_url', 'foto_nota_url'].includes(campo)) {
+    return res.status(400).json({ erro: 'Campo inválido' })
+  }
 
- const [rows] = await pool.query(`SELECT ${campo} FROM recebimentos_b2 WHERE id = ?`, [req.params.id])
- if (rows.length && rows[0][campo]) {
- const urlFoto = rows[0][campo]
- const partes = urlFoto.split('/')
- const publicId = partes.slice(partes.indexOf('recebimentos')).join('/').replace(/\.[^/.]+$/, '')
- try {
- await cloudinary.uploader.destroy(publicId)
- } catch (e) {
- console.error('Erro ao apagar foto do Cloudinary:', e.message)
- }
- }
+  const [rows] = await pool.query(`SELECT ${campo} FROM recebimentos_b2 WHERE id = ?`, [req.params.id])
+  if (rows.length && rows[0][campo]) {
+    const urlFoto = rows[0][campo]
+    const partes = urlFoto.split('/')
+    const publicId = partes
+      .slice(partes.indexOf('recebimentos'))
+      .join('/')
+      .replace(/\.[^/.]+$/, '')
+    try {
+      await cloudinary.uploader.destroy(publicId)
+    } catch (e) {
+      console.error('Erro ao apagar foto do Cloudinary:', e.message)
+    }
+  }
 
- const outrosCampos = campo === 'foto_url' ? 'foto_nota_url' : 'foto_url'
- const [rec] = await pool.query(`SELECT ${outrosCampos}, status_recebimento FROM recebimentos_b2 WHERE id = ?`, [req.params.id])
- const outraFoto = rec[0]?.[outrosCampos]
- const novoStatus = outraFoto ? 'recebido' : 'pendente'
+  const outrosCampos = campo === 'foto_url' ? 'foto_nota_url' : 'foto_url'
+  const [rec] = await pool.query(`SELECT ${outrosCampos}, status_recebimento FROM recebimentos_b2 WHERE id = ?`, [
+    req.params.id
+  ])
+  const outraFoto = rec[0]?.[outrosCampos]
+  const novoStatus = outraFoto ? 'recebido' : 'pendente'
 
- await pool.query(
- `UPDATE recebimentos_b2 SET ${campo} = NULL, status_recebimento = ? WHERE id = ?`,
- [novoStatus, req.params.id]
- )
- res.json({ ok: true })
+  await pool.query(`UPDATE recebimentos_b2 SET ${campo} = NULL, status_recebimento = ? WHERE id = ?`, [
+    novoStatus,
+    req.params.id
+  ])
+  res.json({ ok: true })
 })
 
 app.get('/api/usuarios', autenticar(['admin']), async (req, res) => {
- const [rows] = await pool.query('SELECT id, nome, email, papel FROM usuarios ORDER BY nome')
- res.json(rows)
+  const [rows] = await pool.query('SELECT id, nome, email, papel FROM usuarios ORDER BY nome')
+  res.json(rows)
 })
 
 app.post('/api/usuarios', autenticar(['admin']), async (req, res) => {
- const { nome, email, senha, papel } = req.body
- const hash = await bcrypt.hash(senha, 10)
- const [resultado] = await pool.query(
- 'INSERT INTO usuarios (nome, email, senha, papel) VALUES (?, ?, ?, ?)',
- [nome, email, hash, papel]
- )
- res.json({ id: resultado.insertId })
+  const { nome, email, senha, papel } = req.body
+  const hash = await bcrypt.hash(senha, 10)
+  const [resultado] = await pool.query('INSERT INTO usuarios (nome, email, senha, papel) VALUES (?, ?, ?, ?)', [
+    nome,
+    email,
+    hash,
+    papel
+  ])
+  res.json({ id: resultado.insertId })
 })
 
 app.delete('/api/usuarios/:id', autenticar(['admin']), async (req, res) => {
- await pool.query('DELETE FROM usuarios WHERE id = ?', [req.params.id])
- res.json({ ok: true })
+  await pool.query('DELETE FROM usuarios WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
 })
 
-app.post('/api/estoque/entrada', autenticar(['admin', 'deposito']), upload.fields([{ name: 'foto_produto', maxCount: 1 }, { name: 'foto_nota', maxCount: 1 }]), async (req, res) => {
- const { embalagem_kg, rotulo_kg, pallet_caixas, produto, localizacao } = req.body
- let fotoUrl = null
- let fotoNotaUrl = null
+app.post(
+  '/api/estoque/entrada',
+  autenticar(['admin', 'deposito']),
+  upload.fields([
+    { name: 'foto_produto', maxCount: 1 },
+    { name: 'foto_nota', maxCount: 1 }
+  ]),
+  async (req, res) => {
+    const { embalagem_kg, rotulo_kg, pallet_caixas, produto, localizacao } = req.body
+    let fotoUrl = null
+    let fotoNotaUrl = null
 
- async function uploadFoto(buffer, pasta) {
- return new Promise((resolve, reject) => {
- cloudinary.uploader.upload_stream(
- { folder: pasta, resource_type: 'image' },
- (erro, resultado) => erro ? reject(erro) : resolve(resultado.secure_url)
- ).end(buffer)
- })
- }
+    async function uploadFoto(buffer, pasta) {
+      return new Promise((resolve, reject) => {
+        cloudinary.uploader
+          .upload_stream({ folder: pasta, resource_type: 'image' }, (erro, resultado) =>
+            erro ? reject(erro) : resolve(resultado.secure_url)
+          )
+          .end(buffer)
+      })
+    }
 
- if (req.files?.foto_produto?.[0]) {
- fotoUrl = await uploadFoto(req.files.foto_produto[0].buffer, 'estoque/produtos')
- }
- if (req.files?.foto_nota?.[0]) {
- fotoNotaUrl = await uploadFoto(req.files.foto_nota[0].buffer, 'estoque/notas')
- }
+    if (req.files?.foto_produto?.[0]) {
+      fotoUrl = await uploadFoto(req.files.foto_produto[0].buffer, 'estoque/produtos')
+    }
+    if (req.files?.foto_nota?.[0]) {
+      fotoNotaUrl = await uploadFoto(req.files.foto_nota[0].buffer, 'estoque/notas')
+    }
 
- await pool.query(
- 'INSERT INTO estoque_insumos (produto, embalagem_kg, rotulo_kg, pallet_caixas, foto_url, foto_nota_url, localizacao) VALUES (?, ?, ?, ?, ?, ?, ?)',
- [produto || null, parseFloat(embalagem_kg) || 0, parseFloat(rotulo_kg) || 0, parseInt(pallet_caixas) || 0, fotoUrl, fotoNotaUrl, localizacao || null]
- )
+    await pool.query(
+      'INSERT INTO estoque_insumos (produto, embalagem_kg, rotulo_kg, pallet_caixas, foto_url, foto_nota_url, localizacao) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [
+        produto || null,
+        parseFloat(embalagem_kg) || 0,
+        parseFloat(rotulo_kg) || 0,
+        parseInt(pallet_caixas) || 0,
+        fotoUrl,
+        fotoNotaUrl,
+        localizacao || null
+      ]
+    )
 
- res.json({ ok: true })
-})
+    res.json({ ok: true })
+  }
+)
 
 app.get('/api/estoque/historico', autenticar(TODOS), async (req, res) => {
- const [rows] = await pool.query('SELECT * FROM estoque_insumos ORDER BY criado_em DESC LIMIT 50')
- res.json(rows)
+  const [rows] = await pool.query('SELECT * FROM estoque_insumos ORDER BY criado_em DESC LIMIT 50')
+  res.json(rows)
 })
 
 app.get('/api/estoque/saldo', autenticar(TODOS), async (req, res) => {
- const [[entradas]] = await pool.query(
- 'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM estoque_insumos'
- )
- const [[vinculos]] = await pool.query(
- 'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM vinculos_insumos'
- )
- res.json({
- embalagem_kg: Math.max(0, parseFloat(entradas.emb) - parseFloat(vinculos.emb)),
- rotulo_kg: Math.max(0, parseFloat(entradas.rot) - parseFloat(vinculos.rot)),
- pallet_caixas: Math.max(0, parseInt(entradas.pal) - parseInt(vinculos.pal))
- })
+  const [[entradas]] = await pool.query(
+    'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM estoque_insumos'
+  )
+  const [[vinculos]] = await pool.query(
+    'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM vinculos_insumos'
+  )
+  res.json({
+    embalagem_kg: Math.max(0, parseFloat(entradas.emb) - parseFloat(vinculos.emb)),
+    rotulo_kg: Math.max(0, parseFloat(entradas.rot) - parseFloat(vinculos.rot)),
+    pallet_caixas: Math.max(0, parseInt(entradas.pal) - parseInt(vinculos.pal))
+  })
 })
 
 app.get('/api/estoque/vinculos', autenticar(TODOS), async (req, res) => {
- const [rows] = await pool.query(`
+  const [rows] = await pool.query(`
  SELECT v.*, p.numero_pi, p.cliente
  FROM vinculos_insumos v
  JOIN pedidos p ON p.id = v.pi_id
  ORDER BY v.criado_em DESC LIMIT 100
  `)
- res.json(rows)
+  res.json(rows)
 })
 
 app.post('/api/estoque/vincular', autenticar(['admin', 'almoxarifado']), async (req, res) => {
- const { entrada_id, pi_id, produto, embalagem_kg, rotulo_kg, pallet_caixas } = req.body
+  const { entrada_id, pi_id, produto, embalagem_kg, rotulo_kg, pallet_caixas } = req.body
 
- const [[entrada]] = await pool.query(
- 'SELECT embalagem_kg, rotulo_kg, pallet_caixas FROM estoque_insumos WHERE id = ?', [entrada_id]
- )
- if (!entrada) return res.status(400).json({ erro: 'Entrada não encontrada.' })
+  const [[entrada]] = await pool.query(
+    'SELECT embalagem_kg, rotulo_kg, pallet_caixas FROM estoque_insumos WHERE id = ?',
+    [entrada_id]
+  )
+  if (!entrada) return res.status(400).json({ erro: 'Entrada não encontrada.' })
 
- const [[vinculados]] = await pool.query(
- 'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM vinculos_insumos WHERE entrada_id = ?',
- [entrada_id]
- )
- const saldoEmb = parseFloat(entrada.embalagem_kg) - parseFloat(vinculados.emb)
- const saldoRot = parseFloat(entrada.rotulo_kg) - parseFloat(vinculados.rot)
- const saldoPal = parseInt(entrada.pallet_caixas) - parseInt(vinculados.pal)
+  const [[vinculados]] = await pool.query(
+    'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM vinculos_insumos WHERE entrada_id = ?',
+    [entrada_id]
+  )
+  const saldoEmb = parseFloat(entrada.embalagem_kg) - parseFloat(vinculados.emb)
+  const saldoRot = parseFloat(entrada.rotulo_kg) - parseFloat(vinculados.rot)
+  const saldoPal = parseInt(entrada.pallet_caixas) - parseInt(vinculados.pal)
 
- if ((parseFloat(embalagem_kg) || 0) > saldoEmb) return res.status(400).json({ erro: `Saldo insuficiente de embalagem. Disponível: ${saldoEmb} kg` })
- if ((parseFloat(rotulo_kg) || 0) > saldoRot) return res.status(400).json({ erro: `Saldo insuficiente de rótulo. Disponível: ${saldoRot} kg` })
- if ((parseInt(pallet_caixas) || 0) > saldoPal) return res.status(400).json({ erro: `Saldo insuficiente de pallets. Disponível: ${saldoPal}` })
+  if ((parseFloat(embalagem_kg) || 0) > saldoEmb)
+    return res.status(400).json({ erro: `Saldo insuficiente de embalagem. Disponível: ${saldoEmb} kg` })
+  if ((parseFloat(rotulo_kg) || 0) > saldoRot)
+    return res.status(400).json({ erro: `Saldo insuficiente de rótulo. Disponível: ${saldoRot} kg` })
+  if ((parseInt(pallet_caixas) || 0) > saldoPal)
+    return res.status(400).json({ erro: `Saldo insuficiente de pallets. Disponível: ${saldoPal}` })
 
- await pool.query(
- 'INSERT INTO vinculos_insumos (entrada_id, pi_id, produto, embalagem_kg, rotulo_kg, pallet_caixas) VALUES (?, ?, ?, ?, ?, ?)',
- [entrada_id, pi_id, produto || null, parseFloat(embalagem_kg) || 0, parseFloat(rotulo_kg) || 0, parseInt(pallet_caixas) || 0]
- )
+  await pool.query(
+    'INSERT INTO vinculos_insumos (entrada_id, pi_id, produto, embalagem_kg, rotulo_kg, pallet_caixas) VALUES (?, ?, ?, ?, ?, ?)',
+    [
+      entrada_id,
+      pi_id,
+      produto || null,
+      parseFloat(embalagem_kg) || 0,
+      parseFloat(rotulo_kg) || 0,
+      parseInt(pallet_caixas) || 0
+    ]
+  )
 
- res.json({ ok: true })
+  res.json({ ok: true })
 })
 
 app.delete('/api/estoque/entradas/:id', autenticar(['admin', 'deposito']), async (req, res) => {
- await pool.query('DELETE FROM estoque_insumos WHERE id = ?', [req.params.id])
- res.json({ ok: true })
+  await pool.query('DELETE FROM estoque_insumos WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
 })
 
 app.patch('/api/estoque/entradas/:id/produto', autenticar(['admin', 'almoxarifado']), async (req, res) => {
- const { produto } = req.body
- await pool.query('UPDATE estoque_insumos SET produto = ? WHERE id = ?', [produto || null, req.params.id])
- res.json({ ok: true })
+  const { produto } = req.body
+  await pool.query('UPDATE estoque_insumos SET produto = ? WHERE id = ?', [produto || null, req.params.id])
+  res.json({ ok: true })
 })
 
-app.patch('/api/estoque/entradas/:id/localizacao', autenticar(['admin', 'almoxarifado', 'deposito']), async (req, res) => {
- const { localizacao } = req.body
- await pool.query('UPDATE estoque_insumos SET localizacao = ? WHERE id = ?', [localizacao || null, req.params.id])
- res.json({ ok: true })
-})
+app.patch(
+  '/api/estoque/entradas/:id/localizacao',
+  autenticar(['admin', 'almoxarifado', 'deposito']),
+  async (req, res) => {
+    const { localizacao } = req.body
+    await pool.query('UPDATE estoque_insumos SET localizacao = ? WHERE id = ?', [localizacao || null, req.params.id])
+    res.json({ ok: true })
+  }
+)
 
 app.patch('/api/estoque/vinculos/:id', autenticar(['admin', 'almoxarifado']), async (req, res) => {
- const { pi_id, embalagem_kg, rotulo_kg, pallet_caixas } = req.body
+  const { pi_id, embalagem_kg, rotulo_kg, pallet_caixas } = req.body
 
- const [[entradas]] = await pool.query(
- 'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM estoque_insumos'
- )
- const [[outros]] = await pool.query(
- 'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM vinculos_insumos WHERE id != ?',
- [req.params.id]
- )
- const saldoEmb = parseFloat(entradas.emb) - parseFloat(outros.emb)
- const saldoRot = parseFloat(entradas.rot) - parseFloat(outros.rot)
- const saldoPal = parseInt(entradas.pal) - parseInt(outros.pal)
+  const [[entradas]] = await pool.query(
+    'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM estoque_insumos'
+  )
+  const [[outros]] = await pool.query(
+    'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM vinculos_insumos WHERE id != ?',
+    [req.params.id]
+  )
+  const saldoEmb = parseFloat(entradas.emb) - parseFloat(outros.emb)
+  const saldoRot = parseFloat(entradas.rot) - parseFloat(outros.rot)
+  const saldoPal = parseInt(entradas.pal) - parseInt(outros.pal)
 
- if ((parseFloat(embalagem_kg) || 0) > saldoEmb) return res.status(400).json({ erro: `Saldo insuficiente de embalagem. Disponível: ${saldoEmb} kg` })
- if ((parseFloat(rotulo_kg) || 0) > saldoRot) return res.status(400).json({ erro: `Saldo insuficiente de rótulo. Disponível: ${saldoRot} kg` })
- if ((parseInt(pallet_caixas) || 0) > saldoPal) return res.status(400).json({ erro: `Saldo insuficiente de pallets. Disponível: ${saldoPal}` })
+  if ((parseFloat(embalagem_kg) || 0) > saldoEmb)
+    return res.status(400).json({ erro: `Saldo insuficiente de embalagem. Disponível: ${saldoEmb} kg` })
+  if ((parseFloat(rotulo_kg) || 0) > saldoRot)
+    return res.status(400).json({ erro: `Saldo insuficiente de rótulo. Disponível: ${saldoRot} kg` })
+  if ((parseInt(pallet_caixas) || 0) > saldoPal)
+    return res.status(400).json({ erro: `Saldo insuficiente de pallets. Disponível: ${saldoPal}` })
 
- const { produto } = req.body
- await pool.query(
- 'UPDATE vinculos_insumos SET pi_id = ?, produto = ?, embalagem_kg = ?, rotulo_kg = ?, pallet_caixas = ? WHERE id = ?',
- [pi_id, produto || null, parseFloat(embalagem_kg) || 0, parseFloat(rotulo_kg) || 0, parseInt(pallet_caixas) || 0, req.params.id]
- )
- res.json({ ok: true })
+  const { produto } = req.body
+  await pool.query(
+    'UPDATE vinculos_insumos SET pi_id = ?, produto = ?, embalagem_kg = ?, rotulo_kg = ?, pallet_caixas = ? WHERE id = ?',
+    [
+      pi_id,
+      produto || null,
+      parseFloat(embalagem_kg) || 0,
+      parseFloat(rotulo_kg) || 0,
+      parseInt(pallet_caixas) || 0,
+      req.params.id
+    ]
+  )
+  res.json({ ok: true })
 })
 
 app.delete('/api/estoque/vinculos/:id', autenticar(['admin', 'almoxarifado']), async (req, res) => {
- await pool.query('DELETE FROM vinculos_insumos WHERE id = ?', [req.params.id])
- res.json({ ok: true })
+  await pool.query('DELETE FROM vinculos_insumos WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
 })
 
 async function verificarAlertasEmbarque() {
- try {
- const [pis] = await pool.query(
- `SELECT id, numero_pi, cliente, destino, data_embarque
+  try {
+    const [pis] = await pool.query(
+      `SELECT id, numero_pi, cliente, destino, data_embarque
  FROM pedidos
  WHERE concluida = 0 AND data_embarque IS NOT NULL
  AND data_embarque <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)
  ORDER BY data_embarque ASC`
- )
+    )
 
- const alertas = []
- for (const pi of pis) {
- const [[tot]] = await pool.query('SELECT COUNT(*) as total FROM produtos_pi WHERE pi_id = ?', [pi.id])
- const [[pend]] = await pool.query(
- `SELECT COUNT(*) as pendentes
+    const alertas = []
+    for (const pi of pis) {
+      const [[tot]] = await pool.query('SELECT COUNT(*) as total FROM produtos_pi WHERE pi_id = ?', [pi.id])
+      const [[pend]] = await pool.query(
+        `SELECT COUNT(*) as pendentes
  FROM produtos_pi pp
  JOIN insumos_produto ip ON ip.produto_id = pp.id
  WHERE pp.pi_id = ? AND ip.confirmado = 0`,
- [pi.id]
- )
- const pronta = tot.total > 0 && pend.pendentes === 0
- if (!pronta) alertas.push(pi)
- }
+        [pi.id]
+      )
+      const pronta = tot.total > 0 && pend.pendentes === 0
+      if (!pronta) alertas.push(pi)
+    }
 
- if (!alertas.length) return
- if (!(await podeEnviarHoje('alertas_embarque'))) return
+    if (!alertas.length) return
+    if (!(await podeEnviarHoje('alertas_embarque'))) return
 
- const hoje = new Date()
- hoje.setHours(0, 0, 0, 0)
- const linhas = alertas.map((pi) => {
- const alvo = new Date(String(pi.data_embarque).slice(0, 10) + 'T00:00:00')
- const dias = Math.round((alvo - hoje) / 86400000)
- const quando = dias < 0 ? `VENCIDO há ${Math.abs(dias)} dia(s)` : dias === 0 ? 'HOJE' : `em ${dias} dia(s)`
- const dataFmt = alvo.toLocaleDateString('pt-BR')
- return `<tr><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;font-weight:700">PI ${pi.numero_pi}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${pi.cliente || '—'}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;color:#ED3237;font-weight:700">${dataFmt} (${quando})</td></tr>`
- }).join('')
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+    const linhas = alertas
+      .map((pi) => {
+        const alvo = new Date(String(pi.data_embarque).slice(0, 10) + 'T00:00:00')
+        const dias = Math.round((alvo - hoje) / 86400000)
+        const quando = dias < 0 ? `VENCIDO há ${Math.abs(dias)} dia(s)` : dias === 0 ? 'HOJE' : `em ${dias} dia(s)`
+        const dataFmt = alvo.toLocaleDateString('pt-BR')
+        return `<tr><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;font-weight:700">PI ${pi.numero_pi}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${pi.cliente || '—'}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;color:#ED3237;font-weight:700">${dataFmt} (${quando})</td></tr>`
+      })
+      .join('')
 
- enviarPush(`⚠️ ${alertas.length} PI(s) em risco de embarque`, alertas.map((p) => `PI ${p.numero_pi}`).join(', '), '/HTML/estoque/embarques.html', 'alertas_embarque').catch(() => {})
- enviarEmail(
- `ALERTA: ${alertas.length} PI(s) perto do embarque e SEM estar pronta`,
- `<h2 style="color:#ED3237;margin:0 0 16px">PIs em Risco de Embarque</h2><p style="margin:0 0 12px;color:#8a6a6a">As PIs abaixo têm embarque em até 7 dias (ou já vencido) e ainda possuem itens pendentes no almoxarifado:</p><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">PI</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Cliente</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Embarque</th></tr></thead><tbody>${linhas}</tbody></table>`,
- ['admin', 'gerente_producao']
- )
- console.log(`Alerta de embarque enviado: ${alertas.length} PI(s)`)
- } catch (e) {
- console.error('Erro no alerta de embarque:', e.message)
- }
+    enviarPush(
+      `⚠️ ${alertas.length} PI(s) em risco de embarque`,
+      alertas.map((p) => `PI ${p.numero_pi}`).join(', '),
+      '/HTML/estoque/embarques.html',
+      'alertas_embarque'
+    ).catch(() => {})
+    enviarEmail(
+      `ALERTA: ${alertas.length} PI(s) perto do embarque e SEM estar pronta`,
+      `<h2 style="color:#ED3237;margin:0 0 16px">PIs em Risco de Embarque</h2><p style="margin:0 0 12px;color:#8a6a6a">As PIs abaixo têm embarque em até 7 dias (ou já vencido) e ainda possuem itens pendentes no almoxarifado:</p><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">PI</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Cliente</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Embarque</th></tr></thead><tbody>${linhas}</tbody></table>`,
+      ['admin', 'gerente_producao']
+    )
+    console.log(`Alerta de embarque enviado: ${alertas.length} PI(s)`)
+  } catch (e) {
+    console.error('Erro no alerta de embarque:', e.message)
+  }
 }
 
 setTimeout(verificarAlertasEmbarque, 60 * 1000)
@@ -774,141 +901,203 @@ const SQL_DECLARACAO_PENDENTE = `
  ORDER BY pp.criado_em ASC`
 
 async function verificarAlertasDeclaracao() {
- try {
- const [rows] = await pool.query(SQL_DECLARACAO_PENDENTE)
- if (!rows.length) return
- if (!(await podeEnviarHoje('declaracao_pendente'))) return
+  try {
+    const [rows] = await pool.query(SQL_DECLARACAO_PENDENTE)
+    if (!rows.length) return
+    if (!(await podeEnviarHoje('declaracao_pendente'))) return
 
- const linhas = rows.map((r) => {
- const horas = Math.floor((Date.now() - new Date(r.criado_em).getTime()) / 3600000)
- return `<tr><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;font-weight:700">PI ${r.numero_pi}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${r.cliente || '—'}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${r.produto}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;color:#E65100;font-weight:700">há ${horas}h sem declarar</td></tr>`
- }).join('')
+    const linhas = rows
+      .map((r) => {
+        const horas = Math.floor((Date.now() - new Date(r.criado_em).getTime()) / 3600000)
+        return `<tr><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;font-weight:700">PI ${r.numero_pi}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${r.cliente || '—'}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${r.produto}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;color:#E65100;font-weight:700">há ${horas}h sem declarar</td></tr>`
+      })
+      .join('')
 
- const maxHoras = Math.max(...rows.map((r) => Math.floor((Date.now() - new Date(r.criado_em).getTime()) / 3600000)))
- const urgente = maxHoras >= 96
+    const maxHoras = Math.max(...rows.map((r) => Math.floor((Date.now() - new Date(r.criado_em).getTime()) / 3600000)))
+    const urgente = maxHoras >= 96
 
- enviarPush(`${urgente ? '🚨 URGENTE' : '⚠️ Atenção'} — Estoque não declarado`, `${rows.length} produto(s) sem declaração no almoxarifado.`, '/HTML/estoque/almoxarifado.html', 'declaracao_pendente').catch(() => {})
- enviarEmail(
- `${urgente ? 'URGENTE — ' : ''}${rows.length} produto(s) sem estoque declarado (Almoxarifado)`,
- `<h2 style="color:#E65100;margin:0 0 16px">${urgente ? 'URGENTE — ' : ''}Estoque não declarado pelo Almoxarifado</h2><p style="margin:0 0 12px;color:#8a6a6a">Os produtos abaixo foram cadastrados há mais de 48h e ainda não tiveram o informe de estoque salvo no almoxarifado:</p><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #E65100">PI</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #E65100">Cliente</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #E65100">Produto</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #E65100">Situação</th></tr></thead><tbody>${linhas}</tbody></table>`,
- ['admin', 'almoxarifado']
- )
- console.log(`Alerta de declaração enviado: ${rows.length} produto(s)`)
- } catch (e) {
- console.error('Erro no alerta de declaração:', e.message)
- }
+    enviarPush(
+      `${urgente ? '🚨 URGENTE' : '⚠️ Atenção'} — Estoque não declarado`,
+      `${rows.length} produto(s) sem declaração no almoxarifado.`,
+      '/HTML/estoque/almoxarifado.html',
+      'declaracao_pendente'
+    ).catch(() => {})
+    enviarEmail(
+      `${urgente ? 'URGENTE — ' : ''}${rows.length} produto(s) sem estoque declarado (Almoxarifado)`,
+      `<h2 style="color:#E65100;margin:0 0 16px">${urgente ? 'URGENTE — ' : ''}Estoque não declarado pelo Almoxarifado</h2><p style="margin:0 0 12px;color:#8a6a6a">Os produtos abaixo foram cadastrados há mais de 48h e ainda não tiveram o informe de estoque salvo no almoxarifado:</p><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #E65100">PI</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #E65100">Cliente</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #E65100">Produto</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #E65100">Situação</th></tr></thead><tbody>${linhas}</tbody></table>`,
+      ['admin', 'almoxarifado']
+    )
+    console.log(`Alerta de declaração enviado: ${rows.length} produto(s)`)
+  } catch (e) {
+    console.error('Erro no alerta de declaração:', e.message)
+  }
 }
 
 setTimeout(verificarAlertasDeclaracao, 90 * 1000)
 setInterval(verificarAlertasDeclaracao, 24 * 60 * 60 * 1000)
 
 app.get('/api/alertas/declaracao', autenticar(TODOS), async (req, res) => {
- const [rows] = await pool.query(SQL_DECLARACAO_PENDENTE)
- res.json(rows)
+  const [rows] = await pool.query(SQL_DECLARACAO_PENDENTE)
+  res.json(rows)
 })
 
 app.get('/api/pendencias', autenticar(TODOS), async (req, res) => {
- try {
- const [decl] = await pool.query(SQL_DECLARACAO_PENDENTE)
- const [emb] = await pool.query(SQL_EMBARQUES_PENDENTES)
- const [[ped]] = await pool.query(`SELECT COUNT(*) as n FROM demandas WHERE status = 'pendente'`)
- const [[atr]] = await pool.query(`SELECT COUNT(*) as n FROM compras WHERE status <> 'recebido' AND data_prevista IS NOT NULL AND data_prevista < CURDATE()`)
- res.json({
- estoqueNaoDeclarado: decl.length,
- embarquesPendentes: emb.length,
- pedidosCompra: ped.n,
- comprasAtrasadas: atr.n
- })
- } catch (e) {
- res.json({ estoqueNaoDeclarado: 0, embarquesPendentes: 0, pedidosCompra: 0, comprasAtrasadas: 0 })
- }
+  try {
+    const [decl] = await pool.query(SQL_DECLARACAO_PENDENTE)
+    const [emb] = await pool.query(SQL_EMBARQUES_PENDENTES)
+    const [[ped]] = await pool.query(`SELECT COUNT(*) as n FROM demandas WHERE status = 'pendente'`)
+    const [[atr]] = await pool.query(
+      `SELECT COUNT(*) as n FROM compras WHERE status <> 'recebido' AND data_prevista IS NOT NULL AND data_prevista < CURDATE()`
+    )
+    res.json({
+      estoqueNaoDeclarado: decl.length,
+      embarquesPendentes: emb.length,
+      pedidosCompra: ped.n,
+      comprasAtrasadas: atr.n
+    })
+  } catch (e) {
+    res.json({ estoqueNaoDeclarado: 0, embarquesPendentes: 0, pedidosCompra: 0, comprasAtrasadas: 0 })
+  }
 })
 
-const tipoLabelCompra = { embalagem: 'Embalagem', rotulo: 'Rótulo', caixa: 'Caixa', etiqueta: 'Etiqueta', outro: 'Outro' }
+const tipoLabelCompra = {
+  embalagem: 'Embalagem',
+  rotulo: 'Rótulo',
+  caixa: 'Caixa',
+  etiqueta: 'Etiqueta',
+  outro: 'Outro'
+}
 
 app.get('/api/compras', autenticar(TODOS), async (req, res) => {
- const [rows] = await pool.query(`
+  const [rows] = await pool.query(`
  SELECT c.*, p.numero_pi, p.cliente, p.data_embarque
  FROM compras c
  LEFT JOIN pedidos p ON p.id = c.pi_id
  ORDER BY c.criado_em DESC LIMIT 300`)
- res.json(rows)
+  res.json(rows)
 })
 
 app.post('/api/compras', autenticar(['admin', 'compras', 'compras_aromas']), async (req, res) => {
- const { descricao, tipo, quantidade, unidade, fornecedor, data_compra, data_prevista, custo, pi_id, observacoes, status } = req.body
- if (!descricao) return res.status(400).json({ erro: 'Informe o que está sendo comprado.' })
+  const {
+    descricao,
+    tipo,
+    quantidade,
+    unidade,
+    fornecedor,
+    data_compra,
+    data_prevista,
+    custo,
+    pi_id,
+    observacoes,
+    status
+  } = req.body
+  if (!descricao) return res.status(400).json({ erro: 'Informe o que está sendo comprado.' })
 
- const [r] = await pool.query(
- `INSERT INTO compras (descricao, tipo, quantidade, unidade, fornecedor, data_compra, data_prevista, custo, pi_id, observacoes, status)
+  const [r] = await pool.query(
+    `INSERT INTO compras (descricao, tipo, quantidade, unidade, fornecedor, data_compra, data_prevista, custo, pi_id, observacoes, status)
  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
- [descricao, tipo || 'outro', parseFloat(quantidade) || 0, unidade || null, fornecedor || null,
- data_compra || null, data_prevista || null, (custo !== undefined && custo !== null && custo !== '') ? parseFloat(custo) : null,
- pi_id || null, observacoes || null, status || 'comprado']
- )
+    [
+      descricao,
+      tipo || 'outro',
+      parseFloat(quantidade) || 0,
+      unidade || null,
+      fornecedor || null,
+      data_compra || null,
+      data_prevista || null,
+      custo !== undefined && custo !== null && custo !== '' ? parseFloat(custo) : null,
+      pi_id || null,
+      observacoes || null,
+      status || 'comprado'
+    ]
+  )
 
- res.json({ id: r.insertId })
+  res.json({ id: r.insertId })
 })
 
 app.patch('/api/compras/:id', autenticar(['admin', 'compras', 'compras_aromas']), async (req, res) => {
- const campos = ['descricao', 'tipo', 'quantidade', 'unidade', 'fornecedor', 'data_compra', 'data_prevista', 'custo', 'pi_id', 'observacoes', 'status']
- const sets = []
- const vals = []
- for (const campo of campos) {
- if (campo in req.body) {
- let v = req.body[campo]
- if ((campo === 'quantidade' || campo === 'custo') && v !== '' && v !== null) v = parseFloat(v)
- if (v === '') v = null
- sets.push(`${campo} = ?`)
- vals.push(v)
- }
- }
- if (!sets.length) return res.json({ ok: true })
- vals.push(req.params.id)
- await pool.query(`UPDATE compras SET ${sets.join(', ')} WHERE id = ?`, vals)
- res.json({ ok: true })
+  const campos = [
+    'descricao',
+    'tipo',
+    'quantidade',
+    'unidade',
+    'fornecedor',
+    'data_compra',
+    'data_prevista',
+    'custo',
+    'pi_id',
+    'observacoes',
+    'status'
+  ]
+  const sets = []
+  const vals = []
+  for (const campo of campos) {
+    if (campo in req.body) {
+      let v = req.body[campo]
+      if ((campo === 'quantidade' || campo === 'custo') && v !== '' && v !== null) v = parseFloat(v)
+      if (v === '') v = null
+      sets.push(`${campo} = ?`)
+      vals.push(v)
+    }
+  }
+  if (!sets.length) return res.json({ ok: true })
+  vals.push(req.params.id)
+  await pool.query(`UPDATE compras SET ${sets.join(', ')} WHERE id = ?`, vals)
+  res.json({ ok: true })
 })
 
 app.patch('/api/compras/:id/receber', autenticar(['admin', 'compras', 'compras_aromas']), async (req, res) => {
- await pool.query(`UPDATE compras SET status = 'recebido', recebido_em = NOW() WHERE id = ?`, [req.params.id])
- const [[c]] = await pool.query(`SELECT c.*, p.numero_pi FROM compras c LEFT JOIN pedidos p ON p.id = c.pi_id WHERE c.id = ?`, [req.params.id])
- if (c) {
- enviarPush(`📦 Compra recebida — lançar no B2`, `${c.descricao}${c.numero_pi ? ' · PI ' + c.numero_pi : ''}`, '/HTML/estoque/recebimento.html', `compra_recebida_${c.id}`).catch(() => {})
- enviarEmail(
- `Compra recebida — lançar no estoque B2 (${c.descricao})`,
- `<h2 style="color:#2E7D32;margin:0 0 16px">Compra Recebida</h2><p style="margin:0 0 12px;color:#8a6a6a">O setor de compras marcou este item como recebido. Depósito/almoxarifado: confiram e lancem no estoque B2.</p><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:160px">Item</td><td style="padding:8px 0;font-weight:600">${c.descricao}</td></tr><tr><td style="padding:8px 0;color:#8a6a6a">Tipo</td><td style="padding:8px 0;font-weight:600">${tipoLabelCompra[c.tipo] || 'Outro'}</td></tr>
+  await pool.query(`UPDATE compras SET status = 'recebido', recebido_em = NOW() WHERE id = ?`, [req.params.id])
+  const [[c]] = await pool.query(
+    `SELECT c.*, p.numero_pi FROM compras c LEFT JOIN pedidos p ON p.id = c.pi_id WHERE c.id = ?`,
+    [req.params.id]
+  )
+  if (c) {
+    enviarPush(
+      `📦 Compra recebida — lançar no B2`,
+      `${c.descricao}${c.numero_pi ? ' · PI ' + c.numero_pi : ''}`,
+      '/HTML/estoque/recebimento.html',
+      `compra_recebida_${c.id}`
+    ).catch(() => {})
+    enviarEmail(
+      `Compra recebida — lançar no estoque B2 (${c.descricao})`,
+      `<h2 style="color:#2E7D32;margin:0 0 16px">Compra Recebida</h2><p style="margin:0 0 12px;color:#8a6a6a">O setor de compras marcou este item como recebido. Depósito/almoxarifado: confiram e lancem no estoque B2.</p><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:160px">Item</td><td style="padding:8px 0;font-weight:600">${c.descricao}</td></tr><tr><td style="padding:8px 0;color:#8a6a6a">Tipo</td><td style="padding:8px 0;font-weight:600">${tipoLabelCompra[c.tipo] || 'Outro'}</td></tr>
  ${c.quantidade > 0 ? `<tr><td style="padding:8px 0;color:#8a6a6a">Quantidade</td><td style="padding:8px 0;font-weight:600">${c.quantidade} ${c.unidade || ''}</td></tr>` : ''}
  ${c.fornecedor ? `<tr><td style="padding:8px 0;color:#8a6a6a">Fornecedor</td><td style="padding:8px 0;font-weight:600">${c.fornecedor}</td></tr>` : ''}
  ${c.numero_pi ? `<tr><td style="padding:8px 0;color:#8a6a6a">PI vinculada</td><td style="padding:8px 0;font-weight:600">${c.numero_pi}</td></tr>` : ''}
  </table>`,
- ['admin', 'deposito', 'almoxarifado']
- )
- }
- res.json({ ok: true })
+      ['admin', 'deposito', 'almoxarifado']
+    )
+  }
+  res.json({ ok: true })
 })
 
 app.delete('/api/compras/:id', autenticar(['admin', 'compras', 'compras_aromas']), async (req, res) => {
- await pool.query('DELETE FROM compras WHERE id = ?', [req.params.id])
- res.json({ ok: true })
+  await pool.query('DELETE FROM compras WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
 })
 
 app.patch('/api/compras/:id/observacao', autenticar(['admin', 'compras', 'compras_aromas']), async (req, res) => {
- const { observacoes } = req.body
- await pool.query('UPDATE compras SET observacoes = ? WHERE id = ?', [observacoes || null, req.params.id])
- const [[c]] = await pool.query('SELECT descricao FROM compras WHERE id = ?', [req.params.id])
- if (c && observacoes && observacoes.trim()) {
- enviarPush(`💬 Observação na compra`, `${c.descricao}: ${observacoes.slice(0, 80)}`, '/HTML/estoque/compras.html', `obs_compra_${Date.now()}`).catch(() => {})
- enviarEmail(
- `Observação na compra — ${c.descricao}`,
- `<h2 style="color:#E65100;margin:0 0 16px">Observação / Verificação de Compra</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:140px">Item</td><td style="padding:8px 0;font-weight:600">${c.descricao}</td></tr><tr><td style="padding:8px 0;color:#8a6a6a">Observação</td><td style="padding:8px 0;font-weight:600">${observacoes}</td></tr></table>`,
- ['compras', 'admin']
- )
- }
- res.json({ ok: true })
+  const { observacoes } = req.body
+  await pool.query('UPDATE compras SET observacoes = ? WHERE id = ?', [observacoes || null, req.params.id])
+  const [[c]] = await pool.query('SELECT descricao FROM compras WHERE id = ?', [req.params.id])
+  if (c && observacoes && observacoes.trim()) {
+    enviarPush(
+      `💬 Observação na compra`,
+      `${c.descricao}: ${observacoes.slice(0, 80)}`,
+      '/HTML/estoque/compras.html',
+      `obs_compra_${Date.now()}`
+    ).catch(() => {})
+    enviarEmail(
+      `Observação na compra — ${c.descricao}`,
+      `<h2 style="color:#E65100;margin:0 0 16px">Observação / Verificação de Compra</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:140px">Item</td><td style="padding:8px 0;font-weight:600">${c.descricao}</td></tr><tr><td style="padding:8px 0;color:#8a6a6a">Observação</td><td style="padding:8px 0;font-weight:600">${observacoes}</td></tr></table>`,
+      ['compras', 'admin']
+    )
+  }
+  res.json({ ok: true })
 })
 
 app.get('/api/compras/sugestoes', autenticar(TODOS), async (req, res) => {
- const [rows] = await pool.query(`
+  const [rows] = await pool.query(`
  SELECT p.id as pi_id, p.numero_pi, p.cliente, p.data_embarque,
  pp.id as produto_id, pp.produto, pp.quantidade,
  ip.tipo as insumo_tipo, ip.sobra
@@ -918,35 +1107,45 @@ app.get('/api/compras/sugestoes', autenticar(TODOS), async (req, res) => {
  WHERE p.concluida = 0
  AND ( ip.confirmado = 0 OR (ip.tipo = 'etiqueta' AND ip.sobra < 100) )
  ORDER BY (p.data_embarque IS NULL), p.data_embarque ASC, p.numero_pi ASC`)
- res.json(rows)
+  res.json(rows)
 })
 
 async function verificarComprasAtrasadas() {
- try {
- const [rows] = await pool.query(`
+  try {
+    const [rows] = await pool.query(`
  SELECT c.*, p.numero_pi FROM compras c
  LEFT JOIN pedidos p ON p.id = c.pi_id
  WHERE c.status <> 'recebido' AND c.data_prevista IS NOT NULL AND c.data_prevista < CURDATE()
  ORDER BY c.data_prevista ASC`)
- if (!rows.length) return
- if (!(await podeEnviarHoje('compras_atrasadas'))) return
+    if (!rows.length) return
+    if (!(await podeEnviarHoje('compras_atrasadas'))) return
 
- const linhas = rows.map((c) => {
- const prev = new Date(String(c.data_prevista).slice(0, 10) + 'T00:00:00')
- const dias = Math.floor((Date.now() - prev.getTime()) / 86400000)
- return `<tr><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;font-weight:700">${c.descricao}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${c.fornecedor || '—'}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${c.numero_pi ? 'PI ' + c.numero_pi : 'Estoque geral'}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;color:#ED3237;font-weight:700">atrasada ${dias} dia(s)</td></tr>`
- }).join('')
+    const linhas = rows
+      .map((c) => {
+        const prev = new Date(String(c.data_prevista).slice(0, 10) + 'T00:00:00')
+        const dias = Math.floor((Date.now() - prev.getTime()) / 86400000)
+        return `<tr><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;font-weight:700">${c.descricao}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${c.fornecedor || '—'}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${c.numero_pi ? 'PI ' + c.numero_pi : 'Estoque geral'}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;color:#ED3237;font-weight:700">atrasada ${dias} dia(s)</td></tr>`
+      })
+      .join('')
 
- enviarPush(`⏰ ${rows.length} compra(s) atrasada(s)`, rows.map((c) => c.descricao).slice(0, 3).join(', '), '/HTML/estoque/compras.html', 'compras_atrasadas').catch(() => {})
- enviarEmail(
- `⏰ ALERTA: ${rows.length} compra(s) atrasada(s) na entrega`,
- `<h2 style="color:#ED3237;margin:0 0 16px">⏰ Compras com Entrega Atrasada</h2><p style="margin:0 0 12px;color:#8a6a6a">As compras abaixo passaram da data prevista de chegada e ainda não foram marcadas como recebidas:</p><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Item</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Fornecedor</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Destino</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Situação</th></tr></thead><tbody>${linhas}</tbody></table>`,
- ['admin', 'compras']
- )
- console.log(`Alerta de compras atrasadas enviado: ${rows.length}`)
- } catch (e) {
- console.error('Erro no alerta de compras atrasadas:', e.message)
- }
+    enviarPush(
+      `⏰ ${rows.length} compra(s) atrasada(s)`,
+      rows
+        .map((c) => c.descricao)
+        .slice(0, 3)
+        .join(', '),
+      '/HTML/estoque/compras.html',
+      'compras_atrasadas'
+    ).catch(() => {})
+    enviarEmail(
+      `⏰ ALERTA: ${rows.length} compra(s) atrasada(s) na entrega`,
+      `<h2 style="color:#ED3237;margin:0 0 16px">⏰ Compras com Entrega Atrasada</h2><p style="margin:0 0 12px;color:#8a6a6a">As compras abaixo passaram da data prevista de chegada e ainda não foram marcadas como recebidas:</p><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Item</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Fornecedor</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Destino</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #ED3237">Situação</th></tr></thead><tbody>${linhas}</tbody></table>`,
+      ['admin', 'compras']
+    )
+    console.log(`Alerta de compras atrasadas enviado: ${rows.length}`)
+  } catch (e) {
+    console.error('Erro no alerta de compras atrasadas:', e.message)
+  }
 }
 
 setTimeout(verificarComprasAtrasadas, 120 * 1000)
@@ -964,159 +1163,229 @@ const SQL_EMBARQUES_PENDENTES = `
  ORDER BY p.numero_pi ASC`
 
 async function verificarEmbarquesPendentes() {
- try {
- const [rows] = await pool.query(SQL_EMBARQUES_PENDENTES)
- if (!rows.length) return
- if (!(await podeEnviarHoje('embarques_pendentes'))) return
- const linhas = rows.map((p) => `<tr><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;font-weight:700">PI ${p.numero_pi}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${p.cliente || '—'}</td></tr>`).join('')
- enviarPush(`🚢 ${rows.length} PI(s) prontas sem data de embarque`, rows.map((p) => `PI ${p.numero_pi}`).join(', '), '/HTML/estoque/embarques.html', 'embarques_pendentes').catch(() => {})
- enviarEmail(
- `${rows.length} PI(s) pronta(s) aguardando data de embarque`,
- `<h2 style="color:#1565C0;margin:0 0 16px">PIs prontas sem data de embarque</h2><p style="margin:0 0 12px;color:#8a6a6a">As PIs abaixo já estão liberadas para produção, mas ainda não têm data de embarque definida. Gerente: por favor, declare o embarque.</p><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #1565C0">PI</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #1565C0">Cliente</th></tr></thead><tbody>${linhas}</tbody></table>`,
- ['admin', 'gerente_producao']
- )
- console.log(`Aviso de embarques pendentes enviado: ${rows.length} PI(s)`)
- } catch (e) {
- console.error('Erro no aviso de embarques pendentes:', e.message)
- }
+  try {
+    const [rows] = await pool.query(SQL_EMBARQUES_PENDENTES)
+    if (!rows.length) return
+    if (!(await podeEnviarHoje('embarques_pendentes'))) return
+    const linhas = rows
+      .map(
+        (p) =>
+          `<tr><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0;font-weight:700">PI ${p.numero_pi}</td><td style="padding:8px 10px;border-bottom:1px solid #f0d0d0">${p.cliente || '—'}</td></tr>`
+      )
+      .join('')
+    enviarPush(
+      `🚢 ${rows.length} PI(s) prontas sem data de embarque`,
+      rows.map((p) => `PI ${p.numero_pi}`).join(', '),
+      '/HTML/estoque/embarques.html',
+      'embarques_pendentes'
+    ).catch(() => {})
+    enviarEmail(
+      `${rows.length} PI(s) pronta(s) aguardando data de embarque`,
+      `<h2 style="color:#1565C0;margin:0 0 16px">PIs prontas sem data de embarque</h2><p style="margin:0 0 12px;color:#8a6a6a">As PIs abaixo já estão liberadas para produção, mas ainda não têm data de embarque definida. Gerente: por favor, declare o embarque.</p><table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #1565C0">PI</th><th style="text-align:left;padding:8px 10px;border-bottom:2px solid #1565C0">Cliente</th></tr></thead><tbody>${linhas}</tbody></table>`,
+      ['admin', 'gerente_producao']
+    )
+    console.log(`Aviso de embarques pendentes enviado: ${rows.length} PI(s)`)
+  } catch (e) {
+    console.error('Erro no aviso de embarques pendentes:', e.message)
+  }
 }
 
 setTimeout(verificarEmbarquesPendentes, 150 * 1000)
 setInterval(verificarEmbarquesPendentes, 24 * 60 * 60 * 1000)
 
 app.get('/api/demandas', autenticar(TODOS), async (req, res) => {
- const [rows] = await pool.query(`
+  const [rows] = await pool.query(`
  SELECT d.*, p.numero_pi, p.cliente
  FROM demandas d
  LEFT JOIN pedidos p ON p.id = d.pi_id
  ORDER BY (d.status <> 'pendente'), d.criado_em DESC LIMIT 300`)
- res.json(rows)
+  res.json(rows)
 })
 
 app.post('/api/demandas', autenticar(['admin', 'almoxarifado']), async (req, res) => {
- const { descricao, quantidade, unidade, pi_id, observacoes } = req.body
- const categoria = req.body.categoria === 'aromas' ? 'aromas' : 'gerais'
- if (!descricao) return res.status(400).json({ erro: 'Informe o que está faltando.' })
+  const { descricao, quantidade, unidade, pi_id, observacoes } = req.body
+  const categoria = req.body.categoria === 'aromas' ? 'aromas' : 'gerais'
+  if (!descricao) return res.status(400).json({ erro: 'Informe o que está faltando.' })
 
- const [r] = await pool.query(
- `INSERT INTO demandas (descricao, quantidade, unidade, pi_id, observacoes, solicitante, categoria)
+  const [r] = await pool.query(
+    `INSERT INTO demandas (descricao, quantidade, unidade, pi_id, observacoes, solicitante, categoria)
  VALUES (?, ?, ?, ?, ?, ?, ?)`,
- [descricao, parseFloat(quantidade) || 0, unidade || null, pi_id || null, observacoes || null, req.usuario && req.usuario.nome ? req.usuario.nome : null, categoria]
- )
+    [
+      descricao,
+      parseFloat(quantidade) || 0,
+      unidade || null,
+      pi_id || null,
+      observacoes || null,
+      req.usuario && req.usuario.nome ? req.usuario.nome : null,
+      categoria
+    ]
+  )
 
- const destino = categoria === 'aromas' ? ['admin', 'compras_aromas'] : ['admin', 'compras']
- const label = categoria === 'aromas' ? 'Aromas' : 'Insumos gerais'
- const [[pi]] = pi_id ? await pool.query('SELECT numero_pi FROM pedidos WHERE id = ?', [pi_id]) : [[null]]
- enviarPush(`🛒 Novo pedido ao Compras`, `${descricao}${pi && pi.numero_pi ? ' · PI ' + pi.numero_pi : ''}`, '/HTML/estoque/compras.html', `demanda_${Date.now()}`).catch(() => {})
- enviarEmail(
- `Novo pedido ao Compras (${label}) — ${descricao}`,
- `<h2 style="color:#6A1B9A;margin:0 0 16px">Novo Pedido ao Compras — ${label}</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:160px">Item</td><td style="padding:8px 0;font-weight:600">${descricao}</td></tr>
+  const destino = categoria === 'aromas' ? ['admin', 'compras_aromas'] : ['admin', 'compras']
+  const label = categoria === 'aromas' ? 'Aromas' : 'Insumos gerais'
+  const [[pi]] = pi_id ? await pool.query('SELECT numero_pi FROM pedidos WHERE id = ?', [pi_id]) : [[null]]
+  enviarPush(
+    `🛒 Novo pedido ao Compras`,
+    `${descricao}${pi && pi.numero_pi ? ' · PI ' + pi.numero_pi : ''}`,
+    '/HTML/estoque/compras.html',
+    `demanda_${Date.now()}`
+  ).catch(() => {})
+  enviarEmail(
+    `Novo pedido ao Compras (${label}) — ${descricao}`,
+    `<h2 style="color:#6A1B9A;margin:0 0 16px">Novo Pedido ao Compras — ${label}</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:160px">Item</td><td style="padding:8px 0;font-weight:600">${descricao}</td></tr>
  ${parseFloat(quantidade) > 0 ? `<tr><td style="padding:8px 0;color:#8a6a6a">Quantidade</td><td style="padding:8px 0;font-weight:600">${quantidade} ${unidade || ''}</td></tr>` : ''}
  ${pi && pi.numero_pi ? `<tr><td style="padding:8px 0;color:#8a6a6a">PI</td><td style="padding:8px 0;font-weight:600">${pi.numero_pi}</td></tr>` : ''}
  ${req.usuario && req.usuario.nome ? `<tr><td style="padding:8px 0;color:#8a6a6a">Solicitante</td><td style="padding:8px 0;font-weight:600">${req.usuario.nome}</td></tr>` : ''}
  </table><p style="margin:16px 0 0;color:#6A1B9A;font-weight:600">Compras: verificar disponibilidade e marcar "Tenho" ou "Não tenho".</p>`,
- destino
- )
- res.json({ id: r.insertId })
+    destino
+  )
+  res.json({ id: r.insertId })
 })
 
 app.patch('/api/demandas/:id/status', autenticar(['admin', 'compras', 'compras_aromas']), async (req, res) => {
- const { status } = req.body
- if (!['tem', 'nao_tem', 'pendente'].includes(status)) return res.status(400).json({ erro: 'Status inválido.' })
- const quem = req.usuario && req.usuario.nome ? req.usuario.nome : null
- await pool.query('UPDATE demandas SET status = ?, respondido_por = ?, respondido_em = NOW() WHERE id = ?', [status, quem, req.params.id])
+  const { status } = req.body
+  if (!['tem', 'nao_tem', 'pendente'].includes(status)) return res.status(400).json({ erro: 'Status inválido.' })
+  const quem = req.usuario && req.usuario.nome ? req.usuario.nome : null
+  await pool.query('UPDATE demandas SET status = ?, respondido_por = ?, respondido_em = NOW() WHERE id = ?', [
+    status,
+    quem,
+    req.params.id
+  ])
 
- const [[d]] = await pool.query('SELECT d.*, p.numero_pi FROM demandas d LEFT JOIN pedidos p ON p.id = d.pi_id WHERE d.id = ?', [req.params.id])
- if (d) {
- const label = status === 'tem' ? 'TEM em estoque' : status === 'nao_tem' ? 'NÃO TEM — precisa comprar' : 'Pendente'
- const cor = status === 'nao_tem' ? '#ED3237' : '#2E7D32'
- enviarPush(`Demanda respondida — ${status === 'nao_tem' ? '❌ NÃO TEM' : status === 'tem' ? '✅ TEM' : '⏳ Pendente'}`, `${d.descricao}${d.numero_pi ? ' · PI ' + d.numero_pi : ''}`, '/HTML/estoque/compras.html', `demanda_resp_${req.params.id}`).catch(() => {})
- enviarEmail(
- `Demanda respondida (${status === 'nao_tem' ? 'NÃO TEM' : status === 'tem' ? 'TEM' : 'pendente'}) — ${d.descricao}`,
- `<h2 style="color:${cor};margin:0 0 16px">Demanda de Compra Respondida</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:160px">Item</td><td style="padding:8px 0;font-weight:600">${d.descricao}</td></tr>
+  const [[d]] = await pool.query(
+    'SELECT d.*, p.numero_pi FROM demandas d LEFT JOIN pedidos p ON p.id = d.pi_id WHERE d.id = ?',
+    [req.params.id]
+  )
+  if (d) {
+    const label = status === 'tem' ? 'TEM em estoque' : status === 'nao_tem' ? 'NÃO TEM — precisa comprar' : 'Pendente'
+    const cor = status === 'nao_tem' ? '#ED3237' : '#2E7D32'
+    enviarPush(
+      `Demanda respondida — ${status === 'nao_tem' ? '❌ NÃO TEM' : status === 'tem' ? '✅ TEM' : '⏳ Pendente'}`,
+      `${d.descricao}${d.numero_pi ? ' · PI ' + d.numero_pi : ''}`,
+      '/HTML/estoque/compras.html',
+      `demanda_resp_${req.params.id}`
+    ).catch(() => {})
+    enviarEmail(
+      `Demanda respondida (${status === 'nao_tem' ? 'NÃO TEM' : status === 'tem' ? 'TEM' : 'pendente'}) — ${d.descricao}`,
+      `<h2 style="color:${cor};margin:0 0 16px">Demanda de Compra Respondida</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px 0;color:#8a6a6a;width:160px">Item</td><td style="padding:8px 0;font-weight:600">${d.descricao}</td></tr>
  ${d.numero_pi ? `<tr><td style="padding:8px 0;color:#8a6a6a">PI</td><td style="padding:8px 0;font-weight:600">${d.numero_pi}</td></tr>` : ''}
  <tr><td style="padding:8px 0;color:#8a6a6a">Resposta</td><td style="padding:8px 0;font-weight:700;color:${cor}">${label}</td></tr>
  ${quem ? `<tr><td style="padding:8px 0;color:#8a6a6a">Respondido por</td><td style="padding:8px 0;font-weight:600">${quem}</td></tr>` : ''}
  </table>`,
- ['admin', 'almoxarifado', 'compras', 'compras_aromas']
- )
- }
- res.json({ ok: true })
+      ['admin', 'almoxarifado', 'compras', 'compras_aromas']
+    )
+  }
+  res.json({ ok: true })
 })
 
 app.delete('/api/demandas/:id', autenticar(['admin', 'almoxarifado']), async (req, res) => {
- await pool.query('DELETE FROM demandas WHERE id = ?', [req.params.id])
- res.json({ ok: true })
+  await pool.query('DELETE FROM demandas WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
 })
 
 const EMAILS_FINANCEIRO = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'joaoantonio@pietrobon.com.br']
 
 function autenticarContabil() {
- const base = autenticar(['admin'])
- return (req, res, next) => base(req, res, () => {
- if (!EMAILS_FINANCEIRO.includes((req.usuario.email || '').toLowerCase())) {
- return res.status(403).json({ erro: 'Sem permissão' })
- }
- next()
- })
+  const base = autenticar(['admin'])
+  return (req, res, next) =>
+    base(req, res, () => {
+      if (!EMAILS_FINANCEIRO.includes((req.usuario.email || '').toLowerCase())) {
+        return res.status(403).json({ erro: 'Sem permissão' })
+      }
+      next()
+    })
 }
 
-const CAMPOS_NFE = ['ano', 'mes', 'data', 'nf', 'fatura', 'num_due', 'data_due',
- 'num_conhecimento', 'data_conhecimento', 'tipo', 'valor_nfe', 'peso', 'vendedor', 'produto', 'pais']
+const CAMPOS_NFE = [
+  'ano',
+  'mes',
+  'data',
+  'nf',
+  'fatura',
+  'num_due',
+  'data_due',
+  'num_conhecimento',
+  'data_conhecimento',
+  'tipo',
+  'valor_nfe',
+  'peso',
+  'vendedor',
+  'produto',
+  'pais'
+]
 
 app.get('/api/contabil/anos', autenticarContabil(), async (req, res) => {
- const [rows] = await pool.query('SELECT DISTINCT ano FROM nfe_lancamentos ORDER BY ano DESC')
- const anos = rows.map((r) => r.ano)
- const atual = new Date().getFullYear()
- if (!anos.includes(atual)) anos.unshift(atual)
- res.json(anos)
+  const [rows] = await pool.query('SELECT DISTINCT ano FROM nfe_lancamentos ORDER BY ano DESC')
+  const anos = rows.map((r) => r.ano)
+  const atual = new Date().getFullYear()
+  if (!anos.includes(atual)) anos.unshift(atual)
+  res.json(anos)
 })
 
 app.get('/api/contabil', autenticarContabil(), async (req, res) => {
- const ano = parseInt(req.query.ano) || new Date().getFullYear()
- const [rows] = await pool.query(
- 'SELECT * FROM nfe_lancamentos WHERE ano = ? ORDER BY mes ASC, data ASC, id ASC', [ano])
- res.json(rows)
+  const ano = parseInt(req.query.ano) || new Date().getFullYear()
+  const [rows] = await pool.query('SELECT * FROM nfe_lancamentos WHERE ano = ? ORDER BY mes ASC, data ASC, id ASC', [
+    ano
+  ])
+  res.json(rows)
 })
 
 app.post('/api/contabil', autenticarContabil(), async (req, res) => {
- const b = req.body
- if (!b.ano || !b.mes) return res.status(400).json({ erro: 'Ano e mês são obrigatórios.' })
- const vals = CAMPOS_NFE.map((c) => {
- let v = b[c]
- if (v === '' || v === undefined) v = null
- if ((c === 'valor_nfe' || c === 'peso') && v !== null) v = parseFloat(String(v).replace(',', '.')) || 0
- if ((c === 'ano' || c === 'mes') && v !== null) v = parseInt(v)
- return v
- })
- const [r] = await pool.query(
- `INSERT INTO nfe_lancamentos (${CAMPOS_NFE.join(', ')}) VALUES (${CAMPOS_NFE.map(() => '?').join(', ')})`, vals)
- res.json({ id: r.insertId })
+  const b = req.body
+  if (!b.ano || !b.mes) return res.status(400).json({ erro: 'Ano e mês são obrigatórios.' })
+  const vals = CAMPOS_NFE.map((c) => {
+    let v = b[c]
+    if (v === '' || v === undefined) v = null
+    if ((c === 'valor_nfe' || c === 'peso') && v !== null) v = parseFloat(String(v).replace(',', '.')) || 0
+    if ((c === 'ano' || c === 'mes') && v !== null) v = parseInt(v)
+    return v
+  })
+  const [r] = await pool.query(
+    `INSERT INTO nfe_lancamentos (${CAMPOS_NFE.join(', ')}) VALUES (${CAMPOS_NFE.map(() => '?').join(', ')})`,
+    vals
+  )
+  res.json({ id: r.insertId })
 })
 
 app.patch('/api/contabil/:id', autenticarContabil(), async (req, res) => {
- const sets = [], vals = []
- for (const c of CAMPOS_NFE) {
- if (c in req.body) {
- let v = req.body[c]
- if (v === '' || v === undefined) v = null
- if ((c === 'valor_nfe' || c === 'peso') && v !== null) v = parseFloat(String(v).replace(',', '.')) || 0
- if ((c === 'ano' || c === 'mes') && v !== null) v = parseInt(v)
- sets.push(`${c} = ?`); vals.push(v)
- }
- }
- if (!sets.length) return res.json({ ok: true })
- vals.push(req.params.id)
- await pool.query(`UPDATE nfe_lancamentos SET ${sets.join(', ')} WHERE id = ?`, vals)
- res.json({ ok: true })
+  const sets = [],
+    vals = []
+  for (const c of CAMPOS_NFE) {
+    if (c in req.body) {
+      let v = req.body[c]
+      if (v === '' || v === undefined) v = null
+      if ((c === 'valor_nfe' || c === 'peso') && v !== null) v = parseFloat(String(v).replace(',', '.')) || 0
+      if ((c === 'ano' || c === 'mes') && v !== null) v = parseInt(v)
+      sets.push(`${c} = ?`)
+      vals.push(v)
+    }
+  }
+  if (!sets.length) return res.json({ ok: true })
+  vals.push(req.params.id)
+  await pool.query(`UPDATE nfe_lancamentos SET ${sets.join(', ')} WHERE id = ?`, vals)
+  res.json({ ok: true })
 })
 
 app.delete('/api/contabil/:id', autenticarContabil(), async (req, res) => {
- await pool.query('DELETE FROM nfe_lancamentos WHERE id = ?', [req.params.id])
- res.json({ ok: true })
+  await pool.query('DELETE FROM nfe_lancamentos WHERE id = ?', [req.params.id])
+  res.json({ ok: true })
 })
 
-const NOMES_MESES_EC = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+const NOMES_MESES_EC = [
+  '',
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro'
+]
 
 async function inicializarContabExportacao() {
   let ecSeed
@@ -1158,22 +1427,50 @@ async function inicializarFinanceiro() {
 }
 setTimeout(inicializarFinanceiro, 5000)
 const EC_MOD = {
-  exterior: { tabela: 'ec_lanc_exterior', col: 'cliente_id', ent: 'ec_clientes', aumenta: 'debito', diminui: 'baixa', temFatura: true },
-  adiant_clientes: { tabela: 'ec_lanc_adiant_clientes', col: 'cliente_id', ent: 'ec_clientes', aumenta: 'credito', diminui: 'debito', temFatura: false },
-  adiant_fornecedores: { tabela: 'ec_lanc_adiant_fornecedores', col: 'fornecedor_id', ent: 'ec_fornecedores', aumenta: 'debito', diminui: 'pagamento', temFatura: false }
+  exterior: {
+    tabela: 'ec_lanc_exterior',
+    col: 'cliente_id',
+    ent: 'ec_clientes',
+    aumenta: 'debito',
+    diminui: 'baixa',
+    temFatura: true
+  },
+  adiant_clientes: {
+    tabela: 'ec_lanc_adiant_clientes',
+    col: 'cliente_id',
+    ent: 'ec_clientes',
+    aumenta: 'credito',
+    diminui: 'debito',
+    temFatura: false
+  },
+  adiant_fornecedores: {
+    tabela: 'ec_lanc_adiant_fornecedores',
+    col: 'fornecedor_id',
+    ent: 'ec_fornecedores',
+    aumenta: 'debito',
+    diminui: 'pagamento',
+    temFatura: false
+  }
 }
-function ecCfg(modulo) { return EC_MOD[modulo] || null }
+function ecCfg(modulo) {
+  return EC_MOD[modulo] || null
+}
 
 app.get('/api/ec/meses', autenticarContabil(), async (req, res) => {
   const [rows] = await pool.query('SELECT * FROM ec_meses ORDER BY ano DESC, mes DESC')
   res.json(rows)
 })
 app.post('/api/ec/meses', autenticarContabil(), async (req, res) => {
-  const ano = parseInt(req.body.ano), mes = parseInt(req.body.mes)
+  const ano = parseInt(req.body.ano),
+    mes = parseInt(req.body.mes)
   if (!(ano > 2000) || !(mes >= 1 && mes <= 12)) return res.status(400).json({ erro: 'Ano/mês inválido.' })
   const [ex] = await pool.query('SELECT id FROM ec_meses WHERE ano = ? AND mes = ?', [ano, mes])
   if (ex.length) return res.json({ id: ex[0].id })
-  const [r] = await pool.query('INSERT INTO ec_meses (ano, mes, nome) VALUES (?, ?, ?)', [ano, mes, `${NOMES_MESES_EC[mes]} ${ano}`])
+  const [r] = await pool.query('INSERT INTO ec_meses (ano, mes, nome) VALUES (?, ?, ?)', [
+    ano,
+    mes,
+    `${NOMES_MESES_EC[mes]} ${ano}`
+  ])
   res.json({ id: r.insertId })
 })
 app.delete('/api/ec/meses/:id', autenticarContabil(), async (req, res) => {
@@ -1192,7 +1489,10 @@ app.post('/api/ec/entidades', autenticarContabil(), async (req, res) => {
   if (req.body.tipo === 'fornecedores') {
     await pool.query('INSERT IGNORE INTO ec_fornecedores (nome) VALUES (?)', [nome])
   } else {
-    await pool.query('INSERT IGNORE INTO ec_clientes (nome, pais) VALUES (?, ?)', [nome, (req.body.pais || '').trim() || null])
+    await pool.query('INSERT IGNORE INTO ec_clientes (nome, pais) VALUES (?, ?)', [
+      nome,
+      (req.body.pais || '').trim() || null
+    ])
   }
   res.json({ ok: true })
 })
@@ -1215,39 +1515,63 @@ app.get('/api/ec/saldos', autenticarContabil(), async (req, res) => {
     const [[ant]] = await pool.query(
       `SELECT COALESCE(SUM(CASE WHEN l.tipo = ? THEN l.valor ELSE 0 END),0) - COALESCE(SUM(CASE WHEN l.tipo = ? THEN l.valor ELSE 0 END),0) AS s
        FROM ${cfg.tabela} l JOIN ec_meses m ON m.id = l.mes_id
-       WHERE l.${cfg.col} = ? AND (m.ano*12+m.mes) < ?`, [cfg.aumenta, cfg.diminui, ent.id, chave])
+       WHERE l.${cfg.col} = ? AND (m.ano*12+m.mes) < ?`,
+      [cfg.aumenta, cfg.diminui, ent.id, chave]
+    )
     const [[mov]] = await pool.query(
       `SELECT COALESCE(SUM(CASE WHEN tipo = ? THEN valor ELSE 0 END),0) AS aumenta,
               COALESCE(SUM(CASE WHEN tipo = ? THEN valor ELSE 0 END),0) AS diminui
-       FROM ${cfg.tabela} WHERE ${cfg.col} = ? AND mes_id = ?`, [cfg.aumenta, cfg.diminui, ent.id, mesId])
-    const anterior = Number(ant.s) || 0, aumenta = Number(mov.aumenta) || 0, diminui = Number(mov.diminui) || 0
-    linhas.push({ id: ent.id, nome: ent.nome, pais: ent.pais || '', anterior, aumenta, diminui, atual: anterior + aumenta - diminui })
+       FROM ${cfg.tabela} WHERE ${cfg.col} = ? AND mes_id = ?`,
+      [cfg.aumenta, cfg.diminui, ent.id, mesId]
+    )
+    const anterior = Number(ant.s) || 0,
+      aumenta = Number(mov.aumenta) || 0,
+      diminui = Number(mov.diminui) || 0
+    linhas.push({
+      id: ent.id,
+      nome: ent.nome,
+      pais: ent.pais || '',
+      anterior,
+      aumenta,
+      diminui,
+      atual: anterior + aumenta - diminui
+    })
   }
   res.json({ mes, temFatura: cfg.temFatura, linhas })
 })
 
 app.get('/api/ec/lancamentos', autenticarContabil(), async (req, res) => {
   const cfg = ecCfg(req.query.modulo)
-  const mesId = parseInt(req.query.mesId), entidadeId = parseInt(req.query.entidadeId)
+  const mesId = parseInt(req.query.mesId),
+    entidadeId = parseInt(req.query.entidadeId)
   if (!cfg || !mesId || !entidadeId) return res.status(400).json({ erro: 'Parâmetros inválidos.' })
-  const [rows] = await pool.query(`SELECT * FROM ${cfg.tabela} WHERE ${cfg.col} = ? AND mes_id = ? ORDER BY data_lanc, id`, [entidadeId, mesId])
+  const [rows] = await pool.query(
+    `SELECT * FROM ${cfg.tabela} WHERE ${cfg.col} = ? AND mes_id = ? ORDER BY data_lanc, id`,
+    [entidadeId, mesId]
+  )
   res.json({ temFatura: cfg.temFatura, lancamentos: rows })
 })
 app.post('/api/ec/lancamentos', autenticarContabil(), async (req, res) => {
   const cfg = ecCfg(req.body.modulo)
-  const mesId = parseInt(req.body.mesId), entidadeId = parseInt(req.body.entidadeId)
-  const tipo = req.body.tipo, data = req.body.data_lanc
+  const mesId = parseInt(req.body.mesId),
+    entidadeId = parseInt(req.body.entidadeId)
+  const tipo = req.body.tipo,
+    data = req.body.data_lanc
   const valor = parseFloat(String(req.body.valor || '').replace(',', '.'))
   if (!cfg || !mesId || !entidadeId || !data || !(valor >= 0) || ![cfg.aumenta, cfg.diminui].includes(tipo)) {
     return res.status(400).json({ erro: 'Preencha tipo, data e valor corretamente.' })
   }
   const obs = (req.body.observacao || '').trim() || null
   if (cfg.temFatura) {
-    await pool.query(`INSERT INTO ${cfg.tabela} (mes_id, ${cfg.col}, tipo, data_lanc, valor, fatura, observacao) VALUES (?,?,?,?,?,?,?)`,
-      [mesId, entidadeId, tipo, data, valor, (req.body.fatura || '').trim() || null, obs])
+    await pool.query(
+      `INSERT INTO ${cfg.tabela} (mes_id, ${cfg.col}, tipo, data_lanc, valor, fatura, observacao) VALUES (?,?,?,?,?,?,?)`,
+      [mesId, entidadeId, tipo, data, valor, (req.body.fatura || '').trim() || null, obs]
+    )
   } else {
-    await pool.query(`INSERT INTO ${cfg.tabela} (mes_id, ${cfg.col}, tipo, data_lanc, valor, observacao) VALUES (?,?,?,?,?,?)`,
-      [mesId, entidadeId, tipo, data, valor, obs])
+    await pool.query(
+      `INSERT INTO ${cfg.tabela} (mes_id, ${cfg.col}, tipo, data_lanc, valor, observacao) VALUES (?,?,?,?,?,?)`,
+      [mesId, entidadeId, tipo, data, valor, obs]
+    )
   }
   res.json({ ok: true })
 })
@@ -1269,9 +1593,13 @@ async function importacoesComputadas() {
     SELECT i.*, f.nome AS fornecedor_nome, f.pais AS fornecedor_pais
     FROM fin_importacoes i LEFT JOIN fin_fornecedores f ON f.id = i.fornecedor_id
     ORDER BY i.data_invoice DESC, i.id DESC`)
-  const [pgs] = await pool.query('SELECT importacao_id, COALESCE(SUM(valor_reais),0) AS pago, COALESCE(SUM(valor_moeda),0) AS pago_moeda FROM fin_pagamentos GROUP BY importacao_id')
+  const [pgs] = await pool.query(
+    'SELECT importacao_id, COALESCE(SUM(valor_reais),0) AS pago, COALESCE(SUM(valor_moeda),0) AS pago_moeda FROM fin_pagamentos GROUP BY importacao_id'
+  )
   const mapa = {}
-  pgs.forEach((p) => { mapa[p.importacao_id] = { pago: Number(p.pago) || 0, pago_moeda: Number(p.pago_moeda) || 0 } })
+  pgs.forEach((p) => {
+    mapa[p.importacao_id] = { pago: Number(p.pago) || 0, pago_moeda: Number(p.pago_moeda) || 0 }
+  })
   return imps.map((i) => {
     const vr = Number(i.valor_reais) || 0
     const pago = mapa[i.id] ? mapa[i.id].pago : 0
@@ -1295,23 +1623,36 @@ async function migrarFinanceiro() {
         UPDATE fin_pagamentos p JOIN fin_importacoes i ON i.id = p.importacao_id
         SET p.valor_moeda = ROUND(p.valor_reais / i.taxa_cambio, 2)
         WHERE (p.valor_moeda IS NULL OR p.valor_moeda = 0) AND i.taxa_cambio > 0 AND p.valor_reais > 0`)
-      await pool.query("INSERT INTO notif_log (chave, ultima_data) VALUES ('backfill_pag_usd', CURDATE()) ON DUPLICATE KEY UPDATE ultima_data = CURDATE()")
+      await pool.query(
+        "INSERT INTO notif_log (chave, ultima_data) VALUES ('backfill_pag_usd', CURDATE()) ON DUPLICATE KEY UPDATE ultima_data = CURDATE()"
+      )
       console.log('Backfill USD dos pagamentos:', r.affectedRows, 'linhas.')
     }
     try {
       const [uc] = await pool.query("SHOW COLUMNS FROM fin_custos LIKE 'unidade'")
       if (!uc.length) await pool.query("ALTER TABLE fin_custos ADD COLUMN unidade VARCHAR(4) DEFAULT 'KG'")
       const [pc] = await pool.query("SHOW COLUMNS FROM fin_custos LIKE 'produto'")
-      if (!pc.length) await pool.query("ALTER TABLE fin_custos ADD COLUMN produto VARCHAR(200)")
+      if (!pc.length) await pool.query('ALTER TABLE fin_custos ADD COLUMN produto VARCHAR(200)')
     } catch (e) {}
-  } catch (e) { console.error('Erro migração financeiro:', e.message) }
+  } catch (e) {
+    console.error('Erro migração financeiro:', e.message)
+  }
 }
 setTimeout(migrarFinanceiro, 7000)
 
 const EMAILS_RESUMO_IMPORT = ['joaoantonio@pietrobon.com.br', 'export2@pietrobon.com.br']
-function _brl(n) { return 'R$ ' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
-function _num2(n) { return (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
-function _escEmail(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
+function _brl(n) {
+  return 'R$ ' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function _num2(n) {
+  return (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function _escEmail(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
 
 async function montarCorpoResumoImport() {
   const imps = await importacoesComputadas()
@@ -1320,7 +1661,7 @@ async function montarCorpoResumoImport() {
     const smRegistrado = Number(i.saldo_moeda) || 0
     const pmRegistrado = i._vm - smRegistrado
     const taxa = Number(i.taxa_cambio) || 0
-    i._pm = pmRegistrado > 0.01 ? pmRegistrado : (taxa > 0 ? (i.pago / taxa) : 0)
+    i._pm = pmRegistrado > 0.01 ? pmRegistrado : taxa > 0 ? i.pago / taxa : 0
     if (i._pm > i._vm) i._pm = i._vm
     i._sm = i._vm - i._pm
   })
@@ -1388,7 +1729,9 @@ async function enviarResumoSemanalImportacao(forcar = false) {
     }
     const corpo = await montarCorpoResumoImport()
     await enviarEmailPara('Resumo Semanal de Importação', corpo, EMAILS_RESUMO_IMPORT)
-  } catch (e) { console.error('Erro resumo semanal import:', e.message) }
+  } catch (e) {
+    console.error('Erro resumo semanal import:', e.message)
+  }
 }
 setTimeout(() => enviarResumoSemanalImportacao(false), 200 * 1000)
 setInterval(() => enviarResumoSemanalImportacao(false), 24 * 60 * 60 * 1000)
@@ -1413,21 +1756,28 @@ app.get('/api/fin/resumo', autenticarContabil(), async (req, res) => {
     porForn[k].saldo += i.saldo
   })
   res.json({
-    totalImportado, totalPago, saldoDevedor: totalImportado - totalPago,
-    qtd: imps.length, contagem: cont,
+    totalImportado,
+    totalPago,
+    saldoDevedor: totalImportado - totalPago,
+    qtd: imps.length,
+    contagem: cont,
     porFornecedor: Object.values(porForn).sort((a, b) => b.saldo - a.saldo),
     importacoes: imps
   })
 })
 
 const _ptaxCache = {}
-function _fmtBCB(d) { const [y, m, dd] = d.split('-'); return `${m}-${dd}-${y}` }
+function _fmtBCB(d) {
+  const [y, m, dd] = d.split('-')
+  return `${m}-${dd}-${y}`
+}
 app.get('/api/fin/ptax', autenticarContabil(), async (req, res) => {
   const data = String(req.query.data || '').slice(0, 10)
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return res.status(400).json({ erro: 'Data inválida.' })
   if (_ptaxCache[data]) return res.json(_ptaxCache[data])
   try {
-    const ini = new Date(data + 'T00:00:00'); ini.setDate(ini.getDate() - 12)
+    const ini = new Date(data + 'T00:00:00')
+    ini.setDate(ini.getDate() - 12)
     const iniStr = ini.toISOString().slice(0, 10)
     const url = `https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)?@dataInicial='${_fmtBCB(iniStr)}'&@dataFinalCotacao='${_fmtBCB(data)}'&$top=100&$orderby=dataHoraCotacao%20desc&$format=json`
     const resp = await fetch(url)
@@ -1452,14 +1802,26 @@ app.get('/api/fin/fornecedores', autenticarContabil(), async (req, res) => {
 app.post('/api/fin/fornecedores', autenticarContabil(), async (req, res) => {
   const b = req.body
   if (!(b.nome || '').trim()) return res.status(400).json({ erro: 'Informe o nome.' })
-  await pool.query('INSERT INTO fin_fornecedores (nome, pais, moeda, contato, email, obs) VALUES (?,?,?,?,?,?)',
-    [b.nome.trim(), b.pais || null, b.moeda || 'USD', b.contato || null, b.email || null, b.obs || null])
+  await pool.query('INSERT INTO fin_fornecedores (nome, pais, moeda, contato, email, obs) VALUES (?,?,?,?,?,?)', [
+    b.nome.trim(),
+    b.pais || null,
+    b.moeda || 'USD',
+    b.contato || null,
+    b.email || null,
+    b.obs || null
+  ])
   res.json({ ok: true })
 })
 app.patch('/api/fin/fornecedores/:id', autenticarContabil(), async (req, res) => {
   const campos = ['nome', 'pais', 'moeda', 'contato', 'email', 'obs', 'ativo']
-  const sets = [], vals = []
-  for (const c of campos) { if (c in req.body) { sets.push(`${c} = ?`); vals.push(req.body[c] === '' ? null : req.body[c]) } }
+  const sets = [],
+    vals = []
+  for (const c of campos) {
+    if (c in req.body) {
+      sets.push(`${c} = ?`)
+      vals.push(req.body[c] === '' ? null : req.body[c])
+    }
+  }
   if (!sets.length) return res.json({ ok: true })
   vals.push(req.params.id)
   await pool.query(`UPDATE fin_fornecedores SET ${sets.join(', ')} WHERE id = ?`, vals)
@@ -1470,8 +1832,20 @@ app.delete('/api/fin/fornecedores/:id', autenticarContabil(), async (req, res) =
   res.json({ ok: true })
 })
 
-const CAMPOS_IMP = ['fornecedor_id', 'invoice', 'data_invoice', 'mercadoria', 'moeda', 'valor_moeda', 'taxa_cambio', 'banco', 'obs']
-function calcValorReais(b) { return (parseFloat(b.valor_moeda) || 0) * (parseFloat(b.taxa_cambio) || 0) }
+const CAMPOS_IMP = [
+  'fornecedor_id',
+  'invoice',
+  'data_invoice',
+  'mercadoria',
+  'moeda',
+  'valor_moeda',
+  'taxa_cambio',
+  'banco',
+  'obs'
+]
+function calcValorReais(b) {
+  return (parseFloat(b.valor_moeda) || 0) * (parseFloat(b.taxa_cambio) || 0)
+}
 app.post('/api/fin/importacoes', autenticarContabil(), async (req, res) => {
   const b = req.body
   if (!b.invoice) return res.status(400).json({ erro: 'Informe o Nº do invoice.' })
@@ -1479,14 +1853,37 @@ app.post('/api/fin/importacoes', autenticarContabil(), async (req, res) => {
   await pool.query(
     `INSERT INTO fin_importacoes (fornecedor_id, invoice, data_invoice, mercadoria, moeda, valor_moeda, taxa_cambio, valor_reais, banco, obs)
      VALUES (?,?,?,?,?,?,?,?,?,?)`,
-    [b.fornecedor_id || null, b.invoice, b.data_invoice || null, b.mercadoria || null, b.moeda || 'USD',
-     parseFloat(b.valor_moeda) || 0, parseFloat(b.taxa_cambio) || 0, valorReais, b.banco || null, b.obs || null])
+    [
+      b.fornecedor_id || null,
+      b.invoice,
+      b.data_invoice || null,
+      b.mercadoria || null,
+      b.moeda || 'USD',
+      parseFloat(b.valor_moeda) || 0,
+      parseFloat(b.taxa_cambio) || 0,
+      valorReais,
+      b.banco || null,
+      b.obs || null
+    ]
+  )
   res.json({ ok: true })
 })
 app.patch('/api/fin/importacoes/:id', autenticarContabil(), async (req, res) => {
-  const sets = [], vals = []
-  for (const c of CAMPOS_IMP) { if (c in req.body) { let v = req.body[c]; if (v === '') v = null; if (c === 'valor_moeda' || c === 'taxa_cambio') v = parseFloat(v) || 0; sets.push(`${c} = ?`); vals.push(v) } }
-  if ('valor_moeda' in req.body || 'taxa_cambio' in req.body) { sets.push('valor_reais = ?'); vals.push(calcValorReais(req.body)) }
+  const sets = [],
+    vals = []
+  for (const c of CAMPOS_IMP) {
+    if (c in req.body) {
+      let v = req.body[c]
+      if (v === '') v = null
+      if (c === 'valor_moeda' || c === 'taxa_cambio') v = parseFloat(v) || 0
+      sets.push(`${c} = ?`)
+      vals.push(v)
+    }
+  }
+  if ('valor_moeda' in req.body || 'taxa_cambio' in req.body) {
+    sets.push('valor_reais = ?')
+    vals.push(calcValorReais(req.body))
+  }
   if (!sets.length) return res.json({ ok: true })
   vals.push(req.params.id)
   await pool.query(`UPDATE fin_importacoes SET ${sets.join(', ')} WHERE id = ?`, vals)
@@ -1500,20 +1897,41 @@ app.delete('/api/fin/importacoes/:id', autenticarContabil(), async (req, res) =>
 })
 
 app.get('/api/fin/pagamentos', autenticarContabil(), async (req, res) => {
-  const [rows] = await pool.query('SELECT * FROM fin_pagamentos WHERE importacao_id = ? ORDER BY data_pgto, id', [parseInt(req.query.importacaoId) || 0])
+  const [rows] = await pool.query('SELECT * FROM fin_pagamentos WHERE importacao_id = ? ORDER BY data_pgto, id', [
+    parseInt(req.query.importacaoId) || 0
+  ])
   res.json(rows)
 })
 app.post('/api/fin/pagamentos', autenticarContabil(), async (req, res) => {
   const b = req.body
   if (!b.importacao_id || !(parseFloat(b.valor_reais) >= 0)) return res.status(400).json({ erro: 'Dados inválidos.' })
-  await pool.query('INSERT INTO fin_pagamentos (importacao_id, data_pgto, valor_reais, valor_moeda, forma, obs, contrato_id) VALUES (?,?,?,?,?,?,?)',
-    [b.importacao_id, b.data_pgto || null, parseFloat(b.valor_reais) || 0, parseFloat(b.valor_moeda) || 0, b.forma || null, b.obs || null, b.contrato_id || null])
+  await pool.query(
+    'INSERT INTO fin_pagamentos (importacao_id, data_pgto, valor_reais, valor_moeda, forma, obs, contrato_id) VALUES (?,?,?,?,?,?,?)',
+    [
+      b.importacao_id,
+      b.data_pgto || null,
+      parseFloat(b.valor_reais) || 0,
+      parseFloat(b.valor_moeda) || 0,
+      b.forma || null,
+      b.obs || null,
+      b.contrato_id || null
+    ]
+  )
   res.json({ ok: true })
 })
 app.patch('/api/fin/pagamentos/:id', autenticarContabil(), async (req, res) => {
   const campos = ['data_pgto', 'valor_reais', 'valor_moeda', 'forma', 'obs', 'contrato_id']
-  const sets = [], vals = []
-  for (const c of campos) { if (c in req.body) { let v = req.body[c]; if (v === '') v = null; if (c === 'valor_reais' || c === 'valor_moeda') v = parseFloat(v) || 0; sets.push(`${c} = ?`); vals.push(v) } }
+  const sets = [],
+    vals = []
+  for (const c of campos) {
+    if (c in req.body) {
+      let v = req.body[c]
+      if (v === '') v = null
+      if (c === 'valor_reais' || c === 'valor_moeda') v = parseFloat(v) || 0
+      sets.push(`${c} = ?`)
+      vals.push(v)
+    }
+  }
   if (!sets.length) return res.json({ ok: true })
   vals.push(req.params.id)
   await pool.query(`UPDATE fin_pagamentos SET ${sets.join(', ')} WHERE id = ?`, vals)
@@ -1527,9 +1945,12 @@ app.delete('/api/fin/pagamentos/:id', autenticarContabil(), async (req, res) => 
 app.get('/api/fin/contratos', autenticarContabil(), async (req, res) => {
   const cond = req.query.importacaoId ? 'WHERE c.importacao_id = ?' : ''
   const args = req.query.importacaoId ? [parseInt(req.query.importacaoId)] : []
-  const [rows] = await pool.query(`
+  const [rows] = await pool.query(
+    `
     SELECT c.*, i.invoice FROM fin_contratos c LEFT JOIN fin_importacoes i ON i.id = c.importacao_id
-    ${cond} ORDER BY c.data_fechamento DESC, c.id DESC`, args)
+    ${cond} ORDER BY c.data_fechamento DESC, c.id DESC`,
+    args
+  )
   res.json(rows)
 })
 app.post('/api/fin/contratos', autenticarContabil(), async (req, res) => {
@@ -1538,25 +1959,52 @@ app.post('/api/fin/contratos', autenticarContabil(), async (req, res) => {
   await pool.query(
     `INSERT INTO fin_contratos (num_contrato, banco, data_fechamento, moeda, valor_moeda, taxa, valor_reais, importacao_id, liquidado, data_liquidacao, obs)
      VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-    [b.num_contrato, b.banco || null, b.data_fechamento || null, b.moeda || 'USD', parseFloat(b.valor_moeda) || 0,
-     parseFloat(b.taxa) || 0, (parseFloat(b.valor_moeda) || 0) * (parseFloat(b.taxa) || 0), b.importacao_id || null,
-     b.liquidado ? 1 : 0, b.data_liquidacao || null, b.obs || null])
+    [
+      b.num_contrato,
+      b.banco || null,
+      b.data_fechamento || null,
+      b.moeda || 'USD',
+      parseFloat(b.valor_moeda) || 0,
+      parseFloat(b.taxa) || 0,
+      (parseFloat(b.valor_moeda) || 0) * (parseFloat(b.taxa) || 0),
+      b.importacao_id || null,
+      b.liquidado ? 1 : 0,
+      b.data_liquidacao || null,
+      b.obs || null
+    ]
+  )
   res.json({ ok: true })
 })
 app.patch('/api/fin/contratos/:id', autenticarContabil(), async (req, res) => {
   const b = req.body
-  const campos = ['num_contrato', 'banco', 'data_fechamento', 'moeda', 'valor_moeda', 'taxa', 'importacao_id', 'liquidado', 'data_liquidacao', 'obs']
-  const sets = [], vals = []
+  const campos = [
+    'num_contrato',
+    'banco',
+    'data_fechamento',
+    'moeda',
+    'valor_moeda',
+    'taxa',
+    'importacao_id',
+    'liquidado',
+    'data_liquidacao',
+    'obs'
+  ]
+  const sets = [],
+    vals = []
   for (const c of campos) {
     if (c in b) {
       let v = b[c]
       if (v === '') v = null
       if (c === 'valor_moeda' || c === 'taxa') v = parseFloat(v) || 0
       if (c === 'liquidado') v = b[c] ? 1 : 0
-      sets.push(`${c} = ?`); vals.push(v)
+      sets.push(`${c} = ?`)
+      vals.push(v)
     }
   }
-  if ('valor_moeda' in b || 'taxa' in b) { sets.push('valor_reais = ?'); vals.push((parseFloat(b.valor_moeda) || 0) * (parseFloat(b.taxa) || 0)) }
+  if ('valor_moeda' in b || 'taxa' in b) {
+    sets.push('valor_reais = ?')
+    vals.push((parseFloat(b.valor_moeda) || 0) * (parseFloat(b.taxa) || 0))
+  }
   if (!sets.length) return res.json({ ok: true })
   vals.push(req.params.id)
   await pool.query(`UPDATE fin_contratos SET ${sets.join(', ')} WHERE id = ?`, vals)
@@ -1585,8 +2033,10 @@ async function inicializarCustos() {
 
     const [cols] = await pool.query('SHOW COLUMNS FROM fin_custos')
     const nomes = cols.map((c) => c.Field)
-    if (!nomes.includes('mp_total')) await pool.query('ALTER TABLE fin_custos ADD COLUMN mp_total DECIMAL(14,2) NULL AFTER produto')
-    if (!nomes.includes('percentual')) await pool.query('ALTER TABLE fin_custos ADD COLUMN percentual DECIMAL(9,4) DEFAULT 100 AFTER mp_total')
+    if (!nomes.includes('mp_total'))
+      await pool.query('ALTER TABLE fin_custos ADD COLUMN mp_total DECIMAL(14,2) NULL AFTER produto')
+    if (!nomes.includes('percentual'))
+      await pool.query('ALTER TABLE fin_custos ADD COLUMN percentual DECIMAL(9,4) DEFAULT 100 AFTER mp_total')
     const [uniq] = await pool.query("SHOW INDEX FROM fin_custos WHERE Column_name = 'importacao_id' AND Non_unique = 0")
     for (const k of new Set(uniq.map((i) => i.Key_name))) {
       await pool.query(`ALTER TABLE fin_custos DROP INDEX \`${k}\``)
@@ -1594,7 +2044,9 @@ async function inicializarCustos() {
     }
     const [idx] = await pool.query("SHOW INDEX FROM fin_custos WHERE Column_name = 'importacao_id'")
     if (!idx.length) await pool.query('ALTER TABLE fin_custos ADD INDEX idx_custos_imp (importacao_id)')
-  } catch (e) { console.error('Erro init custos:', e.message) }
+  } catch (e) {
+    console.error('Erro init custos:', e.message)
+  }
 }
 setTimeout(inicializarCustos, 6000)
 
@@ -1607,7 +2059,10 @@ function computarCusto(cab, despesas, st) {
   const stCusto = (st || []).reduce((s, i) => s + stARecolher(i), 0)
   const mp = Number(cab.materia_prima) || 0
   const ii = Number(cab.imposto_importacao) || 0
-  const ipi = Number(cab.ipi) || 0, pis = Number(cab.pis) || 0, cofins = Number(cab.cofins) || 0, icms = Number(cab.icms) || 0
+  const ipi = Number(cab.ipi) || 0,
+    pis = Number(cab.pis) || 0,
+    cofins = Number(cab.cofins) || 0,
+    icms = Number(cab.icms) || 0
   const total = mp + ii + stCusto + ipi + pis + cofins + icms + despTotal
   const credito = icms + ipi + pis + cofins
   const custoCredito = total - credito
@@ -1617,8 +2072,8 @@ function computarCusto(cab, despesas, st) {
 
 function materiaPrimaProduto(b) {
   const tot = Number(b.mp_total)
-  const pct = (b.percentual === '' || b.percentual === undefined || b.percentual === null) ? 100 : Number(b.percentual)
-  if (tot > 0) return Math.round(tot * pct / 100 * 100) / 100
+  const pct = b.percentual === '' || b.percentual === undefined || b.percentual === null ? 100 : Number(b.percentual)
+  if (tot > 0) return Math.round(((tot * pct) / 100) * 100) / 100
   return Number(b.materia_prima) || 0
 }
 
@@ -1630,23 +2085,51 @@ async function custoCompleto(c) {
 
 async function salvarFilhosCusto(custoId, b) {
   await pool.query('DELETE FROM fin_custo_despesas WHERE custo_id = ?', [custoId])
-  for (const d of (b.despesas || [])) {
+  for (const d of b.despesas || []) {
     if (!(d.nome || '').trim() && !(Number(d.valor) > 0)) continue
-    await pool.query('INSERT INTO fin_custo_despesas (custo_id, nome, valor) VALUES (?,?,?)', [custoId, d.nome || null, Number(d.valor) || 0])
+    await pool.query('INSERT INTO fin_custo_despesas (custo_id, nome, valor) VALUES (?,?,?)', [
+      custoId,
+      d.nome || null,
+      Number(d.valor) || 0
+    ])
   }
   await pool.query('DELETE FROM fin_custo_st WHERE custo_id = ?', [custoId])
-  for (const s of (b.st || [])) {
+  for (const s of b.st || []) {
     if (!(s.produto || '').trim() && !(Number(s.base_icms) > 0)) continue
-    await pool.query('INSERT INTO fin_custo_st (custo_id, produto, ncm, base_icms, icms_proprio, aliquota, ipi_destacado, mva) VALUES (?,?,?,?,?,?,?,?)',
-      [custoId, s.produto || null, s.ncm || null, Number(s.base_icms) || 0, Number(s.icms_proprio) || 0, Number(s.aliquota) || 0, Number(s.ipi_destacado) || 0, Number(s.mva) || 0])
+    await pool.query(
+      'INSERT INTO fin_custo_st (custo_id, produto, ncm, base_icms, icms_proprio, aliquota, ipi_destacado, mva) VALUES (?,?,?,?,?,?,?,?)',
+      [
+        custoId,
+        s.produto || null,
+        s.ncm || null,
+        Number(s.base_icms) || 0,
+        Number(s.icms_proprio) || 0,
+        Number(s.aliquota) || 0,
+        Number(s.ipi_destacado) || 0,
+        Number(s.mva) || 0
+      ]
+    )
   }
 }
 
 function valoresCusto(b) {
-  const pct = (b.percentual === '' || b.percentual === undefined || b.percentual === null) ? 100 : Number(b.percentual) || 0
-  return [b.nfe || null, b.produto || null, Number(b.mp_total) > 0 ? Number(b.mp_total) : null, pct, materiaPrimaProduto(b),
-    Number(b.imposto_importacao) || 0, Number(b.ipi) || 0, Number(b.pis) || 0, Number(b.cofins) || 0, Number(b.icms) || 0,
-    Number(b.quantidade_kg) || 0, b.unidade || 'KG', b.obs || null]
+  const pct =
+    b.percentual === '' || b.percentual === undefined || b.percentual === null ? 100 : Number(b.percentual) || 0
+  return [
+    b.nfe || null,
+    b.produto || null,
+    Number(b.mp_total) > 0 ? Number(b.mp_total) : null,
+    pct,
+    materiaPrimaProduto(b),
+    Number(b.imposto_importacao) || 0,
+    Number(b.ipi) || 0,
+    Number(b.pis) || 0,
+    Number(b.cofins) || 0,
+    Number(b.icms) || 0,
+    Number(b.quantidade_kg) || 0,
+    b.unidade || 'KG',
+    b.obs || null
+  ]
 }
 
 app.get('/api/fin/custos', autenticarContabil(), async (req, res) => {
@@ -1656,9 +2139,14 @@ app.get('/api/fin/custos', autenticarContabil(), async (req, res) => {
     ORDER BY c.atualizado_em DESC`)
   const [desp] = await pool.query('SELECT custo_id, valor FROM fin_custo_despesas')
   const [st] = await pool.query('SELECT * FROM fin_custo_st')
-  const dMap = {}, sMap = {}
-  desp.forEach((d) => { (dMap[d.custo_id] = dMap[d.custo_id] || []).push(d) })
-  st.forEach((s) => { (sMap[s.custo_id] = sMap[s.custo_id] || []).push(s) })
+  const dMap = {},
+    sMap = {}
+  desp.forEach((d) => {
+    ;(dMap[d.custo_id] = dMap[d.custo_id] || []).push(d)
+  })
+  st.forEach((s) => {
+    ;(sMap[s.custo_id] = sMap[s.custo_id] || []).push(s)
+  })
   res.json(rows.map((c) => ({ ...c, calc: computarCusto(c, dMap[c.id] || [], sMap[c.id] || []) })))
 })
 
@@ -1676,7 +2164,8 @@ app.post('/api/fin/custos/:importacaoId', autenticarContabil(), async (req, res)
   const b = req.body || {}
   const [r] = await pool.query(
     'INSERT INTO fin_custos (importacao_id, nfe, produto, mp_total, percentual, materia_prima, imposto_importacao, ipi, pis, cofins, icms, quantidade_kg, unidade, obs) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-    [impId, ...valoresCusto(b)])
+    [impId, ...valoresCusto(b)]
+  )
   await salvarFilhosCusto(r.insertId, b)
   res.json({ ok: true, id: r.insertId })
 })
@@ -1689,7 +2178,8 @@ app.put('/api/fin/custos/:importacaoId/:custoId', autenticarContabil(), async (r
   const b = req.body || {}
   await pool.query(
     'UPDATE fin_custos SET nfe = ?, produto = ?, mp_total = ?, percentual = ?, materia_prima = ?, imposto_importacao = ?, ipi = ?, pis = ?, cofins = ?, icms = ?, quantidade_kg = ?, unidade = ?, obs = ? WHERE id = ?',
-    [...valoresCusto(b), custoId])
+    [...valoresCusto(b), custoId]
+  )
   await salvarFilhosCusto(custoId, b)
   res.json({ ok: true, id: custoId })
 })
@@ -1710,12 +2200,13 @@ const EMAILS_CHECKLIST = ['export2@pietrobon.com.br', 'export@pietrobon.com.br',
 
 function autenticarChecklist() {
   const base = autenticar(TODOS)
-  return (req, res, next) => base(req, res, () => {
-    if (!EMAILS_CHECKLIST.includes((req.usuario.email || '').toLowerCase())) {
-      return res.status(403).json({ erro: 'Sem permissão' })
-    }
-    next()
-  })
+  return (req, res, next) =>
+    base(req, res, () => {
+      if (!EMAILS_CHECKLIST.includes((req.usuario.email || '').toLowerCase())) {
+        return res.status(403).json({ erro: 'Sem permissão' })
+      }
+      next()
+    })
 }
 
 async function inicializarChecklist() {
@@ -1730,11 +2221,27 @@ async function inicializarChecklist() {
       id INT AUTO_INCREMENT PRIMARY KEY, checklist_id INT NOT NULL, ordem INT DEFAULT 0,
       produto VARCHAR(300), gramatura VARCHAR(80), qtd_cx VARCHAR(40), lote VARCHAR(80), validade VARCHAR(40),
       INDEX(checklist_id))`)
-  } catch (e) { console.error('Erro init checklist:', e.message) }
+  } catch (e) {
+    console.error('Erro init checklist:', e.message)
+  }
 }
 setTimeout(inicializarChecklist, 3000)
 
-const CAMPOS_CL = ['fatura', 'pedido', 'data_emb', 'cliente_nome', 'cliente_endereco', 'cliente_contato', 'embarque', 'descarga', 'destino', 'peso_liquido', 'peso_bruto', 'volume', 'observacoes']
+const CAMPOS_CL = [
+  'fatura',
+  'pedido',
+  'data_emb',
+  'cliente_nome',
+  'cliente_endereco',
+  'cliente_contato',
+  'embarque',
+  'descarga',
+  'destino',
+  'peso_liquido',
+  'peso_bruto',
+  'volume',
+  'observacoes'
+]
 
 async function salvarItens(checklistId, itens) {
   await pool.query('DELETE FROM checklist_exp_itens WHERE checklist_id = ?', [checklistId])
@@ -1742,34 +2249,51 @@ async function salvarItens(checklistId, itens) {
     for (let i = 0; i < itens.length; i++) {
       const it = itens[i]
       if (!it || (!it.produto && !it.gramatura && !it.qtd_cx)) continue
-      await pool.query('INSERT INTO checklist_exp_itens (checklist_id, ordem, produto, gramatura, qtd_cx, lote, validade) VALUES (?,?,?,?,?,?,?)',
-        [checklistId, i + 1, it.produto || null, it.gramatura || null, it.qtd_cx || null, it.lote || null, it.validade || null])
+      await pool.query(
+        'INSERT INTO checklist_exp_itens (checklist_id, ordem, produto, gramatura, qtd_cx, lote, validade) VALUES (?,?,?,?,?,?,?)',
+        [
+          checklistId,
+          i + 1,
+          it.produto || null,
+          it.gramatura || null,
+          it.qtd_cx || null,
+          it.lote || null,
+          it.validade || null
+        ]
+      )
     }
   }
 }
 
 app.get('/api/checklist', autenticarChecklist(), async (req, res) => {
-  const [rows] = await pool.query('SELECT id, fatura, pedido, cliente_nome, data_emb, destino, criado_em FROM checklist_exp ORDER BY id DESC LIMIT 300')
+  const [rows] = await pool.query(
+    'SELECT id, fatura, pedido, cliente_nome, data_emb, destino, criado_em FROM checklist_exp ORDER BY id DESC LIMIT 300'
+  )
   res.json(rows)
 })
 app.get('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
   const [[cab]] = await pool.query('SELECT * FROM checklist_exp WHERE id = ?', [req.params.id])
   if (!cab) return res.status(404).json({ erro: 'Não encontrado.' })
-  const [itens] = await pool.query('SELECT * FROM checklist_exp_itens WHERE checklist_id = ? ORDER BY ordem, id', [req.params.id])
+  const [itens] = await pool.query('SELECT * FROM checklist_exp_itens WHERE checklist_id = ? ORDER BY ordem, id', [
+    req.params.id
+  ])
   res.json({ ...cab, itens })
 })
 app.post('/api/checklist', autenticarChecklist(), async (req, res) => {
   const b = req.body
-  const vals = CAMPOS_CL.map((c) => (b[c] === '' || b[c] === undefined) ? null : b[c])
+  const vals = CAMPOS_CL.map((c) => (b[c] === '' || b[c] === undefined ? null : b[c]))
   vals.push(req.usuario.nome || null)
-  const [r] = await pool.query(`INSERT INTO checklist_exp (${CAMPOS_CL.join(', ')}, criado_por) VALUES (${CAMPOS_CL.map(() => '?').join(', ')}, ?)`, vals)
+  const [r] = await pool.query(
+    `INSERT INTO checklist_exp (${CAMPOS_CL.join(', ')}, criado_por) VALUES (${CAMPOS_CL.map(() => '?').join(', ')}, ?)`,
+    vals
+  )
   await salvarItens(r.insertId, b.itens)
   res.json({ id: r.insertId })
 })
 app.put('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
   const b = req.body
   const sets = CAMPOS_CL.map((c) => `${c} = ?`)
-  const vals = CAMPOS_CL.map((c) => (b[c] === '' || b[c] === undefined) ? null : b[c])
+  const vals = CAMPOS_CL.map((c) => (b[c] === '' || b[c] === undefined ? null : b[c]))
   vals.push(req.params.id)
   await pool.query(`UPDATE checklist_exp SET ${sets.join(', ')} WHERE id = ?`, vals)
   await salvarItens(req.params.id, b.itens)
@@ -1821,10 +2345,12 @@ async function inicializarTarefas() {
       atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`)
     const hash = await bcrypt.hash('exp123', 10)
-    await pool.query(
-      'INSERT IGNORE INTO usuarios (email, senha, nome, papel) VALUES (?, ?, ?, ?)',
-      ['export3@pietrobon.com.br', hash, 'Bernardo', 'auxiliar']
-    )
+    await pool.query('INSERT IGNORE INTO usuarios (email, senha, nome, papel) VALUES (?, ?, ?, ?)', [
+      'export3@pietrobon.com.br',
+      hash,
+      'Bernardo',
+      'auxiliar'
+    ])
   } catch (e) {
     console.error('Erro ao inicializar Tarefas:', e.message)
   }
@@ -1846,7 +2372,15 @@ app.post('/api/tarefas', autenticarTarefas(), async (req, res) => {
     if (!titulo) return res.status(400).json({ erro: 'Título obrigatório.' })
     const [r] = await pool.query(
       'INSERT INTO tarefas (titulo, descricao, coluna, prioridade, responsavel, prazo, criado_por) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [titulo, descricao || null, coluna || 'a_fazer', prioridade || 'normal', responsavel || null, prazo || null, req.usuario.email]
+      [
+        titulo,
+        descricao || null,
+        coluna || 'a_fazer',
+        prioridade || 'normal',
+        responsavel || null,
+        prazo || null,
+        req.usuario.email
+      ]
     )
     const [[nova]] = await pool.query('SELECT * FROM tarefas WHERE id = ?', [r.insertId])
     res.json(nova)
@@ -1860,13 +2394,34 @@ app.patch('/api/tarefas/:id', autenticarTarefas(), async (req, res) => {
     const { titulo, descricao, coluna, prioridade, responsavel, prazo, ordem } = req.body
     const campos = []
     const vals = []
-    if (titulo !== undefined)      { campos.push('titulo = ?');      vals.push(titulo) }
-    if (descricao !== undefined)   { campos.push('descricao = ?');   vals.push(descricao) }
-    if (coluna !== undefined)      { campos.push('coluna = ?');      vals.push(coluna) }
-    if (prioridade !== undefined)  { campos.push('prioridade = ?');  vals.push(prioridade) }
-    if (responsavel !== undefined) { campos.push('responsavel = ?'); vals.push(responsavel) }
-    if (prazo !== undefined)       { campos.push('prazo = ?');       vals.push(prazo || null) }
-    if (ordem !== undefined)       { campos.push('ordem = ?');       vals.push(ordem) }
+    if (titulo !== undefined) {
+      campos.push('titulo = ?')
+      vals.push(titulo)
+    }
+    if (descricao !== undefined) {
+      campos.push('descricao = ?')
+      vals.push(descricao)
+    }
+    if (coluna !== undefined) {
+      campos.push('coluna = ?')
+      vals.push(coluna)
+    }
+    if (prioridade !== undefined) {
+      campos.push('prioridade = ?')
+      vals.push(prioridade)
+    }
+    if (responsavel !== undefined) {
+      campos.push('responsavel = ?')
+      vals.push(responsavel)
+    }
+    if (prazo !== undefined) {
+      campos.push('prazo = ?')
+      vals.push(prazo || null)
+    }
+    if (ordem !== undefined) {
+      campos.push('ordem = ?')
+      vals.push(ordem)
+    }
     if (!campos.length) return res.status(400).json({ erro: 'Nada para atualizar.' })
     vals.push(req.params.id)
     await pool.query(`UPDATE tarefas SET ${campos.join(', ')} WHERE id = ?`, vals)
@@ -1894,7 +2449,9 @@ async function inicializarCatalogoProdutos() {
       UNIQUE KEY unique_nome (nome(250)),
       criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`)
-  } catch (e) { console.error('Erro ao criar tabela catálogo:', e.message) }
+  } catch (e) {
+    console.error('Erro ao criar tabela catálogo:', e.message)
+  }
   try {
     const [[{ total }]] = await pool.query('SELECT COUNT(*) as total FROM produtos_catalogo')
     if (Number(total) === 0) {
@@ -1905,7 +2462,9 @@ async function inicializarCatalogoProdutos() {
       )
       if (r.affectedRows > 0) console.log(`Catálogo: ${r.affectedRows} produto(s) importado(s) de produtos_pi.`)
     }
-  } catch (e) { console.error('Erro ao popular catálogo:', e.message) }
+  } catch (e) {
+    console.error('Erro ao popular catálogo:', e.message)
+  }
 }
 setTimeout(inicializarCatalogoProdutos, 4000)
 
@@ -1913,7 +2472,9 @@ app.get('/api/catalogo-produtos', autenticar(TODOS), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT id, nome FROM produtos_catalogo ORDER BY nome ASC')
     res.json(rows)
-  } catch (e) { res.status(500).json({ erro: e.message }) }
+  } catch (e) {
+    res.status(500).json({ erro: e.message })
+  }
 })
 
 app.post('/api/catalogo-produtos', autenticar(TODOS), async (req, res) => {
@@ -1922,30 +2483,34 @@ app.post('/api/catalogo-produtos', autenticar(TODOS), async (req, res) => {
     if (!nome || !nome.trim()) return res.status(400).json({ erro: 'Nome obrigatório.' })
     await pool.query('INSERT IGNORE INTO produtos_catalogo (nome) VALUES (?)', [nome.trim()])
     res.json({ ok: true })
-  } catch (e) { res.status(500).json({ erro: e.message }) }
+  } catch (e) {
+    res.status(500).json({ erro: e.message })
+  }
 })
 
 app.delete('/api/catalogo-produtos/:id', autenticar(['admin']), async (req, res) => {
   try {
     await pool.query('DELETE FROM produtos_catalogo WHERE id = ?', [req.params.id])
     res.json({ ok: true })
-  } catch (e) { res.status(500).json({ erro: e.message }) }
+  } catch (e) {
+    res.status(500).json({ erro: e.message })
+  }
 })
 
 app.get('*', (req, res) => {
- res.sendFile(path.join(__dirname, 'index.html'))
+  res.sendFile(path.join(__dirname, 'index.html'))
 })
 
 app.use((err, req, res, next) => {
- console.error('Erro na requisição:', err && err.message ? err.message : err)
- if (!res.headersSent) res.status(500).json({ erro: 'Erro no servidor. Tente novamente.' })
+  console.error('Erro na requisição:', err && err.message ? err.message : err)
+  if (!res.headersSent) res.status(500).json({ erro: 'Erro no servidor. Tente novamente.' })
 })
 
 process.on('unhandledRejection', (err) => {
- console.error('Erro não tratado (promise):', err && err.message ? err.message : err)
+  console.error('Erro não tratado (promise):', err && err.message ? err.message : err)
 })
 process.on('uncaughtException', (err) => {
- console.error('Exceção não tratada:', err && err.message ? err.message : err)
+  console.error('Exceção não tratada:', err && err.message ? err.message : err)
 })
 
 const PORTA = process.env.PORT || 8080

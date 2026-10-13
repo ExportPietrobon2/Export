@@ -87,12 +87,13 @@ async function carregarLista() {
     return
   }
 
-  container.innerHTML = registros.map((d) => {
-    const status = STATUS_INFO[d.status] || STATUS_INFO.pendente
-    const categoria = CATEGORIA_INFO[d.categoria] || CATEGORIA_INFO.gerais
-    const podeResponder = categoriasQuePodemResponder.includes(d.categoria || 'gerais')
+  container.innerHTML = registros
+    .map((d) => {
+      const status = STATUS_INFO[d.status] || STATUS_INFO.pendente
+      const categoria = CATEGORIA_INFO[d.categoria] || CATEGORIA_INFO.gerais
+      const podeResponder = categoriasQuePodemResponder.includes(d.categoria || 'gerais')
 
-    return `
+      return `
       <div class="card border-0 shadow-sm mb-2">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
@@ -110,19 +111,28 @@ async function carregarLista() {
             </div>
           </div>
           ${d.respondido_por ? `<div class="small text-muted mb-2">Respondido por ${d.respondido_por}</div>` : ''}
-          ${podeResponder ? `
+          ${
+            podeResponder
+              ? `
             <div class="d-flex gap-2 flex-wrap">
               <button class="btn btn-sm ${d.status === 'tem' ? 'btn-success' : 'btn-outline-success'}"
                 onclick="responderDemanda(${d.id}, 'tem')">Tenho</button>
               <button class="btn btn-sm ${d.status === 'nao_tem' ? 'btn-danger' : 'btn-outline-danger'}"
                 onclick="responderDemanda(${d.id}, 'nao_tem')">Não tenho</button>
-            </div>` : ''}
-          ${podeCriar ? `
+            </div>`
+              : ''
+          }
+          ${
+            podeCriar
+              ? `
             <button class="btn btn-sm btn-outline-secondary mt-2"
-              onclick="excluirDemanda(${d.id})">Excluir</button>` : ''}
+              onclick="excluirDemanda(${d.id})">Excluir</button>`
+              : ''
+          }
         </div>
       </div>`
-  }).join('')
+    })
+    .join('')
 }
 
 async function submeterFormulario(e) {
