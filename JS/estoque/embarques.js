@@ -1,5 +1,5 @@
 import { api } from '/JS/core/api.js'
-import { calcularStatusProduto, formatarQuantidade } from '/JS/core/constants.js'
+import { calcularStatusProduto, formatarQuantidade, rotuloStatus } from '/JS/core/constants.js'
 import { exigirPapel } from '/JS/core/auth.js'
 import { montarCabecalho } from '/JS/core/cabecalho.js'
 import { piEmAlerta, bannerAlertaHtml, resumoAlertasHtml } from '/JS/core/alertas.js'
@@ -67,7 +67,7 @@ function renderAlmoxarifado(produtos) {
  }).join('')
 
  return `
- <div class="card border-0 bg-light rounded-3 p-3 mb-2"><div class="d-flex align-items-center gap-2 flex-wrap mb-2"><strong>${produto.produto}</strong><span class="badge bg-secondary">${formatarQuantidade(produto.quantidade)}</span><span class="badge ${liberado ? 'bg-success' : 'bg-danger'}">${status}</span></div>
+ <div class="card border-0 bg-light rounded-3 p-3 mb-2"><div class="d-flex align-items-center gap-2 flex-wrap mb-2"><strong>${produto.produto}</strong><span class="badge bg-secondary">${formatarQuantidade(produto.quantidade)}</span><span class="badge ${liberado ? 'bg-success' : 'bg-danger'}">${rotuloStatus(status)}</span></div>
  ${insumos.length > 0
  ? `<table class="table table-sm table-bordered mb-0 tabela-insumos-admin"><thead><tr><th>Insumo</th><th>OK</th><th>Estoque</th></tr></thead><tbody>${linhasInsumos}</tbody></table>`
  : '<p class="text-muted small mb-0 fst-italic">Sem dados do almoxarifado.</p>'}
@@ -152,7 +152,7 @@ function construirLinha(pedido) {
    ${emAlerta ? '<span class="badge bg-danger">Embarque próximo</span>' : ''}
    ${pedido.comentario_embarque ? '<span class="badge bg-primary">💬 Cobrança</span>' : ''}
    ${totalRecb > 0 ? `<span class="pi-linha-mini">B2 ${recebidos}/${totalRecb}</span>` : ''}
-   <span class="badge ${pronta ? 'bg-success' : 'bg-danger'}">${pronta ? 'Pronto para produzir' : 'Não pronto'}</span>
+   <span class="badge ${pronta ? 'bg-success' : 'bg-danger'}">${pronta ? 'Liberado' : 'Não está pronto'}</span>
   </span>
   <span class="pi-linha-seta" aria-hidden="true">›</span>`
  return linha
@@ -204,7 +204,7 @@ function abrirDetalhe(id) {
   id: pedido.id,
   titulo: `PI ${pedido.numero_pi}`,
   subtitulo: `${pedido.cliente || ''}${pedido.destino ? ' · ' + paisDe(pedido.destino) : ''}`,
-  selos: `<span class="badge ${pronta ? 'bg-success' : 'bg-danger'}">${pronta ? 'Pronto para produzir' : 'Não pronto'}</span>`,
+  selos: `<span class="badge ${pronta ? 'bg-success' : 'bg-danger'}">${pronta ? 'Liberado' : 'Não está pronto'}</span>`,
   conteudo: construirDetalhe(pedido)
  })
 }

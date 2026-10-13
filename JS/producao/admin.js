@@ -1,5 +1,5 @@
 import { api } from '/JS/core/api.js'
-import { calcularStatusProduto, formatarQuantidade } from '/JS/core/constants.js'
+import { calcularStatusProduto, formatarQuantidade, rotuloStatus } from '/JS/core/constants.js'
 import { exigirPapel } from '/JS/core/auth.js'
 import { montarCabecalho } from '/JS/core/cabecalho.js'
 import {
@@ -89,7 +89,7 @@ function gerarHtmlInsumosProduto(produtos) {
         <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
           <strong>${produto.produto}</strong>
           <span class="badge bg-secondary">${formatarQuantidade(produto.quantidade)}</span>
-          <span class="badge ${liberado ? 'bg-success' : 'bg-danger'}">${status}</span>
+          <span class="badge ${liberado ? 'bg-success' : 'bg-danger'}">${rotuloStatus(status)}</span>
           ${seloPrazoDeclaracaoHtml(produto)}
         </div>
         ${insumos.length > 0
@@ -224,7 +224,7 @@ function resumoPedido(pedido) {
 }
 
 function seloStatus(r) {
-  return `<span class="badge ${r.liberado ? 'bg-success' : r.naoProducao ? 'bg-danger' : 'bg-secondary'}">${r.status}</span>`
+  return `<span class="badge ${r.liberado ? 'bg-success' : r.naoProducao ? 'bg-danger' : 'bg-secondary'}">${rotuloStatus(r.status)}</span>`
 }
 
 function construirLinha(pedido) {

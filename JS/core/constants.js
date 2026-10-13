@@ -20,3 +20,13 @@ export function calcularStatusProduto(insumos) {
   if (!insumos || insumos.length === 0) return 'NÃO PRODUZ'
   return insumos.every((insumo) => insumo.confirmado) ? 'LIBERADO' : 'NÃO PRODUZ'
 }
+
+const ROTULOS_STATUS = {
+  'LIBERADO': 'Liberado',
+  'NÃO PRODUZ': 'Não está pronto',
+  'SEM PRODUTOS': 'Sem produtos'
+}
+
+export function rotuloStatus(status) {
+  return ROTULOS_STATUS[status] || status
+}
