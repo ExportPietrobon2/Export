@@ -110,7 +110,7 @@ body {
 }
 
 #menu-principal .dropdown-header {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -465,7 +465,7 @@ body[data-pagina='tarefas.html'] .page-header-icon::before {
 .table thead tr th {
   background: #f8fafd !important;
   color: var(--slate) !important;
-  font-size: 0.72rem !important;
+  font-size: 0.8rem !important;
   font-weight: 700 !important;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -548,7 +548,7 @@ body[data-pagina='tarefas.html'] .page-header-icon::before {
 .badge {
   font-family: 'Inter', system-ui, sans-serif;
   font-weight: 600;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   letter-spacing: 0.02em;
   border-radius: 6px;
   padding: 0.35em 0.65em;
@@ -614,7 +614,7 @@ body[data-pagina='tarefas.html'] .page-header-icon::before {
 }
 
 .card-insumo-almox h4 {
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: var(--muted);
   text-transform: uppercase;
@@ -745,7 +745,7 @@ body[data-pagina='tarefas.html'] .page-header-icon::before {
 }
 
 .foto-detalhe-label {
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   font-weight: 700;
   color: var(--muted);
   text-transform: uppercase;
@@ -880,7 +880,7 @@ body[data-pagina='tarefas.html'] .page-header-icon::before {
   border: 1px solid #fde68a;
   border-radius: 6px;
   padding: 2px 8px;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 700;
 }
 
@@ -890,7 +890,7 @@ body[data-pagina='tarefas.html'] .page-header-icon::before {
   color: #fff;
   border-radius: 6px;
   padding: 2px 8px;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 700;
 }
 
@@ -941,7 +941,7 @@ p.text-muted:only-child {
 .tabela-insumos-admin thead th {
   background: #f8fafd !important;
   color: var(--slate) !important;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 10px 12px;
@@ -1282,7 +1282,7 @@ p.text-muted:only-child {
 }
 
 .pais-chevron {
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   color: var(--muted-light);
   width: 14px;
   text-align: center;
@@ -1358,7 +1358,7 @@ p.text-muted:only-child {
   color: var(--slate);
 }
 .ano-qtd {
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   color: var(--muted);
   margin-left: auto;
 }
@@ -1377,11 +1377,11 @@ p.text-muted:only-child {
   --e4: 16px;
   --e5: 20px;
   --e6: 24px;
-  --fs-xs: 0.72rem;
-  --fs-sm: 0.8rem;
-  --fs-md: 0.875rem;
-  --fs-lg: 1rem;
-  --fs-xl: 1.2rem;
+  --fs-xs: 0.8rem;
+  --fs-sm: 0.875rem;
+  --fs-md: 0.95rem;
+  --fs-lg: 1.05rem;
+  --fs-xl: 1.35rem;
 }
 
 body {
@@ -1434,7 +1434,7 @@ body {
 }
 .table thead tr th {
   padding: 8px 12px !important;
-  font-size: 0.68rem !important;
+  font-size: 0.75rem !important;
 }
 .table tbody td {
   padding: 7px 12px;
@@ -1468,7 +1468,7 @@ body {
 }
 
 .badge {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   padding: 0.3em 0.6em;
 }
 
@@ -1499,7 +1499,7 @@ body {
 .recolher-seta {
   display: inline-block;
   width: 12px;
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   color: var(--muted-light);
   transition:
     transform 0.18s ease,
@@ -1605,7 +1605,7 @@ body {
   gap: var(--e2);
 }
 .filtro-rotulo {
-  font-size: 0.66rem;
+  font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1843,7 +1843,7 @@ body {
   min-width: 0;
 }
 .painel-info span {
-  font-size: 0.66rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted-light);
@@ -1874,4 +1874,23 @@ body {
   .painel-info {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+html {
+  font-size: 16.5px;
+}
+
+.small,
+small {
+  font-size: 0.9em;
+}
+
+.form-control-sm,
+.form-select-sm,
+.btn-sm {
+  font-size: var(--fs-sm);
+}
+
+.table {
+  font-size: var(--fs-md);
 }
