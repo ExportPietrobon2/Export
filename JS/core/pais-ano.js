@@ -57,8 +57,9 @@ function chip(valor, rotulo, qtd, ativo, tipo) {
     <span>${rotulo}</span><span class="filtro-chip-qtd">${qtd}</span></button>`
 }
 
-export function filtroPaisAno(lista, { chave, antesDe = lista, comAno = true, aoMudar } = {}) {
+export function filtroPaisAno(lista, { chave, antesDe, comAno = true, aoMudar } = {}) {
   if (!lista) return
+  antesDe = antesDe || lista
   const anterior =
     antesDe.parentElement && antesDe.parentElement.querySelector(`:scope > .filtro-pais-ano[data-chave="${chave}"]`)
   if (anterior) anterior.remove()

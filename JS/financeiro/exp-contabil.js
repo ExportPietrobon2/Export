@@ -251,13 +251,6 @@ window.abrirLancamentos = async function (entidadeId, nome) {
   $('l-data').value = new Date().toISOString().slice(0, 10)
   renderListaLanc(lancs)
   $('l-salvar').addEventListener('click', () => salvarLanc(entidadeId, nome))
-  const tabelaClientes = $('modal-ec-body').querySelector('tbody')
-  if (tabelaClientes)
-    filtroPaisAno(tabelaClientes, {
-      chave: 'ec-clientes',
-      antesDe: tabelaClientes.closest('.table-responsive'),
-      comAno: false
-    })
   window._modalEc.show()
 }
 
