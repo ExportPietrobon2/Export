@@ -1,6 +1,6 @@
-import { api } from '/JS/comum/api.js'
-import { exigirPapel } from '/JS/comum/sessao.js'
-import { montarCabecalho } from '/JS/comum/cabecalho.js'
+import { api } from '/JS/compartilhado/api.js'
+import { exigirPapel } from '/JS/compartilhado/sessao.js'
+import { montarCabecalho } from '/JS/compartilhado/cabecalho.js'
 
 const EMAILS_FINANCEIRO = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'joaoantonio@pietrobon.com.br']
 const MESES = [
@@ -769,7 +769,7 @@ async function iniciar() {
   const perfil = exigirPapel(['admin'])
   if (!perfil) return
   if (!EMAILS_FINANCEIRO.includes((perfil.email || '').toLowerCase())) {
-    window.location.href = '/HTML/producao/admin.html'
+    window.location.href = '/HTML/producao/visao-geral.html'
     return
   }
   montarCabecalho(perfil.papel)

@@ -1,4 +1,4 @@
-import { calcularStatusProduto } from '/JS/comum/constantes.js'
+import { calcularStatusProduto } from '/JS/compartilhado/constantes.js'
 
 const PRAZO_DECLARACAO_MS = 48 * 3600 * 1000
 

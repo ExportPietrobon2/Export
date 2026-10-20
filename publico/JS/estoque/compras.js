@@ -1,7 +1,7 @@
-import { api } from '/JS/comum/api.js'
-import { exigirPapel } from '/JS/comum/sessao.js'
-import { montarCabecalho } from '/JS/comum/cabecalho.js'
-import { iniciarPedidosCompra } from '/JS/comum/demandas.js'
+import { api } from '/JS/compartilhado/api.js'
+import { exigirPapel } from '/JS/compartilhado/sessao.js'
+import { montarCabecalho } from '/JS/compartilhado/cabecalho.js'
+import { iniciarPedidosCompra } from '/JS/compartilhado/formulario-pedido-compra.js'
 
 const tipoLabel = { embalagem: 'Embalagem', rotulo: 'Rótulo', caixa: 'Caixa', etiqueta: 'Etiqueta', outro: 'Outro' }
 const statusLabel = { pendente: 'Pendente', comprado: 'Comprado', em_transito: 'Em trânsito', recebido: 'Recebido' }

@@ -1,7 +1,7 @@
-import { api } from '/JS/comum/api.js'
-import { TIPOS_INSUMO, formatarQuantidade } from '/JS/comum/constantes.js'
-import { exigirPapel } from '/JS/comum/sessao.js'
-import { montarCabecalho } from '/JS/comum/cabecalho.js'
+import { api } from '/JS/compartilhado/api.js'
+import { TIPOS_INSUMO, formatarQuantidade } from '/JS/compartilhado/constantes.js'
+import { exigirPapel } from '/JS/compartilhado/sessao.js'
+import { montarCabecalho } from '/JS/compartilhado/cabecalho.js'
 
 const listaPedidos = document.getElementById('lista-pedidos')
 const paisesAbertos = new Set()

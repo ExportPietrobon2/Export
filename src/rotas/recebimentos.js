@@ -2,7 +2,7 @@ const express = require('express')
 const cloudinary = require('cloudinary').v2
 const { TODOS_PERFIS, autenticar } = require('../middlewares/autenticacao')
 const { banco } = require('../config/banco')
-const { envioArquivo } = require('../servicos/arquivos')
+const { envioArquivo } = require('../servicos/envio-de-fotos')
 
 const rotas = express.Router()
 

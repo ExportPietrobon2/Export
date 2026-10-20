@@ -1,7 +1,7 @@
-import { sair, obterPerfil } from '/JS/comum/sessao.js'
-import { api } from '/JS/comum/api.js'
-import { iniciarAvisos } from '/JS/comum/avisos.js'
-import { iniciarRecolhiveis } from '/JS/comum/recolher.js'
+import { sair, obterPerfil } from '/JS/compartilhado/sessao.js'
+import { api } from '/JS/compartilhado/api.js'
+import { iniciarAvisos } from '/JS/compartilhado/avisos.js'
+import { iniciarRecolhiveis } from '/JS/compartilhado/secoes-recolhiveis.js'
 
 const EMAILS_TAREFAS = [
   'export@pietrobon.com.br',
@@ -104,7 +104,7 @@ export function montarCabecalho(papel) {
     {
       titulo: 'Produção',
       itens: [
-        { href: '/HTML/producao/admin.html', texto: 'Visão Geral das PIs' },
+        { href: '/HTML/producao/visao-geral.html', texto: 'Visão Geral das PIs' },
         { href: '/HTML/producao/cadastro.html', texto: 'Cadastrar PI' },
         { href: '/HTML/producao/checklist.html', texto: 'Check-list de Expedição', quando: temAcessoChecklist }
       ]
@@ -114,7 +114,7 @@ export function montarCabecalho(papel) {
       itens: [
         { href: '/HTML/estoque/almoxarifado.html', texto: 'Almoxarifado' },
         { href: '/HTML/estoque/recebimento.html', texto: 'Recebimentos' },
-        { href: '/HTML/estoque/referencia.html', texto: 'Rendimentos' },
+        { href: '/HTML/estoque/rendimentos.html', texto: 'Rendimentos' },
         { href: '/HTML/estoque/embarques.html', texto: 'Embarques' },
         { href: '/HTML/estoque/compras.html', texto: 'Compras' }
       ]
@@ -123,9 +123,9 @@ export function montarCabecalho(papel) {
       titulo: 'Financeiro',
       quando: temAcessoFinanceiro,
       itens: [
-        { href: '/HTML/financeiro/contabil.html', texto: 'Mensal Contabil' },
-        { href: '/HTML/financeiro/exp-contabil.html', texto: 'Fechamento Contabil' },
-        { href: '/HTML/financeiro/financeiro.html', texto: 'Importações' }
+        { href: '/HTML/financeiro/mensal-contabil.html', texto: 'Mensal Contabil' },
+        { href: '/HTML/financeiro/fechamento-contabil.html', texto: 'Fechamento Contabil' },
+        { href: '/HTML/financeiro/importacoes.html', texto: 'Importações' }
       ]
     },
     {
@@ -163,7 +163,7 @@ export function montarCabecalho(papel) {
   nav.className = 'navbar navbar-pietrobon sticky-top'
   nav.innerHTML = `
     <div class="container-fluid px-3">
-      <a class="navbar-brand d-flex align-items-center gap-2" href="/HTML/producao/admin.html">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="/HTML/producao/visao-geral.html">
         <img src="/logo.png" alt="Hub de Exportações Pietrobon" style="height:36px;object-fit:contain;">
       </a>
       <div class="d-flex align-items-center gap-2 ms-auto">

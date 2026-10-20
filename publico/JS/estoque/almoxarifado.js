@@ -1,10 +1,10 @@
-import { api } from '/JS/comum/api.js'
-import { TIPOS_INSUMO, formatarQuantidade } from '/JS/comum/constantes.js'
-import { exigirPapel } from '/JS/comum/sessao.js'
-import { montarCabecalho } from '/JS/comum/cabecalho.js'
-import { iniciarReferencia } from '/JS/estoque/referencia.js'
-import { seloPrazoDeclaracaoHtml } from '/JS/comum/alertas.js'
-import { iniciarPedidosCompra } from '/JS/comum/demandas.js'
+import { api } from '/JS/compartilhado/api.js'
+import { TIPOS_INSUMO, formatarQuantidade } from '/JS/compartilhado/constantes.js'
+import { exigirPapel } from '/JS/compartilhado/sessao.js'
+import { montarCabecalho } from '/JS/compartilhado/cabecalho.js'
+import { iniciarReferencia } from '/JS/estoque/rendimentos.js'
+import { seloPrazoDeclaracaoHtml } from '/JS/compartilhado/regras-de-alerta.js'
+import { iniciarPedidosCompra } from '/JS/compartilhado/formulario-pedido-compra.js'
 
 let podeCriarPedido = false
 let podeResponderPedido = false

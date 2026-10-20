@@ -1,7 +1,7 @@
-import { api } from '/JS/comum/api.js'
-import { exigirPapel } from '/JS/comum/sessao.js'
-import { montarCabecalho } from '/JS/comum/cabecalho.js'
-import { filtroPaisAno, paisDe, anoDe } from '/JS/comum/pais-ano.js'
+import { api } from '/JS/compartilhado/api.js'
+import { exigirPapel } from '/JS/compartilhado/sessao.js'
+import { montarCabecalho } from '/JS/compartilhado/cabecalho.js'
+import { filtroPaisAno, paisDe, anoDe } from '/JS/compartilhado/filtro-pais-ano.js'
 
 const EMAILS_CHECKLIST = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'export3@pietrobon.com.br']
 const EXPORTADOR = [
@@ -302,7 +302,7 @@ async function iniciar() {
   const perfil = exigirPapel('todos')
   if (!perfil) return
   if (!EMAILS_CHECKLIST.includes((perfil.email || '').toLowerCase())) {
-    window.location.href = '/HTML/producao/admin.html'
+    window.location.href = '/HTML/producao/visao-geral.html'
     return
   }
   montarCabecalho(perfil.papel)

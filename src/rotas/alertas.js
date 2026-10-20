@@ -1,7 +1,7 @@
 const express = require('express')
 const { TODOS_PERFIS, autenticar } = require('../middlewares/autenticacao')
 const { banco } = require('../config/banco')
-const { SQL_DECLARACAO_PENDENTE, SQL_EMBARQUES_PENDENTES } = require('../rotinas/alertas')
+const { SQL_DECLARACAO_PENDENTE, SQL_EMBARQUES_PENDENTES } = require('../rotinas/alertas-diarios')
 
 const rotas = express.Router()
 

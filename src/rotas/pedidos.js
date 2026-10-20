@@ -65,7 +65,7 @@ rotas.post('/api/pedidos', autenticar(['admin']), async (req, res) => {
   enviarPush(
     tituloNovaPi,
     detalheNovaPi || 'Acesse o sistema para ver os detalhes.',
-    '/HTML/producao/admin.html',
+    '/HTML/producao/visao-geral.html',
     chaveNovaPi
   ).catch(() => {})
   enviarEmail(

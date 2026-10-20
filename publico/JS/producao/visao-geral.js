@@ -1,7 +1,7 @@
-import { api } from '/JS/comum/api.js'
-import { calcularStatusProduto, formatarQuantidade, rotuloStatus } from '/JS/comum/constantes.js'
-import { exigirPapel } from '/JS/comum/sessao.js'
-import { montarCabecalho } from '/JS/comum/cabecalho.js'
+import { api } from '/JS/compartilhado/api.js'
+import { calcularStatusProduto, formatarQuantidade, rotuloStatus } from '/JS/compartilhado/constantes.js'
+import { exigirPapel } from '/JS/compartilhado/sessao.js'
+import { montarCabecalho } from '/JS/compartilhado/cabecalho.js'
 import {
   piEmAlerta,
   bannerAlertaHtml,
@@ -11,9 +11,9 @@ import {
   resumoDeclaracaoHtml,
   seloPrazoDeclaracaoPiHtml,
   seloPrazoDeclaracaoHtml
-} from '/JS/comum/alertas.js'
-import { filtroPaisAno, paisDe, anoDe } from '/JS/comum/pais-ano.js'
-import { abrirPainel, corpoPainel, painelAbertoId, fecharPainel } from '/JS/comum/painel.js'
+} from '/JS/compartilhado/regras-de-alerta.js'
+import { filtroPaisAno, paisDe, anoDe } from '/JS/compartilhado/filtro-pais-ano.js'
+import { abrirPainel, corpoPainel, painelAbertoId, fecharPainel } from '/JS/compartilhado/painel-lateral.js'
 
 const containerPis = document.getElementById('container-pis')
 const toggleConcluidas = document.getElementById('toggle-concluidas')

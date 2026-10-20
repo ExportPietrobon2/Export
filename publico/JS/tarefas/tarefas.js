@@ -1,5 +1,5 @@
-import { montarCabecalho } from '/JS/comum/cabecalho.js'
-import { obterPerfil, exigirPapel } from '/JS/comum/sessao.js'
+import { montarCabecalho } from '/JS/compartilhado/cabecalho.js'
+import { obterPerfil, exigirPapel } from '/JS/compartilhado/sessao.js'
 
 const EMAILS_TAREFAS = [
   'export@pietrobon.com.br',

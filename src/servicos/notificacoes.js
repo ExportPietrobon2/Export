@@ -4,9 +4,13 @@ const { banco } = require('../config/banco')
 const CHAVE_PUBLICA_VAPID =
   process.env.VAPID_PUBLIC || 'BBKXW9q8UQm07c-duKRqEFyyXEbDwQz4AeXipuuTOsPpcKB9nn7wJmXgTHE68GhjxUZej0YsGln4Cafu61_0slE'
 
-const CHAVE_PRIVADA_VAPID = process.env.VAPID_PRIVATE || 'APBGcOONkbNs6Bf0KNqNj-T9hJMsdVdUpxXKWg4JgF0'
+const CHAVE_PRIVADA_VAPID = process.env.VAPID_PRIVATE
 
-webpush.setVapidDetails('mailto:export2@pietrobon.com.br', CHAVE_PUBLICA_VAPID, CHAVE_PRIVADA_VAPID)
+if (CHAVE_PRIVADA_VAPID) {
+  webpush.setVapidDetails('mailto:export2@pietrobon.com.br', CHAVE_PUBLICA_VAPID, CHAVE_PRIVADA_VAPID)
+} else {
+  console.warn('VAPID_PRIVATE não configurada — notificações push não serão enviadas.')
+}
 
 async function garantirTabelaPush() {
   await banco.query(`CREATE TABLE IF NOT EXISTS push_subscriptions (

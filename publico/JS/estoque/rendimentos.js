@@ -1,5 +1,5 @@
-import { exigirPapel } from '/JS/comum/sessao.js'
-import { montarCabecalho } from '/JS/comum/cabecalho.js'
+import { exigirPapel } from '/JS/compartilhado/sessao.js'
+import { montarCabecalho } from '/JS/compartilhado/cabecalho.js'
 
 const DADOS = [
   {
@@ -398,6 +398,6 @@ async function iniciar() {
   iniciarReferencia(null)
 }
 
-if (document.body.dataset.pagina === 'referencia.html') {
+if (document.body.dataset.pagina === 'rendimentos.html') {
   iniciar()
 }

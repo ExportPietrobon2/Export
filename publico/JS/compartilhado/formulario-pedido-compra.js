@@ -1,4 +1,4 @@
-import { api } from '/JS/comum/api.js'
+import { api } from '/JS/compartilhado/api.js'
 
 const STATUS_INFO = {
   pendente: { rotulo: 'Pendente', cor: 'bg-warning text-dark' },

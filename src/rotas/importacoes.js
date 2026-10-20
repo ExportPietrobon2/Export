@@ -1,7 +1,7 @@
 const express = require('express')
 const { banco } = require('../config/banco')
 const { autenticarContabil } = require('../middlewares/autenticacao')
-const { enviarResumoSemanalImportacao, importacoesComputadas } = require('../servicos/importacoes')
+const { enviarResumoSemanalImportacao, importacoesComputadas } = require('../servicos/resumo-importacoes')
 
 const rotas = express.Router()
 

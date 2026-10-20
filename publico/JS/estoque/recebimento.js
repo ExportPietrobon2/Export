@@ -1,6 +1,6 @@
-import { api } from '/JS/comum/api.js'
-import { exigirPapel } from '/JS/comum/sessao.js'
-import { montarCabecalho } from '/JS/comum/cabecalho.js'
+import { api } from '/JS/compartilhado/api.js'
+import { exigirPapel } from '/JS/compartilhado/sessao.js'
+import { montarCabecalho } from '/JS/compartilhado/cabecalho.js'
 
 const containerCards = document.getElementById('cards-recebimento')
 const mensagemVazio = document.getElementById('mensagem-vazio')

@@ -88,7 +88,7 @@
   border-color: var(--border-soft);
 }
 
-#menu-principal a[href$='admin.html']::before {
+#menu-principal a[href$='visao-geral.html']::before {
   content: '📊';
 }
 #menu-principal a[href$='cadastro.html']::before {
@@ -100,7 +100,7 @@
 #menu-principal a[href$='recebimento.html']::before {
   content: '🚚';
 }
-#menu-principal a[href$='referencia.html']::before {
+#menu-principal a[href$='rendimentos.html']::before {
   content: '📐';
 }
 #menu-principal a[href$='embarques.html']::before {
@@ -109,13 +109,13 @@
 #menu-principal a[href$='compras.html']::before {
   content: '🛒';
 }
-#menu-principal a[href$='contabil.html']::before {
+#menu-principal a[href$='mensal-contabil.html']::before {
   content: '💰';
 }
-#menu-principal a[href$='exp-contabil.html']::before {
+#menu-principal a[href$='fechamento-contabil.html']::before {
   content: '🌎';
 }
-#menu-principal a[href$='financeiro.html']::before {
+#menu-principal a[href$='importacoes.html']::before {
   content: '🏦';
 }
 #menu-principal a[href$='checklist.html']::before {

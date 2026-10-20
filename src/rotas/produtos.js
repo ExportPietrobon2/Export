@@ -127,7 +127,7 @@ rotas.patch('/api/produtos/:produtoId/insumos', autenticar(['admin', 'almoxarifa
         enviarPush(
           `✅ PI Liberada — ${numero_pi}`,
           `${cliente || ''} — todos os insumos confirmados.`,
-          '/HTML/producao/admin.html',
+          '/HTML/producao/visao-geral.html',
           `pi_liberada_${numero_pi}`
         ).catch(() => {})
         enviarEmail(
