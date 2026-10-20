@@ -1,5 +1,5 @@
 const CACHE = 'hub-exportacoes-v9'
-const ARQUIVOS = ['/index.html', '/CSS/style.css', '/logo.png', '/icon-192.png', '/icon-512.png']
+const ARQUIVOS = ['/index.html', '/CSS/estilo.css', '/logo.png', '/icon-192.png', '/icon-512.png']
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARQUIVOS)))

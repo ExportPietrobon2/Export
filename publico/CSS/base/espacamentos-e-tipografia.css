@@ -1,0 +1,101 @@
+:root {
+  --e1: 4px;
+  --e2: 8px;
+  --e3: 12px;
+  --e4: 16px;
+  --e5: 20px;
+  --e6: 24px;
+  --fs-xs: 0.8rem;
+  --fs-sm: 0.875rem;
+  --fs-md: 0.95rem;
+  --fs-lg: 1.05rem;
+  --fs-xl: 1.35rem;
+}
+
+body {
+  font-size: var(--fs-md);
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 1240px;
+}
+.container.py-4 {
+  padding-top: var(--e5) !important;
+  padding-bottom: var(--e6) !important;
+}
+
+.page-header {
+  padding: var(--e4) var(--e5);
+  margin-bottom: var(--e4);
+  gap: var(--e3);
+  flex-wrap: wrap;
+}
+.page-header-icon {
+  width: 40px;
+  height: 40px;
+  font-size: 1.1rem;
+  border-radius: 10px;
+}
+.page-titulo {
+  font-size: var(--fs-xl);
+  padding-left: var(--e3);
+}
+.page-subtitulo {
+  font-size: var(--fs-sm);
+  padding-left: calc(var(--e3) + 4px);
+}
+
+.card {
+  margin-bottom: var(--e3);
+  border-radius: var(--r) !important;
+}
+.card-body {
+  padding: var(--e4) !important;
+}
+.card:hover {
+  transform: none;
+}
+
+.table {
+  font-size: var(--fs-sm);
+}
+.table thead tr th {
+  padding: 8px 12px !important;
+  font-size: 0.75rem !important;
+}
+.table tbody td {
+  padding: 7px 12px;
+}
+.table td.text-end,
+.table th.text-end,
+.table .num {
+  font-variant-numeric: tabular-nums;
+}
+.table-responsive {
+  border-radius: var(--r-sm);
+}
+
+.form-label {
+  font-size: var(--fs-xs);
+  margin-bottom: 2px;
+}
+.form-control,
+.form-select {
+  font-size: var(--fs-md);
+}
+.form-control-sm,
+.form-select-sm {
+  font-size: var(--fs-sm);
+}
+.btn {
+  font-size: var(--fs-sm);
+}
+.btn-sm {
+  font-size: var(--fs-xs);
+}
+
+.badge {
+  font-size: 0.75rem;
+  padding: 0.3em 0.6em;
+}

@@ -16,7 +16,11 @@ O servidor sobe na porta definida em `PORT` (padrão 8080). As credenciais do ba
 ```
 publico/                    Tudo que o navegador recebe (telas)
   index.html                Tela de login
-  CSS/style.css             Estilos do sistema inteiro
+  CSS/estilo.css            Arquivo principal: importa todos os estilos na ordem certa
+  CSS/base/                 Variáveis, layout geral, tipografia, impressão e celular
+  CSS/componentes/          Peças usadas em várias telas (menu, cards, botões, tabelas,
+                            avisos, alertas, filtros, painel lateral, seções recolhíveis)
+  CSS/telas/                Estilos de uma tela específica (login, almoxarifado, visão geral)
   HTML/<módulo>/*.html      Uma página por tela
   JS/comum/                 Código usado por todas as telas
     api.js                  Chamadas ao servidor (fetch com o token)

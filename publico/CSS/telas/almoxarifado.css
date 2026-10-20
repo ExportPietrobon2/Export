@@ -1,0 +1,106 @@
+.card-insumo-almox {
+  background: #fafbfd;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px;
+  height: 100%;
+  transition: border-color 0.15s;
+}
+
+.card-insumo-almox:focus-within {
+  border-color: var(--red);
+}
+
+.card-insumo-almox h4 {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+
+.linha-produto-almox {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  margin-bottom: 10px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  transition: box-shadow 0.18s;
+}
+
+.linha-produto-almox:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.linha-produto-topo {
+  padding: 14px 18px;
+}
+
+.formulario-produto-almox {
+  padding: 18px 18px 20px;
+  border-top: 1px solid var(--border-soft);
+  background: #fafbfd;
+}
+
+.saldo-positivo,
+.saldo-negativo,
+.saldo-alerta {
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-align: center;
+  margin-top: 8px;
+}
+
+.saldo-positivo {
+  background: var(--green-bg);
+  color: var(--green);
+}
+.saldo-negativo {
+  background: var(--red-light);
+  color: var(--red-dark);
+}
+.saldo-alerta {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.indicador-ok,
+.indicador-nok {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.indicador-ok {
+  background: var(--green-bg);
+  color: var(--green);
+}
+.indicador-nok {
+  background: var(--red-light);
+  color: var(--red-dark);
+}
+
+.texto-ok {
+  color: var(--green);
+  font-weight: 600;
+}
+.texto-erro {
+  color: var(--red);
+  font-weight: 600;
+}
+.texto-alerta {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.text-muted {
+  color: var(--muted) !important;
+}

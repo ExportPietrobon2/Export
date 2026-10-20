@@ -1,0 +1,18 @@
+html {
+  font-size: 16.5px;
+}
+
+.small,
+small {
+  font-size: 0.9em;
+}
+
+.form-control-sm,
+.form-select-sm,
+.btn-sm {
+  font-size: var(--fs-sm);
+}
+
+.table {
+  font-size: var(--fs-md);
+}

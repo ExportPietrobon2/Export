@@ -1,0 +1,61 @@
+:root {
+  --red: #e8313a;
+  --red-dark: #c12028;
+  --red-light: #fef2f2;
+  --orange: #f59332;
+  --orange-bg: #fff8f0;
+  --green: #16a34a;
+  --green-bg: #f0fdf4;
+  --green-ok: #16a34a;
+
+  --bg: #f7f8fb;
+  --bg-card: #ffffff;
+  --border: #e4e7ef;
+  --border-soft: #f0f2f7;
+  --text: #1c2230;
+  --muted: #64748b;
+  --muted-light: #94a3b8;
+  --slate: #334155;
+
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.09), 0 2px 4px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.13), 0 4px 8px rgba(15, 23, 42, 0.06);
+
+  --r-sm: 8px;
+  --r: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+
+  --brand-grad: linear-gradient(110deg, #e8313a 0%, #f0503a 100%);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+  background-color: var(--bg);
+  background-image: radial-gradient(ellipse 900px 400px at 100% 0%, rgba(232, 49, 58, 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 700px 300px at 0% 100%, rgba(245, 147, 50, 0.04) 0%, transparent 55%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}

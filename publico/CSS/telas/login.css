@@ -1,0 +1,42 @@
+.tela-login {
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--red) 0%, #7a1218 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.login-box {
+  width: 100%;
+  max-width: 380px;
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  box-shadow: 0 28px 64px rgba(0, 0, 0, 0.4);
+}
+
+.login-topo {
+  background: linear-gradient(160deg, #b01f23, #6b0f12);
+  padding: 32px 24px 24px;
+  text-align: center;
+}
+
+.login-logo {
+  height: 68px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.4));
+}
+
+.login-subtitulo {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 10px 0 0;
+}
+
+.login-corpo {
+  background: #fff;
+  padding: 32px 28px 28px;
+}

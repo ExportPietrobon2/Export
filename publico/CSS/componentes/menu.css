@@ -1,0 +1,132 @@
+.navbar-pietrobon {
+  background: var(--brand-grad) !important;
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.08),
+    0 4px 20px rgba(193, 32, 40, 0.2);
+  border-bottom: 3px solid var(--orange);
+  padding: 8px 0;
+  position: sticky;
+  top: 0;
+  z-index: 1030;
+}
+
+.navbar-pietrobon .navbar-brand img {
+  height: 33px;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.25));
+}
+
+.btn-menu-pietrobon {
+  background: rgba(255, 255, 255, 0.14) !important;
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  color: #fff !important;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-radius: var(--r-sm);
+  padding: 7px 18px;
+  letter-spacing: 0.01em;
+  transition: background 0.15s;
+}
+
+.btn-menu-pietrobon:hover,
+.btn-menu-pietrobon:focus,
+.btn-menu-pietrobon.show {
+  background: rgba(255, 255, 255, 0.26) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+#menu-principal {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 8px;
+  min-width: 260px;
+  background: #fff;
+}
+
+#menu-principal .dropdown-header {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-light);
+  padding: 10px 12px 4px;
+}
+
+#menu-principal .dropdown-item {
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: var(--slate);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+#menu-principal .dropdown-item::before {
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+#menu-principal .dropdown-item:hover {
+  background: var(--red-light);
+  color: var(--red-dark);
+}
+
+#menu-principal .dropdown-item.active {
+  background: var(--red);
+  color: #fff;
+}
+
+#menu-principal .dropdown-divider {
+  margin: 6px 0;
+  border-color: var(--border-soft);
+}
+
+#menu-principal a[href$='admin.html']::before {
+  content: '📊';
+}
+#menu-principal a[href$='cadastro.html']::before {
+  content: '📋';
+}
+#menu-principal a[href$='almoxarifado.html']::before {
+  content: '📦';
+}
+#menu-principal a[href$='recebimento.html']::before {
+  content: '🚚';
+}
+#menu-principal a[href$='referencia.html']::before {
+  content: '📐';
+}
+#menu-principal a[href$='embarques.html']::before {
+  content: '🚢';
+}
+#menu-principal a[href$='compras.html']::before {
+  content: '🛒';
+}
+#menu-principal a[href$='contabil.html']::before {
+  content: '💰';
+}
+#menu-principal a[href$='exp-contabil.html']::before {
+  content: '🌎';
+}
+#menu-principal a[href$='financeiro.html']::before {
+  content: '🏦';
+}
+#menu-principal a[href$='checklist.html']::before {
+  content: '✅';
+}
+#menu-principal a[href$='ordem-producao.html']::before {
+  content: '🏭';
+}
+#menu-principal a[href$='conferencia-nfse.html']::before {
+  content: '🔍';
+}
+#menu-principal a[href$='tarefas.html']::before {
+  content: '📌';
+}
