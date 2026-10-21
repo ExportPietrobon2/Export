@@ -1,5 +1,5 @@
 const express = require('express')
-const { banco } = require('../config/banco')
+const { banco, emTransacao } = require('../config/banco')
 const { autenticarContabil } = require('../middlewares/autenticacao')
 const { enviarResumoSemanalImportacao, importacoesComputadas } = require('../servicos/resumo-importacoes')
 
@@ -200,9 +200,11 @@ rotas.patch('/api/fin/importacoes/:id', autenticarContabil(), async (req, res) =
 })
 
 rotas.delete('/api/fin/importacoes/:id', autenticarContabil(), async (req, res) => {
-  await banco.query('DELETE FROM fin_pagamentos WHERE importacao_id = ?', [req.params.id])
-  await banco.query('DELETE FROM fin_contratos WHERE importacao_id = ?', [req.params.id])
-  await banco.query('DELETE FROM fin_importacoes WHERE id = ?', [req.params.id])
+  await emTransacao(async (conexao) => {
+    await conexao.query('DELETE FROM fin_pagamentos WHERE importacao_id = ?', [req.params.id])
+    await conexao.query('DELETE FROM fin_contratos WHERE importacao_id = ?', [req.params.id])
+    await conexao.query('DELETE FROM fin_importacoes WHERE id = ?', [req.params.id])
+  })
   res.json({ ok: true })
 })
 

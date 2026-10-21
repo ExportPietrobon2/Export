@@ -1,6 +1,6 @@
 const express = require('express')
 const { TODOS_PERFIS, autenticar } = require('../middlewares/autenticacao')
-const { banco } = require('../config/banco')
+const { banco, emTransacao } = require('../config/banco')
 const { enviarEmail, enviarPush } = require('../servicos/notificacoes')
 
 const rotas = express.Router()
@@ -12,28 +12,31 @@ rotas.get('/api/pedidos/:piId/produtos', autenticar(TODOS_PERFIS), async (req, r
 
 rotas.post('/api/produtos', autenticar(['admin']), async (req, res) => {
   const { pi_id, produto, quantidade, observacoes } = req.body
-  const [resultado] = await banco.query(
-    'INSERT INTO produtos_pi (pi_id, produto, quantidade, observacoes) VALUES (?, ?, ?, ?)',
-    [pi_id, produto, quantidade, observacoes || null]
-  )
-  const produtoId = resultado.insertId
-  const tiposInsumo = ['embalagem', 'rotulo', 'caixa', 'etiqueta']
-  for (const tipo of tiposInsumo) {
-    await banco.query(
-      'INSERT INTO insumos_produto (produto_id, tipo, confirmado, sobra, quantidade_por_pacote) VALUES (?, ?, 0, 0, 0)',
-      [produtoId, tipo]
+  const produtoId = await emTransacao(async (conexao) => {
+    const [resultado] = await conexao.query(
+      'INSERT INTO produtos_pi (pi_id, produto, quantidade, observacoes) VALUES (?, ?, ?, ?)',
+      [pi_id, produto, quantidade, observacoes || null]
     )
-  }
-  const tiposRecebimento = ['embalagem', 'rotulo', 'caixa']
-  const piId = req.body.pi_id
-  for (const tipo of tiposRecebimento) {
-    await banco.query('INSERT INTO recebimentos_b2 (pi_id, produto_id, tipo, status_recebimento) VALUES (?, ?, ?, ?)', [
-      piId,
-      produtoId,
-      tipo,
-      'pendente'
-    ])
-  }
+    const produtoId = resultado.insertId
+    const tiposInsumo = ['embalagem', 'rotulo', 'caixa', 'etiqueta']
+    for (const tipo of tiposInsumo) {
+      await conexao.query(
+        'INSERT INTO insumos_produto (produto_id, tipo, confirmado, sobra, quantidade_por_pacote) VALUES (?, ?, 0, 0, 0)',
+        [produtoId, tipo]
+      )
+    }
+    const tiposRecebimento = ['embalagem', 'rotulo', 'caixa']
+    const piId = req.body.pi_id
+    for (const tipo of tiposRecebimento) {
+      await conexao.query('INSERT INTO recebimentos_b2 (pi_id, produto_id, tipo, status_recebimento) VALUES (?, ?, ?, ?)', [
+        piId,
+        produtoId,
+        tipo,
+        'pendente'
+      ])
+    }
+    return produtoId
+  })
   res.json({ id: produtoId })
 })
 
@@ -53,49 +56,51 @@ rotas.patch('/api/produtos/:produtoId/insumos', autenticar(['admin', 'almoxarifa
     const antesSemEtiqueta = antesInsumos.filter((i) => i.tipo !== 'etiqueta')
     const eraLiberado = antesSemEtiqueta.length > 0 && antesSemEtiqueta.every((i) => i.confirmado)
 
-    for (const insumo of insumos || []) {
-      if (insumo.tipo === 'rotulo') continue
-      let confirmado = 0
-      if (insumo.tipo === 'etiqueta') {
-        confirmado = 1
-      } else if (insumo.tipo === 'caixa') {
-        confirmado = Number(insumo.sobra) >= Number(quantidade) ? 1 : 0
-      } else {
-        confirmado = Number(insumo.sobra) > 0 ? 1 : 0
-      }
-      await banco.query(
-        'UPDATE insumos_produto SET sobra = ?, quantidade_por_pacote = ?, confirmado = ? WHERE produto_id = ? AND tipo = ?',
-        [
-          parseFloat(insumo.sobra) || 0,
-          parseFloat(insumo.quantidade_por_pacote) || 0,
-          confirmado,
-          req.params.produtoId,
-          insumo.tipo
-        ]
-      )
-    }
-
-    if (Array.isArray(rotulos)) {
-      await banco.query('DELETE FROM insumos_produto WHERE produto_id = ? AND tipo = ?', [
-        req.params.produtoId,
-        'rotulo'
-      ])
-      for (const r of rotulos) {
-        const confirmado = Number(r.sobra) > 0 ? 1 : 0
-        await banco.query(
-          'INSERT INTO insumos_produto (produto_id, tipo, nome, confirmado, sobra, quantidade_por_pacote) VALUES (?, ?, ?, ?, ?, ?)',
-          [req.params.produtoId, 'rotulo', r.nome || null, confirmado, r.sobra || 0, r.quantidade_por_pacote || 0]
+    await emTransacao(async (conexao) => {
+      for (const insumo of insumos || []) {
+        if (insumo.tipo === 'rotulo') continue
+        let confirmado = 0
+        if (insumo.tipo === 'etiqueta') {
+          confirmado = 1
+        } else if (insumo.tipo === 'caixa') {
+          confirmado = Number(insumo.sobra) >= Number(quantidade) ? 1 : 0
+        } else {
+          confirmado = Number(insumo.sobra) > 0 ? 1 : 0
+        }
+        await conexao.query(
+          'UPDATE insumos_produto SET sobra = ?, quantidade_por_pacote = ?, confirmado = ? WHERE produto_id = ? AND tipo = ?',
+          [
+            parseFloat(insumo.sobra) || 0,
+            parseFloat(insumo.quantidade_por_pacote) || 0,
+            confirmado,
+            req.params.produtoId,
+            insumo.tipo
+          ]
         )
       }
-    }
 
-    if (observacoes !== undefined) {
-      await banco.query('UPDATE produtos_pi SET observacoes = ? WHERE id = ?', [observacoes, req.params.produtoId])
-    }
+      if (Array.isArray(rotulos)) {
+        await conexao.query('DELETE FROM insumos_produto WHERE produto_id = ? AND tipo = ?', [
+          req.params.produtoId,
+          'rotulo'
+        ])
+        for (const r of rotulos) {
+          const confirmado = Number(r.sobra) > 0 ? 1 : 0
+          await conexao.query(
+            'INSERT INTO insumos_produto (produto_id, tipo, nome, confirmado, sobra, quantidade_por_pacote) VALUES (?, ?, ?, ?, ?, ?)',
+            [req.params.produtoId, 'rotulo', r.nome || null, confirmado, r.sobra || 0, r.quantidade_por_pacote || 0]
+          )
+        }
+      }
 
-    await banco.query('UPDATE produtos_pi SET declarado_em = NOW() WHERE id = ? AND declarado_em IS NULL', [
-      req.params.produtoId
-    ])
+      if (observacoes !== undefined) {
+        await conexao.query('UPDATE produtos_pi SET observacoes = ? WHERE id = ?', [observacoes, req.params.produtoId])
+      }
+
+      await conexao.query('UPDATE produtos_pi SET declarado_em = NOW() WHERE id = ? AND declarado_em IS NULL', [
+        req.params.produtoId
+      ])
+    })
 
     const [produtoInfo] = await banco.query(
       'SELECT pp.pi_id, pp.produto, p.numero_pi, p.cliente FROM produtos_pi pp JOIN pedidos p ON p.id = pp.pi_id WHERE pp.id = ?',

@@ -2,7 +2,7 @@ const express = require('express')
 const cloudinary = require('cloudinary').v2
 const { TODOS_PERFIS, autenticar } = require('../middlewares/autenticacao')
 const { envioArquivo } = require('../servicos/envio-de-fotos')
-const { banco } = require('../config/banco')
+const { banco, emTransacao } = require('../config/banco')
 
 const rotas = express.Router()
 
@@ -84,39 +84,43 @@ rotas.get('/api/estoque/vinculos', autenticar(TODOS_PERFIS), async (req, res) =>
 rotas.post('/api/estoque/vincular', autenticar(['admin', 'almoxarifado']), async (req, res) => {
   const { entrada_id, pi_id, produto, embalagem_kg, rotulo_kg, pallet_caixas } = req.body
 
-  const [[entrada]] = await banco.query(
-    'SELECT embalagem_kg, rotulo_kg, pallet_caixas FROM estoque_insumos WHERE id = ?',
-    [entrada_id]
-  )
-  if (!entrada) return res.status(400).json({ erro: 'Entrada não encontrada.' })
+  const falha = (mensagem) => ({ erro: mensagem })
+  const resultado = await emTransacao(async (conexao) => {
+    const [[entrada]] = await conexao.query(
+      'SELECT embalagem_kg, rotulo_kg, pallet_caixas FROM estoque_insumos WHERE id = ? FOR UPDATE',
+      [entrada_id]
+    )
+    if (!entrada) return falha('Entrada não encontrada.')
 
-  const [[vinculados]] = await banco.query(
-    'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM vinculos_insumos WHERE entrada_id = ?',
-    [entrada_id]
-  )
-  const saldoEmb = parseFloat(entrada.embalagem_kg) - parseFloat(vinculados.emb)
-  const saldoRot = parseFloat(entrada.rotulo_kg) - parseFloat(vinculados.rot)
-  const saldoPal = parseInt(entrada.pallet_caixas) - parseInt(vinculados.pal)
+    const [[vinculados]] = await conexao.query(
+      'SELECT COALESCE(SUM(embalagem_kg),0) as emb, COALESCE(SUM(rotulo_kg),0) as rot, COALESCE(SUM(pallet_caixas),0) as pal FROM vinculos_insumos WHERE entrada_id = ?',
+      [entrada_id]
+    )
+    const saldoEmb = parseFloat(entrada.embalagem_kg) - parseFloat(vinculados.emb)
+    const saldoRot = parseFloat(entrada.rotulo_kg) - parseFloat(vinculados.rot)
+    const saldoPal = parseInt(entrada.pallet_caixas) - parseInt(vinculados.pal)
 
-  if ((parseFloat(embalagem_kg) || 0) > saldoEmb)
-    return res.status(400).json({ erro: `Saldo insuficiente de embalagem. Disponível: ${saldoEmb} kg` })
-  if ((parseFloat(rotulo_kg) || 0) > saldoRot)
-    return res.status(400).json({ erro: `Saldo insuficiente de rótulo. Disponível: ${saldoRot} kg` })
-  if ((parseInt(pallet_caixas) || 0) > saldoPal)
-    return res.status(400).json({ erro: `Saldo insuficiente de pallets. Disponível: ${saldoPal}` })
+    if ((parseFloat(embalagem_kg) || 0) > saldoEmb)
+      return falha(`Saldo insuficiente de embalagem. Disponível: ${saldoEmb} kg`)
+    if ((parseFloat(rotulo_kg) || 0) > saldoRot)
+      return falha(`Saldo insuficiente de rótulo. Disponível: ${saldoRot} kg`)
+    if ((parseInt(pallet_caixas) || 0) > saldoPal)
+      return falha(`Saldo insuficiente de pallets. Disponível: ${saldoPal}`)
 
-  await banco.query(
-    'INSERT INTO vinculos_insumos (entrada_id, pi_id, produto, embalagem_kg, rotulo_kg, pallet_caixas) VALUES (?, ?, ?, ?, ?, ?)',
-    [
-      entrada_id,
-      pi_id,
-      produto || null,
-      parseFloat(embalagem_kg) || 0,
-      parseFloat(rotulo_kg) || 0,
-      parseInt(pallet_caixas) || 0
-    ]
-  )
-
+    await conexao.query(
+      'INSERT INTO vinculos_insumos (entrada_id, pi_id, produto, embalagem_kg, rotulo_kg, pallet_caixas) VALUES (?, ?, ?, ?, ?, ?)',
+      [
+        entrada_id,
+        pi_id,
+        produto || null,
+        parseFloat(embalagem_kg) || 0,
+        parseFloat(rotulo_kg) || 0,
+        parseInt(pallet_caixas) || 0
+      ]
+    )
+    return null
+  })
+  if (resultado) return res.status(400).json(resultado)
   res.json({ ok: true })
 })
 

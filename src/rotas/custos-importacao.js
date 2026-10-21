@@ -1,5 +1,5 @@
 const express = require('express')
-const { banco } = require('../config/banco')
+const { banco, emTransacao } = require('../config/banco')
 const { autenticarContabil } = require('../middlewares/autenticacao')
 
 const rotas = express.Router()
@@ -182,9 +182,11 @@ rotas.delete('/api/fin/custos/:importacaoId/:custoId', autenticarContabil(), asy
   const custoId = parseInt(req.params.custoId) || 0
   const [[c]] = await banco.query('SELECT id FROM fin_custos WHERE id = ? AND importacao_id = ?', [custoId, impId])
   if (c) {
-    await banco.query('DELETE FROM fin_custo_despesas WHERE custo_id = ?', [c.id])
-    await banco.query('DELETE FROM fin_custo_st WHERE custo_id = ?', [c.id])
-    await banco.query('DELETE FROM fin_custos WHERE id = ?', [c.id])
+    await emTransacao(async (conexao) => {
+      await conexao.query('DELETE FROM fin_custo_despesas WHERE custo_id = ?', [c.id])
+      await conexao.query('DELETE FROM fin_custo_st WHERE custo_id = ?', [c.id])
+      await conexao.query('DELETE FROM fin_custos WHERE id = ?', [c.id])
+    })
   }
   res.json({ ok: true })
 })

@@ -10,4 +10,19 @@ const banco = mysql.createPool({
   connectionLimit: 10
 })
 
-module.exports = { banco }
+async function emTransacao(operacao) {
+  const conexao = await banco.getConnection()
+  try {
+    await conexao.beginTransaction()
+    const resultado = await operacao(conexao)
+    await conexao.commit()
+    return resultado
+  } catch (erro) {
+    await conexao.rollback().catch(() => {})
+    throw erro
+  } finally {
+    conexao.release()
+  }
+}
+
+module.exports = { banco, emTransacao }

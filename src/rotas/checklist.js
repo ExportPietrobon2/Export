@@ -1,5 +1,5 @@
 const express = require('express')
-const { banco } = require('../config/banco')
+const { banco, emTransacao } = require('../config/banco')
 const { autenticarChecklist } = require('../middlewares/autenticacao')
 
 const rotas = express.Router()
@@ -39,13 +39,13 @@ const CAMPOS_CHECKLIST = [
   'observacoes'
 ]
 
-async function salvarItens(checklistId, itens) {
-  await banco.query('DELETE FROM checklist_exp_itens WHERE checklist_id = ?', [checklistId])
+async function salvarItens(conexao, checklistId, itens) {
+  await conexao.query('DELETE FROM checklist_exp_itens WHERE checklist_id = ?', [checklistId])
   if (Array.isArray(itens)) {
     for (let i = 0; i < itens.length; i++) {
       const it = itens[i]
       if (!it || (!it.produto && !it.gramatura && !it.qtd_cx)) continue
-      await banco.query(
+      await conexao.query(
         'INSERT INTO checklist_exp_itens (checklist_id, ordem, produto, gramatura, qtd_cx, lote, validade) VALUES (?,?,?,?,?,?,?)',
         [
           checklistId,
@@ -81,12 +81,15 @@ rotas.post('/api/checklist', autenticarChecklist(), async (req, res) => {
   const b = req.body
   const vals = CAMPOS_CHECKLIST.map((c) => (b[c] === '' || b[c] === undefined ? null : b[c]))
   vals.push(req.usuario.nome || null)
-  const [r] = await banco.query(
-    `INSERT INTO checklist_exp (${CAMPOS_CHECKLIST.join(', ')}, criado_por) VALUES (${CAMPOS_CHECKLIST.map(() => '?').join(', ')}, ?)`,
-    vals
-  )
-  await salvarItens(r.insertId, b.itens)
-  res.json({ id: r.insertId })
+  const id = await emTransacao(async (conexao) => {
+    const [r] = await conexao.query(
+      `INSERT INTO checklist_exp (${CAMPOS_CHECKLIST.join(', ')}, criado_por) VALUES (${CAMPOS_CHECKLIST.map(() => '?').join(', ')}, ?)`,
+      vals
+    )
+    await salvarItens(conexao, r.insertId, b.itens)
+    return r.insertId
+  })
+  res.json({ id })
 })
 
 rotas.put('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
@@ -94,14 +97,18 @@ rotas.put('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
   const sets = CAMPOS_CHECKLIST.map((c) => `${c} = ?`)
   const vals = CAMPOS_CHECKLIST.map((c) => (b[c] === '' || b[c] === undefined ? null : b[c]))
   vals.push(req.params.id)
-  await banco.query(`UPDATE checklist_exp SET ${sets.join(', ')} WHERE id = ?`, vals)
-  await salvarItens(req.params.id, b.itens)
+  await emTransacao(async (conexao) => {
+    await conexao.query(`UPDATE checklist_exp SET ${sets.join(', ')} WHERE id = ?`, vals)
+    await salvarItens(conexao, req.params.id, b.itens)
+  })
   res.json({ ok: true })
 })
 
 rotas.delete('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
-  await banco.query('DELETE FROM checklist_exp_itens WHERE checklist_id = ?', [req.params.id])
-  await banco.query('DELETE FROM checklist_exp WHERE id = ?', [req.params.id])
+  await emTransacao(async (conexao) => {
+    await conexao.query('DELETE FROM checklist_exp_itens WHERE checklist_id = ?', [req.params.id])
+    await conexao.query('DELETE FROM checklist_exp WHERE id = ?', [req.params.id])
+  })
   res.json({ ok: true })
 })
 
