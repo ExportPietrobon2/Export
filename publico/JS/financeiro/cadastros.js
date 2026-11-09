@@ -1,5 +1,6 @@
 import { api } from '/JS/compartilhado/api.js'
 import { $, iniciarPagina, esc, pill, avisar, normalizar, painelLateral } from '/JS/financeiro/comum.js'
+import { seletorPais } from '/JS/compartilhado/listas.js'
 
 let aba = location.hash === '#fornecedores' ? 'fornecedores' : 'clientes'
 let clientes = []
@@ -71,7 +72,7 @@ function abrirForm(id) {
   p.corpo.innerHTML = `
     <div class="row g-2">
       <div class="col-12"><label class="form-label">Nome</label><input id="x-nome" class="form-control form-control-sm" value="${esc(ed?.nome || '')}"></div>
-      <div class="col-6"><label class="form-label">País</label><input id="x-pais" class="form-control form-control-sm" value="${esc(ed?.pais || '')}"></div>
+      <div class="col-6"><label class="form-label">País</label>${seletorPais('x-pais', ed?.pais || '')}</div>
       ${
         ehCliente
           ? ''
@@ -90,10 +91,15 @@ function abrirForm(id) {
   const coletar = () => {
     const d = { nome: $('x-nome').value, pais: $('x-pais').value }
     if (!ehCliente) ['moeda', 'contato', 'email', 'obs'].forEach((k) => (d[k] = $('x-' + k).value))
+    if (!d.pais) {
+      avisar('Selecione o país.', 'warning')
+      return null
+    }
     return d
   }
   $('x-salvar').addEventListener('click', async () => {
     const dados = coletar()
+    if (!dados) return
     const r = ehCliente
       ? ed
         ? await api.cadastros.editarCliente(ed.id, dados)

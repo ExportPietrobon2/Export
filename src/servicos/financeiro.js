@@ -18,6 +18,16 @@ const NOMES_MESES = [
 
 const DIAS_ALERTA_VENCIMENTO = 7
 
+const CAMPOS_DV = ['nf', 'fatura', 'num_due', 'num_conhecimento', 'tipo', 'vendedor', 'produto', 'pais']
+const SQL_NAO_DV = `NOT (${CAMPOS_DV.map((c) => `UPPER(TRIM(COALESCE(${c}, ''))) = 'DV'`).join(' OR ')})`
+const ehNotaDV = (n) =>
+  CAMPOS_DV.some(
+    (c) =>
+      String(n[c] ?? '')
+        .trim()
+        .toUpperCase() === 'DV'
+  )
+
 const n = (v) => Number(v) || 0
 const arred = (v) => Math.round(v * 100) / 100
 
@@ -180,7 +190,7 @@ async function lancamentosAutomaticos(modulo) {
   if (modulo === 'exterior') {
     const [rows] = await banco.query(`
       SELECT id, cliente_id, data, ano, mes, nf, fatura, valor_nfe
-      FROM nfe_lancamentos WHERE cliente_id IS NOT NULL AND entra_fechamento = 1`)
+      FROM nfe_lancamentos WHERE cliente_id IS NOT NULL AND entra_fechamento = 1 AND ${SQL_NAO_DV}`)
     return rows.map((r) => {
       const data = dataISO(r.data)
       return {
@@ -304,6 +314,7 @@ async function lancamentosDaEntidade(modulo, ano, mes, entidadeId) {
 
 module.exports = {
   NOMES_MESES,
+  ehNotaDV,
   MODULOS_EC,
   DIAS_ALERTA_VENCIMENTO,
   dataISO,

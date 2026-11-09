@@ -1,7 +1,7 @@
 const express = require('express')
 const { autenticar } = require('../middlewares/autenticacao')
 const { banco } = require('../config/banco')
-const { importacoesComputadas, saldosDoPeriodo } = require('../servicos/financeiro')
+const { importacoesComputadas, saldosDoPeriodo, ehNotaDV } = require('../servicos/financeiro')
 
 const rotas = express.Router()
 
@@ -52,10 +52,11 @@ rotas.get('/api/fin/painel', autenticar(), async (req, res) => {
     .slice(0, 6)
     .map((l) => ({ id: l.id, nome: l.nome, pais: l.pais, saldo: l.atual }))
 
-  const [notasAno] = await banco.query(
-    'SELECT mes, valor_nfe, peso, cliente_id, num_due, data_due, num_conhecimento, data_conhecimento, tipo, vendedor FROM nfe_lancamentos WHERE ano = ?',
+  const [todasNotas] = await banco.query(
+    'SELECT mes, valor_nfe, peso, cliente_id, nf, fatura, num_due, data_due, num_conhecimento, data_conhecimento, tipo, vendedor, produto, pais FROM nfe_lancamentos WHERE ano = ?',
     [ano]
   )
+  const notasAno = todasNotas.filter((nota) => !ehNotaDV(nota))
   const porMes = Array.from({ length: 12 }, (_, k) => {
     const doMes = notasAno.filter((n) => n.mes === k + 1)
     return { mes: k + 1, valor: somar(doMes, 'valor_nfe'), qtd: doMes.length }

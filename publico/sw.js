@@ -1,4 +1,4 @@
-const CACHE = 'hub-exportacoes-v12'
+const CACHE = 'hub-exportacoes-v13'
 const ARQUIVOS = ['/index.html', '/CSS/estilo.css', '/logo.png', '/icon-192.png', '/icon-512.png']
 
 self.addEventListener('install', (e) => {

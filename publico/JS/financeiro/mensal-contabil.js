@@ -1,5 +1,24 @@
 import { api } from '/JS/compartilhado/api.js'
 import { iniciarPagina, esc, pill, avisar, normalizar } from '/JS/financeiro/comum.js'
+import { seletorPais, seletorComNovo, ativarSeletoresComNovo, normalizarValor } from '/JS/compartilhado/listas.js'
+
+const CAMPOS_DV = ['nf', 'fatura', 'num_due', 'num_conhecimento', 'tipo', 'vendedor', 'produto', 'pais']
+const ehDV = (d) =>
+  CAMPOS_DV.some(
+    (c) =>
+      String(d[c] ?? '')
+        .trim()
+        .toUpperCase() === 'DV'
+  )
+const valorConta = (d) => (ehDV(d) ? 0 : Number(d.valor_nfe) || 0)
+const pesoConta = (d) => (ehDV(d) ? 0 : Number(d.peso) || 0)
+let listaVendedores = []
+let listaProdutos = []
+
+function atualizarListas() {
+  listaVendedores = [...new Set(dados.map((d) => normalizarValor(d.vendedor)).filter((v) => v && v !== 'DV'))].sort()
+  listaProdutos = [...new Set(dados.map((d) => normalizarValor(d.produto)).filter((v) => v && v !== 'DV'))].sort()
+}
 const MESES = [
   'Janeiro',
   'Fevereiro',
@@ -66,8 +85,24 @@ async function carregarDados() {
     return
   }
   dados = rows
+  atualizarListas()
+  preencherSlotsForm()
   renderTabela()
   renderResumo()
+}
+
+function preencherSlotsForm() {
+  const slots = [
+    ['vendedor', listaVendedores],
+    ['produto', listaProdutos]
+  ]
+  for (const [k, lista] of slots) {
+    const slot = document.getElementById('slot-f-' + k)
+    if (!slot) continue
+    const atual = document.getElementById('f-' + k)?.value || ''
+    slot.innerHTML = seletorComNovo('f-' + k, lista, atual === '__novo__' ? '' : atual, k)
+    ativarSeletoresComNovo(slot)
+  }
 }
 
 window.toggleMes = function (m) {
@@ -127,11 +162,12 @@ function notasVisiveis() {
 
 function sinaisNota(d) {
   const faltando = camposFaltando(d)
-  let html = ''
+  let html = ehDV(d) ? '<span class="sinal-dv" title="Nota marcada como DV: não entra nos totais">DV</span>' : ''
   if (!d.cliente_id) html += '<i class="sinal sinal-alerta" title="Sem cliente: não entra no Fechamento"></i>'
   else if (d.entra_fechamento) html += '<i class="sinal sinal-auto" title="Gera o débito no Fechamento"></i>'
   else html += '<i class="sinal sinal-neutro" title="Fora do Fechamento"></i>'
-  if (faltando.length) html += `<span class="sinal-campos" title="Falta: ${esc(faltando.join(', '))}">${faltando.length}</span>`
+  if (faltando.length)
+    html += `<span class="sinal-campos" title="Falta: ${esc(faltando.join(', '))}">${faltando.length}</span>`
   return html
 }
 
@@ -163,6 +199,9 @@ function alertasCampos(d) {
 function gerarFormEdicaoInline(d) {
   const campo = (col) => {
     const val = col.tipo === 'date' ? dISO(d[col.k]) : d[col.k] == null ? '' : d[col.k]
+    if (col.k === 'pais') return seletorPais(`ei-pais-${d.id}`, val)
+    if (col.k === 'vendedor') return seletorComNovo(`ei-vendedor-${d.id}`, listaVendedores, val, 'vendedor')
+    if (col.k === 'produto') return seletorComNovo(`ei-produto-${d.id}`, listaProdutos, val, 'produto')
     if (col.k === 'tipo') {
       return `<select id="ei-tipo-${d.id}" class="form-select form-select-sm">
         <option value="">—</option>
@@ -208,14 +247,14 @@ function renderTabela() {
     return
   }
 
-  const totalAno = visiveis.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
-  let html = `<div class="nota-legenda"><span><i class="sinal sinal-auto"></i>No Fechamento</span><span><i class="sinal sinal-alerta"></i>Sem cliente</span><span><i class="sinal sinal-neutro"></i>Fora do Fechamento</span><span><b class="sinal-campos">n</b>Campos a preencher</span><span class="ms-auto">Clique na nota para ver tudo e editar</span></div><div class="meses-lista">`
+  const totalAno = visiveis.reduce((s, d) => s + valorConta(d), 0)
+  let html = `<div class="nota-legenda"><span><i class="sinal sinal-auto"></i>No Fechamento</span><span><i class="sinal sinal-alerta"></i>Sem cliente</span><span><i class="sinal sinal-neutro"></i>Fora do Fechamento</span><span><b class="sinal-campos">n</b>Campos a preencher</span><span><b class="sinal-dv">DV</b>Não entra nos totais</span><span class="ms-auto">Clique na nota para ver tudo e editar</span></div><div class="meses-lista">`
   for (let m = 1; m <= 12; m++) {
     const doMes = visiveis.filter((d) => d.mes === m)
     if (!doMes.length) continue
     const aberto = mesesAbertos.has(m) || !!busca || soSemCliente
-    const totValor = doMes.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
-    const totPeso = doMes.reduce((s, d) => s + (Number(d.peso) || 0), 0)
+    const totValor = doMes.reduce((s, d) => s + valorConta(d), 0)
+    const totPeso = doMes.reduce((s, d) => s + pesoConta(d), 0)
     const participacao = totalAno ? (totValor / totalAno) * 100 : 0
     const temIncompleto = doMes.some(
       (d) =>
@@ -252,7 +291,7 @@ function renderTabela() {
                     <span class="nota-data">${d.data ? dBR(d.data).slice(0, 5) : ''}</span>
                     <span class="nota-cliente">${d.cliente_nome ? esc(d.cliente_nome) : esc(d.pais || '—')}</span>
                     <span class="nota-sinais">${sinaisNota(d)}</span>
-                    <span class="nota-valor">R$ ${money(d.valor_nfe)}</span>
+                    <span class="nota-valor${ehDV(d) ? ' nota-dv' : ''}">R$ ${money(d.valor_nfe)}</span>
                     <span class="nota-seta">${estaAberto ? '▴' : '▾'}</span>
                   </div>
                   ${estaAberto ? gerarFormEdicaoInline(d) : ''}
@@ -266,6 +305,7 @@ function renderTabela() {
   }
   html += '</div>'
   cont.innerHTML = html
+  ativarSeletoresComNovo(cont)
 }
 
 window.toggleInline = function (id) {
@@ -344,17 +384,18 @@ window.excluirNota = async function (id) {
 }
 
 function renderResumo() {
-  const totalValor = dados.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
-  const totalPeso = dados.reduce((s, d) => s + (Number(d.peso) || 0), 0)
-  const totalNotas = dados.length
-  const noFechamento = dados.filter((d) => d.cliente_id && d.entra_fechamento).length
+  const totalValor = dados.reduce((s, d) => s + valorConta(d), 0)
+  const totalPeso = dados.reduce((s, d) => s + pesoConta(d), 0)
+  const totalNotas = dados.filter((d) => !ehDV(d)).length
+  const qtdDV = dados.filter(ehDV).length
+  const noFechamento = dados.filter((d) => d.cliente_id && d.entra_fechamento && !ehDV(d)).length
   const semCliente = dados.filter((d) => !d.cliente_id).length
   const porMes = MESES.map((nome, i) => {
     const doMes = dados.filter((d) => d.mes === i + 1)
     return {
       nome,
-      valor: doMes.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0),
-      peso: doMes.reduce((s, d) => s + (Number(d.peso) || 0), 0),
+      valor: doMes.reduce((s, d) => s + valorConta(d), 0),
+      peso: doMes.reduce((s, d) => s + pesoConta(d), 0),
       qtd: doMes.length
     }
   })
@@ -371,6 +412,7 @@ function renderResumo() {
         <div class="fat-hero-principal">
           <span class="fat-rotulo"><span class="fat-ponto"></span>Faturamento de exportação · ${anoAtual}</span>
           <div class="fat-total">R$ ${money(totalValor)}</div>
+          ${qtdDV ? `<div class="fat-dv">${qtdDV} nota(s) DV fora do total</div>` : ''}
           <div class="fat-metricas">
             <div><span>Peso</span><strong>${money(totalPeso)} kg</strong></div>
             <div><span>Notas</span><strong>${totalNotas}</strong></div>
@@ -386,7 +428,10 @@ function renderResumo() {
         <div class="fat-grafico" role="img" aria-label="Faturamento por mês">
           ${porMes
             .map(
-              (m, i) => `<div class="fat-col ${i === mesCorrente ? 'atual' : ''} ${m.valor ? '' : 'vazia'}" title="${m.nome}: R$ ${money(m.valor)} · ${m.qtd} nota(s) · ${money(m.peso)} kg">
+              (
+                m,
+                i
+              ) => `<div class="fat-col ${i === mesCorrente ? 'atual' : ''} ${m.valor ? '' : 'vazia'}" title="${m.nome}: R$ ${money(m.valor)} · ${m.qtd} nota(s) · ${money(m.peso)} kg">
               <span class="fat-col-valor">${m.valor ? abreviar(m.valor) : ''}</span>
               <div class="fat-col-trilho"><div class="fat-col-barra" style="height:${m.valor ? Math.max(4, (m.valor / maior) * 100) : 0}%"></div></div>
               <span class="fat-col-mes">${m.nome.slice(0, 3)}</span>
@@ -482,8 +527,8 @@ async function exportarExcel() {
   COLS.forEach((c, i) => {
     ws.getColumn(i + 1).width = LARGURAS[c.k] || 15
   })
-  const totalValor = dados.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
-  const totalPeso = dados.reduce((s, d) => s + (Number(d.peso) || 0), 0)
+  const totalValor = dados.reduce((s, d) => s + valorConta(d), 0)
+  const totalPeso = dados.reduce((s, d) => s + pesoConta(d), 0)
   ws.mergeCells(1, 1, 1, nc)
   const c1 = ws.getCell(1, 1)
   c1.value = 'FATURAMENTO NFe — ' + anoAtual
@@ -501,8 +546,8 @@ async function exportarExcel() {
   for (let m = 1; m <= 12; m++) {
     const doMes = dados.filter((d) => d.mes === m)
     if (!doMes.length) continue
-    const tv = doMes.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
-    const tp = doMes.reduce((s, d) => s + (Number(d.peso) || 0), 0)
+    const tv = doMes.reduce((s, d) => s + valorConta(d), 0)
+    const tp = doMes.reduce((s, d) => s + pesoConta(d), 0)
     ws.mergeCells(r, 1, r, nc)
     const cm = ws.getCell(r, 1)
     cm.value =
@@ -585,14 +630,14 @@ async function exportarExcel() {
 }
 
 function exportarPDF() {
-  const totalValor = dados.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
-  const totalPeso = dados.reduce((s, d) => s + (Number(d.peso) || 0), 0)
+  const totalValor = dados.reduce((s, d) => s + valorConta(d), 0)
+  const totalPeso = dados.reduce((s, d) => s + pesoConta(d), 0)
   let secoes = ''
   for (let m = 1; m <= 12; m++) {
     const doMes = dados.filter((d) => d.mes === m)
     if (!doMes.length) continue
-    const tv = doMes.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
-    const tp = doMes.reduce((s, d) => s + (Number(d.peso) || 0), 0)
+    const tv = doMes.reduce((s, d) => s + valorConta(d), 0)
+    const tp = doMes.reduce((s, d) => s + pesoConta(d), 0)
     const linhas = doMes
       .map(
         (d) =>
@@ -649,8 +694,8 @@ function exportarPDF() {
   const linhasMes = MESES.map((nome, i) => {
     const doMes = dados.filter((d) => d.mes === i + 1)
     if (!doMes.length) return ''
-    const v = doMes.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
-    const p = doMes.reduce((s, d) => s + (Number(d.peso) || 0), 0)
+    const v = doMes.reduce((s, d) => s + valorConta(d), 0)
+    const p = doMes.reduce((s, d) => s + pesoConta(d), 0)
     return (
       '<tr><td>' +
       nome +
@@ -786,9 +831,9 @@ function montarInterface() {
         <div class="col-6 col-md-2"><label class="form-label small mb-0">Tipo</label><select id="f-tipo" class="form-select form-select-sm"><option value="">—</option><option>BL</option><option>CRT</option><option>DDE</option><option>SD</option></select></div>
         <div class="col-6 col-md-2"><label class="form-label small mb-0">Valor da NFE</label><input type="number" step="any" id="f-valor_nfe" class="form-control form-control-sm"></div>
         <div class="col-6 col-md-2"><label class="form-label small mb-0">Peso (kg)</label><input type="number" step="any" id="f-peso" class="form-control form-control-sm"></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">Vendedor</label><input type="text" id="f-vendedor" class="form-control form-control-sm"></div>
-        <div class="col-6 col-md-3"><label class="form-label small mb-0">Produto</label><input type="text" id="f-produto" class="form-control form-control-sm"></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">País</label><input type="text" id="f-pais" class="form-control form-control-sm"></div>
+        <div class="col-6 col-md-2"><label class="form-label small mb-0">Vendedor</label><span id="slot-f-vendedor"></span></div>
+        <div class="col-6 col-md-3"><label class="form-label small mb-0">Produto</label><span id="slot-f-produto"></span></div>
+        <div class="col-6 col-md-2"><label class="form-label small mb-0">País</label>${seletorPais('f-pais', '')}</div>
       </div>
       <div class="mt-3 d-flex gap-2">
         <button id="btn-salvar-nota" class="btn btn-ok-grande">➕ Lançar nota</button>
@@ -841,7 +886,12 @@ function montarInterface() {
   })
   document.getElementById('f-cliente_id').addEventListener('change', (e) => {
     const pais = e.target.selectedOptions[0]?.dataset.pais
-    if (pais && !document.getElementById('f-pais').value) document.getElementById('f-pais').value = pais
+    const sel = document.getElementById('f-pais')
+    if (pais && !sel.value) {
+      const v = normalizarValor(pais)
+      if (![...sel.options].some((o) => o.value === v)) sel.add(new Option(v, v), 1)
+      sel.value = v
+    }
   })
   document.getElementById('btn-excel').addEventListener('click', exportarExcel)
   document.getElementById('btn-pdf').addEventListener('click', exportarPDF)

@@ -19,6 +19,7 @@ import {
   painelLateral,
   buscarPtax
 } from '/JS/financeiro/comum.js'
+import { seletorComNovo, ativarSeletoresComNovo, normalizarValor } from '/JS/compartilhado/listas.js'
 
 const numf = num
 
@@ -35,6 +36,13 @@ let custoDespesas = []
 let custoSt = []
 
 const painel = () => painelLateral('painel-importacao', 'Importação')
+
+function bancosUsados() {
+  return [...resumo.importacoes.map((i) => i.banco), ...contratos.map((c) => c.banco)]
+    .map(normalizarValor)
+    .filter(Boolean)
+    .sort()
+}
 
 async function carregar() {
   const [r, f, c] = await Promise.all([api.fin.resumo(), api.cadastros.fornecedores(), api.fin.contratos()])
@@ -222,7 +230,7 @@ function abrirFormImportacao(id) {
       <div class="col-6"><label class="form-label">Vencimento do pagamento</label><input type="date" id="i-data_vencimento" class="form-control form-control-sm" value="${dISO(ed?.data_vencimento)}">
         <div class="d-flex gap-1 mt-1 flex-wrap">${[0, 30, 60, 90].map((d) => `<button type="button" class="fin-chip py-0" data-prazo="${d}">${d ? d + ' dias' : 'à vista'}</button>`).join('')}</div></div>
       <div class="col-6"><label class="form-label">Chegada da mercadoria</label><input type="date" id="i-data_chegada" class="form-control form-control-sm" value="${dISO(ed?.data_chegada)}"><div class="texto-sub mt-1">Data da NF de entrada. Pagamentos antes dela são adiantamento.</div></div>
-      <div class="col-6"><label class="form-label">Banco</label><input id="i-banco" class="form-control form-control-sm" value="${esc(ed?.banco || '')}"></div>
+      <div class="col-6"><label class="form-label">Banco</label>${seletorComNovo('i-banco', bancosUsados(), ed?.banco || '', 'banco')}</div>
       <div class="col-12"><label class="form-label">Observações</label><input id="i-obs" class="form-control form-control-sm" value="${esc(ed?.obs || '')}"></div>
     </div>
     <div class="d-flex gap-2 mt-4">
@@ -230,6 +238,7 @@ function abrirFormImportacao(id) {
       ${ed ? '<button class="btn btn-outline-danger ms-auto" id="i-excluir">Excluir</button>' : ''}
     </div>`
 
+  ativarSeletoresComNovo(p.corpo)
   const atualizarReais = () => {
     const v = numeroDoCampo($('i-valor_moeda').value) * numeroDoCampo($('i-taxa_cambio').value)
     $('i-valor-reais').textContent = v ? brl(v) : '—'
@@ -333,7 +342,7 @@ async function abrirDetalhe(id, focarPagamento) {
       <div class="col-6"><label class="form-label">Valor pago (${esc(i.moeda)})</label><input inputmode="decimal" id="p-moeda" class="form-control form-control-sm"></div>
       <div class="col-6"><label class="form-label">Taxa</label><input inputmode="decimal" id="p-taxa" class="form-control form-control-sm" value="${i.taxa_cambio || ''}"><div class="texto-sub mt-1" id="p-taxa-nota"></div></div>
       <div class="col-6"><label class="form-label">Valor em R$</label><input inputmode="decimal" id="p-reais" class="form-control form-control-sm"></div>
-      <div class="col-6"><label class="form-label">Forma</label><input id="p-forma" class="form-control form-control-sm" value="Câmbio"></div>
+      <div class="col-6"><label class="form-label">Forma</label><select id="p-forma" class="form-select form-select-sm">${['Câmbio', 'Câmbio antecipado', 'Remessa', 'Boleto', 'Transferência', 'Outro'].map((f) => `<option>${f}</option>`).join('')}</select></div>
       <div class="col-12"><label class="form-label">Observação</label><input id="p-obs" class="form-control form-control-sm"></div>
     </div>
     <div class="d-flex flex-wrap gap-2 align-items-center mb-4">
@@ -480,7 +489,7 @@ function abrirFormContrato(id) {
   p.corpo.innerHTML = `
     <div class="row g-2">
       <div class="col-6"><label class="form-label">Nº do contrato</label><input id="ct-num_contrato" class="form-control form-control-sm" value="${esc(ed?.num_contrato || '')}"></div>
-      <div class="col-6"><label class="form-label">Banco</label><input id="ct-banco" class="form-control form-control-sm" value="${esc(ed?.banco || '')}"></div>
+      <div class="col-6"><label class="form-label">Banco</label>${seletorComNovo('ct-banco', bancosUsados(), ed?.banco || '', 'banco')}</div>
       <div class="col-12"><label class="form-label">Importação</label><select id="ct-importacao_id" class="form-select form-select-sm"><option value="">Sem vínculo</option>${optImp}</select></div>
       <div class="col-6"><label class="form-label">Data de fechamento</label><input type="date" id="ct-data_fechamento" class="form-control form-control-sm" value="${dISO(ed?.data_fechamento)}"></div>
       <div class="col-6"><label class="form-label">Moeda</label><select id="ct-moeda" class="form-select form-select-sm">${['USD', 'EUR', 'CNY'].map((m) => `<option ${(ed?.moeda || 'USD') === m ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
@@ -493,6 +502,7 @@ function abrirFormContrato(id) {
     </div>
     <div class="d-flex gap-2 mt-4"><button class="btn btn-ok-grande" id="ct-salvar">${ed ? 'Salvar alterações' : 'Adicionar contrato'}</button>
       ${ed ? '<button class="btn btn-outline-danger ms-auto" id="ct-excluir">Excluir</button>' : ''}</div>`
+  ativarSeletoresComNovo(p.corpo)
   const atualizar = () => {
     const v = numeroDoCampo($('ct-valor_moeda').value) * numeroDoCampo($('ct-taxa').value)
     $('ct-reais').textContent = v ? brl(v) : '—'
