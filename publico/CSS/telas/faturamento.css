@@ -1,0 +1,463 @@
+body[data-pagina='mensal-contabil.html'] {
+  --fat-tinta: #0b1020;
+  --fat-neon: #ff4d5a;
+  --fat-neon-2: #ff9a3d;
+  --fat-ciano: #38e1ff;
+  --fat-verde: #3ef0a0;
+  --fat-vidro: rgba(255, 255, 255, 0.72);
+  --fat-borda: rgba(15, 23, 42, 0.08);
+  --fat-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  margin-bottom: 18px;
+  color: #e7ecf7;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(255, 77, 90, 0.28) 0%, transparent 45%),
+    radial-gradient(90% 120% at 100% 100%, rgba(56, 225, 255, 0.16) 0%, transparent 50%),
+    linear-gradient(135deg, #0b1020 0%, #141a33 55%, #1b1440 100%);
+  box-shadow:
+    0 20px 50px -20px rgba(11, 16, 32, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-hero-grade {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.9), transparent 85%);
+  pointer-events: none;
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-hero-conteudo {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 28px;
+  padding: 26px 28px;
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-rotulo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9aa6c4;
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-ponto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fat-verde);
+  box-shadow: 0 0 0 4px rgba(62, 240, 160, 0.15), 0 0 14px var(--fat-verde);
+  animation: fat-pulso 2.4s ease-in-out infinite;
+}
+
+@keyframes fat-pulso {
+  50% {
+    box-shadow: 0 0 0 7px rgba(62, 240, 160, 0.05), 0 0 22px var(--fat-verde);
+  }
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-total {
+  font-family: var(--fat-mono);
+  font-size: clamp(1.9rem, 4vw, 2.7rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 8px 0 18px;
+  background: linear-gradient(90deg, #ffffff 0%, #ffd0d4 60%, #ffb27a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-variant-numeric: tabular-nums;
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-metricas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-metricas > div {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+  backdrop-filter: blur(6px);
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-metricas span {
+  display: block;
+  font-size: 0.68rem;
+  color: #8e9abb;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-metricas strong {
+  font-family: var(--fat-mono);
+  font-size: 0.98rem;
+  color: #f1f4fb;
+  font-variant-numeric: tabular-nums;
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-integracao-topo {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: #aab4cf;
+  margin-bottom: 6px;
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-integracao-topo strong {
+  font-family: var(--fat-mono);
+  color: var(--fat-ciano);
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-integracao-barra {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-integracao-barra span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--fat-ciano), var(--fat-verde));
+  box-shadow: 0 0 12px rgba(56, 225, 255, 0.6);
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-integracao-sub {
+  font-size: 0.74rem;
+  color: #8e9abb;
+  margin-top: 6px;
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--fat-neon-2);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-grafico {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 8px;
+  align-items: end;
+  min-height: 230px;
+  padding: 14px 12px 8px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-col-trilho {
+  flex: 1;
+  width: 100%;
+  max-width: 30px;
+  display: flex;
+  align-items: flex-end;
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.07));
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-col-barra {
+  width: 100%;
+  border-radius: 8px 8px 4px 4px;
+  background: linear-gradient(180deg, var(--fat-neon-2) 0%, var(--fat-neon) 100%);
+  box-shadow: 0 0 18px rgba(255, 77, 90, 0.45);
+  transform-origin: bottom;
+  animation: fat-crescer 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-col.atual .fat-col-barra {
+  background: linear-gradient(180deg, #a5f3ff 0%, var(--fat-ciano) 100%);
+  box-shadow: 0 0 22px rgba(56, 225, 255, 0.65);
+}
+
+@keyframes fat-crescer {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-col-valor {
+  font-family: var(--fat-mono);
+  font-size: 0.62rem;
+  color: #c9d2ea;
+  min-height: 1em;
+  white-space: nowrap;
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-col-mes {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #7f8bab;
+}
+
+body[data-pagina='mensal-contabil.html'] .fat-col.atual .fat-col-mes {
+  color: var(--fat-ciano);
+}
+
+body[data-pagina='mensal-contabil.html'] .barra-controles {
+  background: var(--fat-vidro);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--fat-borda);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px -16px rgba(15, 23, 42, 0.35);
+}
+
+body[data-pagina='mensal-contabil.html'] .meses-lista {
+  gap: 10px;
+}
+
+body[data-pagina='mensal-contabil.html'] .mes-section {
+  position: relative;
+  border-radius: 16px;
+  border: 1px solid var(--fat-borda);
+  background: linear-gradient(180deg, #ffffff, #fbfcfe);
+  box-shadow: 0 6px 18px -14px rgba(15, 23, 42, 0.4);
+}
+
+body[data-pagina='mensal-contabil.html'] .mes-section::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--fat-neon), var(--fat-neon-2));
+  opacity: 0.35;
+  transition: opacity 0.2s;
+}
+
+body[data-pagina='mensal-contabil.html'] .mes-section.mes-aberto::before,
+body[data-pagina='mensal-contabil.html'] .mes-section:hover::before {
+  opacity: 1;
+}
+
+body[data-pagina='mensal-contabil.html'] .mes-header {
+  padding: 16px 20px;
+}
+
+body[data-pagina='mensal-contabil.html'] .mes-aberto .mes-header {
+  background: linear-gradient(90deg, rgba(255, 77, 90, 0.05), transparent 60%);
+  border-bottom: 1px solid var(--fat-borda);
+}
+
+body[data-pagina='mensal-contabil.html'] .mes-chevron {
+  color: var(--fat-neon);
+}
+
+body[data-pagina='mensal-contabil.html'] .mes-nome {
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+body[data-pagina='mensal-contabil.html'] .mes-qtd {
+  font-family: var(--fat-mono);
+  font-size: 0.72rem;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+body[data-pagina='mensal-contabil.html'] .mes-incompleto {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #b45309;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+body[data-pagina='mensal-contabil.html'] .mes-participacao {
+  width: 90px;
+  height: 5px;
+  border-radius: 999px;
+  background: #eef1f6;
+  overflow: hidden;
+}
+
+body[data-pagina='mensal-contabil.html'] .mes-participacao span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--fat-neon-2), var(--fat-neon));
+}
+
+body[data-pagina='mensal-contabil.html'] .mes-valor-total {
+  font-family: var(--fat-mono);
+  font-size: 0.95rem;
+  color: #0f9f62;
+  font-variant-numeric: tabular-nums;
+}
+
+body[data-pagina='mensal-contabil.html'] .mes-peso-total {
+  font-family: var(--fat-mono);
+  font-size: 0.74rem;
+  min-width: 96px;
+  text-align: right;
+}
+
+body[data-pagina='mensal-contabil.html'] .mes-body {
+  padding: 12px 16px 14px;
+  gap: 8px;
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-card {
+  background: #fff;
+  border: 1px solid var(--fat-borda);
+  border-radius: 12px;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s;
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-card:hover {
+  border-color: rgba(255, 77, 90, 0.35);
+  box-shadow: 0 8px 20px -14px rgba(255, 77, 90, 0.55);
+  transform: translateY(-1px);
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-fatura {
+  font-family: var(--fat-mono);
+  font-size: 0.86rem;
+  color: #0b1020;
+  background: #f1f5f9;
+  padding: 3px 8px;
+  border-radius: 7px;
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-pais {
+  background: #0b1020 !important;
+  color: #e7ecf7;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-valor {
+  font-family: var(--fat-mono);
+  font-weight: 700;
+  color: #0f9f62;
+  font-variant-numeric: tabular-nums;
+}
+
+body[data-pagina='mensal-contabil.html'] .btn-editar-nota {
+  border-radius: 9px;
+  border-color: #e2e8f0;
+  color: #334155;
+  background: #fff;
+  font-weight: 600;
+}
+
+body[data-pagina='mensal-contabil.html'] .btn-editar-nota:hover {
+  background: #0b1020;
+  border-color: #0b1020;
+  color: #fff;
+}
+
+body[data-pagina='mensal-contabil.html'] #form-lancamento {
+  border-radius: 18px;
+  border: 1px solid rgba(255, 77, 90, 0.25);
+  box-shadow: 0 18px 40px -24px rgba(255, 77, 90, 0.55);
+}
+
+@media (max-width: 900px) {
+  body[data-pagina='mensal-contabil.html'] .fat-hero-conteudo {
+    grid-template-columns: 1fr;
+    padding: 22px 18px;
+  }
+
+  body[data-pagina='mensal-contabil.html'] .fat-grafico {
+    min-height: 180px;
+    gap: 4px;
+    padding: 12px 8px 6px;
+  }
+
+  body[data-pagina='mensal-contabil.html'] .fat-col-valor {
+    display: none;
+  }
+
+  body[data-pagina='mensal-contabil.html'] .mes-participacao,
+  body[data-pagina='mensal-contabil.html'] .mes-peso-total {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-pagina='mensal-contabil.html'] .fat-col-barra,
+  body[data-pagina='mensal-contabil.html'] .fat-ponto {
+    animation: none;
+  }
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-pendente {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #b45309;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+body[data-pagina='mensal-contabil.html'] .barra-controles .btn-outline-secondary,
+body[data-pagina='mensal-contabil.html'] .barra-controles .btn-outline-success,
+body[data-pagina='mensal-contabil.html'] .barra-controles .btn-outline-danger {
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #334155;
+  font-weight: 600;
+}
+
+body[data-pagina='mensal-contabil.html'] .barra-controles .btn-outline-success {
+  color: #0f9f62;
+}
+
+body[data-pagina='mensal-contabil.html'] .barra-controles .btn-outline-danger {
+  color: #e11d48;
+}
+
+body[data-pagina='mensal-contabil.html'] .barra-controles .btn-outline-secondary:hover,
+body[data-pagina='mensal-contabil.html'] .barra-controles .btn-outline-success:hover,
+body[data-pagina='mensal-contabil.html'] .barra-controles .btn-outline-danger:hover {
+  background: #0b1020;
+  border-color: #0b1020;
+  color: #fff;
+}
+
+body[data-pagina='mensal-contabil.html'] .barra-controles .form-control,
+body[data-pagina='mensal-contabil.html'] .barra-controles .form-select {
+  border-radius: 10px;
+}

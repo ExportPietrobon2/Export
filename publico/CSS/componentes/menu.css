@@ -88,26 +88,14 @@
   border-color: var(--border-soft);
 }
 
-#menu-principal a[href$='visao-geral.html']::before {
+#menu-principal a[href$='painel.html']::before {
   content: '📊';
 }
-#menu-principal a[href$='cadastro.html']::before {
-  content: '📋';
-}
-#menu-principal a[href$='almoxarifado.html']::before {
-  content: '📦';
-}
-#menu-principal a[href$='recebimento.html']::before {
-  content: '🚚';
+#menu-principal a[href$='cadastros.html']::before {
+  content: '🗂️';
 }
 #menu-principal a[href$='rendimentos.html']::before {
   content: '📐';
-}
-#menu-principal a[href$='embarques.html']::before {
-  content: '🚢';
-}
-#menu-principal a[href$='compras.html']::before {
-  content: '🛒';
 }
 #menu-principal a[href$='mensal-contabil.html']::before {
   content: '💰';

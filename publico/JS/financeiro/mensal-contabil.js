@@ -135,7 +135,7 @@ function alertasCampos(d) {
   if (!d.vendedor) faltando.push('Vendedor')
   if (!d.peso) faltando.push('Peso')
   if (!faltando.length) return '<span class="badge bg-success">✔ Completo</span>'
-  return `<span class="badge bg-warning text-dark" title="${faltando.join(', ')} não preenchido">⚠ ${faltando.length} campo${faltando.length > 1 ? 's' : ''}</span>`
+  return `<span class="nota-pendente" title="${faltando.join(', ')} não preenchido">${faltando.length} campo${faltando.length > 1 ? 's' : ''}</span>`
 }
 
 function gerarFormEdicaoInline(d) {
@@ -186,6 +186,7 @@ function renderTabela() {
     return
   }
 
+  const totalAno = visiveis.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
   let html = '<div class="meses-lista">'
   for (let m = 1; m <= 12; m++) {
     const doMes = visiveis.filter((d) => d.mes === m)
@@ -193,6 +194,7 @@ function renderTabela() {
     const aberto = mesesAbertos.has(m) || !!busca || soSemCliente
     const totValor = doMes.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
     const totPeso = doMes.reduce((s, d) => s + (Number(d.peso) || 0), 0)
+    const participacao = totalAno ? (totValor / totalAno) * 100 : 0
     const temIncompleto = doMes.some(
       (d) =>
         !d.num_due || !d.data_due || !d.num_conhecimento || !d.data_conhecimento || !d.tipo || !d.vendedor || !d.peso
@@ -205,9 +207,10 @@ function renderTabela() {
             <span class="mes-chevron">${aberto ? '▼' : '▶'}</span>
             <span class="mes-nome">${MESES[m - 1]}</span>
             <span class="mes-qtd">${doMes.length} nota${doMes.length > 1 ? 's' : ''}</span>
-            ${temIncompleto ? '<span class="badge bg-warning text-dark ms-1" style="font-size:.65rem">⚠ Incompleto</span>' : ''}
+            ${temIncompleto ? '<span class="mes-incompleto">Campos pendentes</span>' : ''}
           </div>
           <div class="mes-header-dir">
+            <span class="mes-participacao" title="${money(participacao)}% do ano"><span style="width:${participacao}%"></span></span>
             <span class="mes-valor-total">R$ ${money(totValor)}</span>
             <span class="mes-peso-total">${money(totPeso)} kg</span>
           </div>
@@ -332,6 +335,8 @@ function renderResumo() {
   const totalValor = dados.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
   const totalPeso = dados.reduce((s, d) => s + (Number(d.peso) || 0), 0)
   const totalNotas = dados.length
+  const noFechamento = dados.filter((d) => d.cliente_id && d.entra_fechamento).length
+  const semCliente = dados.filter((d) => !d.cliente_id).length
   const porMes = MESES.map((nome, i) => {
     const doMes = dados.filter((d) => d.mes === i + 1)
     return {
@@ -341,59 +346,58 @@ function renderResumo() {
       qtd: doMes.length
     }
   })
+  const maior = Math.max(...porMes.map((m) => m.valor), 1)
+  const hoje = new Date()
+  const mesCorrente = anoAtual === hoje.getFullYear() ? hoje.getMonth() : -1
+  const melhor = porMes.reduce((a, m) => (m.valor > a.valor ? m : a), porMes[0])
+  const integracao = totalNotas ? Math.round((noFechamento / totalNotas) * 100) : 0
 
   document.getElementById('resumo-contabil').innerHTML = `
-    <div class="row g-3 mb-4">
-      <div class="col-6 col-md-3"><div class="card"><div class="card-body text-center py-3">
-        <div class="small text-muted mb-1">Valor Comercializado</div>
-        <div class="fw-bold fs-5 text-success">R$ ${money(totalValor)}</div>
-      </div></div></div>
-      <div class="col-6 col-md-3"><div class="card"><div class="card-body text-center py-3">
-        <div class="small text-muted mb-1">Kilos Produzidos</div>
-        <div class="fw-bold fs-5">${money(totalPeso)} kg</div>
-      </div></div></div>
-      <div class="col-6 col-md-3"><div class="card"><div class="card-body text-center py-3">
-        <div class="small text-muted mb-1">Notas no ano</div>
-        <div class="fw-bold fs-5">${totalNotas}</div>
-      </div></div></div>
-      <div class="col-6 col-md-3"><div class="card"><div class="card-body text-center py-3">
-        <div class="small text-muted mb-1">Média por nota</div>
-        <div class="fw-bold fs-5">R$ ${money(totalNotas ? totalValor / totalNotas : 0)}</div>
-      </div></div></div>
-    </div>
-    <div class="card mb-4"><div class="card-body py-2">
-      <details>
-        <summary class="secao-titulo-card mb-0" style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;padding:6px 0">
-          <span style="font-size:.85rem;color:#94a3b8">▶</span>
-          Vendas por mês — ${anoAtual}
-        </summary>
-        <div class="table-responsive mt-3">
-          <table class="table table-sm mb-0" style="font-size:.85rem">
-            <thead><tr><th>Mês</th><th class="text-end">Notas</th><th class="text-end">Valor</th><th class="text-end">Peso (kg)</th></tr></thead>
-            <tbody>
-              ${porMes
-                .filter((m) => m.qtd)
-                .map(
-                  (m) => `
-                <tr>
-                  <td>${m.nome}</td>
-                  <td class="text-end">${m.qtd}</td>
-                  <td class="text-end">R$ ${money(m.valor)}</td>
-                  <td class="text-end">${money(m.peso)}</td>
-                </tr>`
-                )
-                .join('')}
-              <tr class="fw-bold" style="background:#fbeaea">
-                <td>TOTAL</td>
-                <td class="text-end">${totalNotas}</td>
-                <td class="text-end">R$ ${money(totalValor)}</td>
-                <td class="text-end">${money(totalPeso)}</td>
-              </tr>
-            </tbody>
-          </table>
+    <section class="fat-hero">
+      <div class="fat-hero-grade"></div>
+      <div class="fat-hero-conteudo">
+        <div class="fat-hero-principal">
+          <span class="fat-rotulo"><span class="fat-ponto"></span>Faturamento de exportação · ${anoAtual}</span>
+          <div class="fat-total">R$ ${money(totalValor)}</div>
+          <div class="fat-metricas">
+            <div><span>Peso</span><strong>${money(totalPeso)} kg</strong></div>
+            <div><span>Notas</span><strong>${totalNotas}</strong></div>
+            <div><span>Média por nota</span><strong>R$ ${money(totalNotas ? totalValor / totalNotas : 0)}</strong></div>
+            <div><span>Melhor mês</span><strong>${melhor.valor ? melhor.nome : '—'}</strong></div>
+          </div>
+          <div class="fat-integracao">
+            <div class="fat-integracao-topo"><span>Integração com o Fechamento</span><strong>${integracao}%</strong></div>
+            <div class="fat-integracao-barra"><span style="width:${integracao}%"></span></div>
+            <div class="fat-integracao-sub">${noFechamento} de ${totalNotas} nota(s) geram o débito sozinhas${semCliente ? ` · <button class="fat-link" id="fat-ver-sem-cliente">${semCliente} sem cliente</button>` : ''}</div>
+          </div>
         </div>
-      </details>
-    </div></div>`
+        <div class="fat-grafico" role="img" aria-label="Faturamento por mês">
+          ${porMes
+            .map(
+              (m, i) => `<div class="fat-col ${i === mesCorrente ? 'atual' : ''} ${m.valor ? '' : 'vazia'}" title="${m.nome}: R$ ${money(m.valor)} · ${m.qtd} nota(s) · ${money(m.peso)} kg">
+              <span class="fat-col-valor">${m.valor ? abreviar(m.valor) : ''}</span>
+              <div class="fat-col-trilho"><div class="fat-col-barra" style="height:${m.valor ? Math.max(4, (m.valor / maior) * 100) : 0}%"></div></div>
+              <span class="fat-col-mes">${m.nome.slice(0, 3)}</span>
+            </div>`
+            )
+            .join('')}
+        </div>
+      </div>
+    </section>`
+  const btnSemCliente = document.getElementById('fat-ver-sem-cliente')
+  if (btnSemCliente)
+    btnSemCliente.addEventListener('click', () => {
+      soSemCliente = true
+      document.getElementById('btn-sem-cliente')?.classList.add('ativo')
+      renderTabela()
+      document.getElementById('tabela-contabil').scrollIntoView({ behavior: 'smooth' })
+    })
+}
+
+function abreviar(v) {
+  if (v >= 1e6) return (v / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'M'
+  if (v >= 1e3) return Math.round(v / 1e3).toLocaleString('pt-BR') + 'k'
+  return Math.round(v).toLocaleString('pt-BR')
 }
 
 async function salvarNota() {
