@@ -461,3 +461,134 @@ body[data-pagina='mensal-contabil.html'] .barra-controles .form-control,
 body[data-pagina='mensal-contabil.html'] .barra-controles .form-select {
   border-radius: 10px;
 }
+
+body[data-pagina='mensal-contabil.html'] .mes-body {
+  padding: 6px 10px 10px;
+  gap: 4px;
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-card {
+  border-radius: 10px;
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-card:hover {
+  transform: none;
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-linha {
+  display: grid;
+  grid-template-columns: 92px 104px 46px minmax(0, 1fr) 54px 150px 14px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-linha .nota-fatura {
+  font-size: 0.78rem;
+  padding: 2px 6px;
+  text-align: center;
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-nf,
+body[data-pagina='mensal-contabil.html'] .nota-data {
+  font-family: var(--fat-mono);
+  font-size: 0.74rem;
+  color: #64748b;
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-cliente {
+  color: #1e293b;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-sinais {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+body[data-pagina='mensal-contabil.html'] .sinal {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+body[data-pagina='mensal-contabil.html'] .sinal-alerta {
+  background: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+
+body[data-pagina='mensal-contabil.html'] .sinal-auto {
+  background: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+body[data-pagina='mensal-contabil.html'] .sinal-neutro {
+  background: #94a3b8;
+}
+
+body[data-pagina='mensal-contabil.html'] .sinal-campos {
+  font-family: var(--fat-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #b45309;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  padding: 0 5px;
+  line-height: 1.5;
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-linha .nota-valor {
+  text-align: right;
+  font-size: 0.82rem;
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-seta {
+  color: #94a3b8;
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-aberta {
+  border-color: rgba(255, 77, 90, 0.35);
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-aberta .nota-linha {
+  background: #fff7f7;
+}
+
+@media (max-width: 700px) {
+  body[data-pagina='mensal-contabil.html'] .nota-linha {
+    grid-template-columns: 78px minmax(0, 1fr) 40px 110px;
+    row-gap: 2px;
+  }
+
+  body[data-pagina='mensal-contabil.html'] .nota-nf,
+  body[data-pagina='mensal-contabil.html'] .nota-data,
+  body[data-pagina='mensal-contabil.html'] .nota-seta {
+    display: none;
+  }
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-legenda {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  font-size: 0.74rem;
+  color: #64748b;
+  padding: 0 6px 10px;
+}
+
+body[data-pagina='mensal-contabil.html'] .nota-legenda span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

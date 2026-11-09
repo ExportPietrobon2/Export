@@ -125,6 +125,28 @@ function notasVisiveis() {
   )
 }
 
+function sinaisNota(d) {
+  const faltando = camposFaltando(d)
+  let html = ''
+  if (!d.cliente_id) html += '<i class="sinal sinal-alerta" title="Sem cliente: não entra no Fechamento"></i>'
+  else if (d.entra_fechamento) html += '<i class="sinal sinal-auto" title="Gera o débito no Fechamento"></i>'
+  else html += '<i class="sinal sinal-neutro" title="Fora do Fechamento"></i>'
+  if (faltando.length) html += `<span class="sinal-campos" title="Falta: ${esc(faltando.join(', '))}">${faltando.length}</span>`
+  return html
+}
+
+function camposFaltando(d) {
+  const faltando = []
+  if (!d.num_due) faltando.push('DUE')
+  if (!d.data_due) faltando.push('Data DUE')
+  if (!d.num_conhecimento) faltando.push('Conhec.')
+  if (!d.data_conhecimento) faltando.push('Data Conhec.')
+  if (!d.tipo) faltando.push('Tipo')
+  if (!d.vendedor) faltando.push('Vendedor')
+  if (!d.peso) faltando.push('Peso')
+  return faltando
+}
+
 function alertasCampos(d) {
   const faltando = []
   if (!d.num_due) faltando.push('DUE')
@@ -187,7 +209,7 @@ function renderTabela() {
   }
 
   const totalAno = visiveis.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
-  let html = '<div class="meses-lista">'
+  let html = `<div class="nota-legenda"><span><i class="sinal sinal-auto"></i>No Fechamento</span><span><i class="sinal sinal-alerta"></i>Sem cliente</span><span><i class="sinal sinal-neutro"></i>Fora do Fechamento</span><span><b class="sinal-campos">n</b>Campos a preencher</span><span class="ms-auto">Clique na nota para ver tudo e editar</span></div><div class="meses-lista">`
   for (let m = 1; m <= 12; m++) {
     const doMes = visiveis.filter((d) => d.mes === m)
     if (!doMes.length) continue
@@ -223,25 +245,15 @@ function renderTabela() {
               .map((d) => {
                 const estaAberto = abertos.has(d.id)
                 return `
-                <div class="nota-card" id="card-nota-${d.id}">
-                  <div class="nota-card-linha">
-                    <div class="nota-info-grupo">
-                      <span class="nota-fatura">${esc(d.fatura || '—')}</span>
-                      <span class="nota-detalhe">NF ${esc(d.nf || '—')}</span>
-                      ${d.cliente_nome ? `<span class="nota-detalhe fw-semibold">${esc(d.cliente_nome)}</span>` : ''}
-                      ${seloFechamento(d)}
-                      ${d.data ? `<span class="nota-detalhe">${dBR(d.data)}</span>` : ''}
-                      ${d.pais ? `<span class="badge bg-secondary nota-pais">${d.pais}</span>` : ''}
-                      ${d.produto ? `<span class="nota-detalhe">${d.produto}</span>` : ''}
-                      ${alertasCampos(d)}
-                    </div>
-                    <div class="nota-acoes">
-                      <span class="nota-valor">R$ ${money(d.valor_nfe)}</span>
-                      <button class="btn btn-sm btn-outline-primary btn-editar-nota"
-                        onclick="toggleInline(${d.id})">
-                        ${estaAberto ? 'Fechar ▴' : 'Editar ▾'}
-                      </button>
-                    </div>
+                <div class="nota-card${estaAberto ? ' nota-aberta' : ''}" id="card-nota-${d.id}">
+                  <div class="nota-linha" onclick="toggleInline(${d.id})" title="${esc(d.produto || '')}">
+                    <span class="nota-fatura">${esc(d.fatura || '—')}</span>
+                    <span class="nota-nf">NF ${esc(d.nf || '—')}</span>
+                    <span class="nota-data">${d.data ? dBR(d.data).slice(0, 5) : ''}</span>
+                    <span class="nota-cliente">${d.cliente_nome ? esc(d.cliente_nome) : esc(d.pais || '—')}</span>
+                    <span class="nota-sinais">${sinaisNota(d)}</span>
+                    <span class="nota-valor">R$ ${money(d.valor_nfe)}</span>
+                    <span class="nota-seta">${estaAberto ? '▴' : '▾'}</span>
                   </div>
                   ${estaAberto ? gerarFormEdicaoInline(d) : ''}
                 </div>`
