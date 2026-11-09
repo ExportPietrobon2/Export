@@ -1,8 +1,5 @@
 import { api } from '/JS/compartilhado/api.js'
-import { exigirPapel } from '/JS/compartilhado/sessao.js'
-import { montarCabecalho } from '/JS/compartilhado/cabecalho.js'
-
-const EMAILS_FINANCEIRO = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'joaoantonio@pietrobon.com.br']
+import { iniciarPagina, esc, pill, avisar, normalizar } from '/JS/financeiro/comum.js'
 const MESES = [
   'Janeiro',
   'Fevereiro',
@@ -35,6 +32,9 @@ const COLS = [
 
 let anoAtual = new Date().getFullYear()
 let dados = []
+let clientes = []
+let busca = ''
+let soSemCliente = false
 let formAberto = false
 const abertos = new Set()
 const mesesAbertos = new Set([new Date().getMonth() + 1])
@@ -99,6 +99,32 @@ window.toggleForm = function () {
   }
 }
 
+function opcoesClientes(selecionado) {
+  return clientes
+    .filter((c) => c.ativo || String(c.id) === String(selecionado))
+    .map(
+      (c) =>
+        `<option value="${c.id}" data-pais="${esc(c.pais || '')}" ${String(c.id) === String(selecionado) ? 'selected' : ''}>${esc(c.nome)}${c.pais ? ' · ' + esc(c.pais) : ''}</option>`
+    )
+    .join('')
+}
+
+function seloFechamento(d) {
+  if (!d.cliente_id) return pill('Sem cliente', 'alerta', 'Vincule um cliente para a nota entrar no Fechamento')
+  if (d.entra_fechamento)
+    return pill('No Fechamento', 'auto', 'Gera o débito do cliente automaticamente no Fechamento contábil')
+  return pill('Fora do Fechamento', 'neutro', 'Débito lançado à mão no Fechamento')
+}
+
+function notasVisiveis() {
+  const b = normalizar(busca)
+  return dados.filter(
+    (d) =>
+      (!soSemCliente || !d.cliente_id) &&
+      (!b || normalizar(`${d.fatura} ${d.nf} ${d.cliente_nome} ${d.pais} ${d.produto} ${d.vendedor}`).includes(b))
+  )
+}
+
 function alertasCampos(d) {
   const faltando = []
   if (!d.num_due) faltando.push('DUE')
@@ -128,6 +154,14 @@ function gerarFormEdicaoInline(d) {
   return `
     <div class="form-edicao-inline" id="form-inline-${d.id}">
       <div class="row g-2">
+        <div class="col-12 col-md-6">
+          <label class="form-label small fw-semibold mb-1">Cliente</label>
+          <select id="ei-cliente_id-${d.id}" class="form-select form-select-sm"><option value="">Sem cliente</option>${opcoesClientes(d.cliente_id)}</select>
+        </div>
+        <div class="col-12 col-md-6 d-flex align-items-end">
+          <div class="form-check"><input class="form-check-input" type="checkbox" id="ei-entra_fechamento-${d.id}" ${d.entra_fechamento ? 'checked' : ''}>
+          <label class="form-check-label small" for="ei-entra_fechamento-${d.id}">Gerar o débito do cliente no Fechamento</label></div>
+        </div>
         ${COLS.map(
           (col) => `
           <div class="col-6 col-md-3">
@@ -146,16 +180,17 @@ function gerarFormEdicaoInline(d) {
 
 function renderTabela() {
   const cont = document.getElementById('tabela-contabil')
-  if (!dados.length) {
-    cont.innerHTML = '<p class="text-muted fst-italic">Nenhuma nota lançada neste ano.</p>'
+  const visiveis = notasVisiveis()
+  if (!visiveis.length) {
+    cont.innerHTML = `<div class="fin-cartao"><div class="fin-vazio">${dados.length ? 'Nenhuma nota neste filtro.' : 'Nenhuma nota lançada neste ano.'}</div></div>`
     return
   }
 
   let html = '<div class="meses-lista">'
   for (let m = 1; m <= 12; m++) {
-    const doMes = dados.filter((d) => d.mes === m)
+    const doMes = visiveis.filter((d) => d.mes === m)
     if (!doMes.length) continue
-    const aberto = mesesAbertos.has(m)
+    const aberto = mesesAbertos.has(m) || !!busca || soSemCliente
     const totValor = doMes.reduce((s, d) => s + (Number(d.valor_nfe) || 0), 0)
     const totPeso = doMes.reduce((s, d) => s + (Number(d.peso) || 0), 0)
     const temIncompleto = doMes.some(
@@ -188,8 +223,10 @@ function renderTabela() {
                 <div class="nota-card" id="card-nota-${d.id}">
                   <div class="nota-card-linha">
                     <div class="nota-info-grupo">
-                      <span class="nota-fatura">${d.fatura || '—'}</span>
-                      <span class="nota-detalhe">NF ${d.nf || '—'}</span>
+                      <span class="nota-fatura">${esc(d.fatura || '—')}</span>
+                      <span class="nota-detalhe">NF ${esc(d.nf || '—')}</span>
+                      ${d.cliente_nome ? `<span class="nota-detalhe fw-semibold">${esc(d.cliente_nome)}</span>` : ''}
+                      ${seloFechamento(d)}
                       ${d.data ? `<span class="nota-detalhe">${dBR(d.data)}</span>` : ''}
                       ${d.pais ? `<span class="badge bg-secondary nota-pais">${d.pais}</span>` : ''}
                       ${d.produto ? `<span class="nota-detalhe">${d.produto}</span>` : ''}
@@ -255,7 +292,9 @@ window.salvarEdicaoInline = async function (id) {
     peso: g('peso'),
     vendedor: g('vendedor'),
     produto: g('produto'),
-    pais: g('pais')
+    pais: g('pais'),
+    cliente_id: g('cliente_id'),
+    entra_fechamento: document.getElementById(`ei-entra_fechamento-${id}`).checked
   }
   const btn = document.querySelector(`#form-inline-${id} .btn-ok-grande`)
   if (btn) {
@@ -271,6 +310,8 @@ window.salvarEdicaoInline = async function (id) {
     }
     return
   }
+  if (r?.aviso) avisar(r.aviso, 'warning')
+  else avisar('Nota atualizada.')
   abertos.delete(id)
   await carregarAnos()
   carregarDados()
@@ -368,6 +409,9 @@ async function salvarNota() {
   COLS.forEach((c) => {
     registro[c.k] = document.getElementById('f-' + c.k)?.value || null
   })
+  registro.cliente_id = document.getElementById('f-cliente_id').value || null
+  registro.entra_fechamento = document.getElementById('f-entra_fechamento').checked
+  if (!registro.cliente_id && !confirm('Lançar a nota sem cliente? Ela não vai gerar o débito no Fechamento.')) return
   const btn = document.getElementById('btn-salvar-nota')
   btn.disabled = true
   const r = await api.contabil.criar(registro)
@@ -377,10 +421,12 @@ async function salvarNota() {
     return
   }
   if (mes) mesesAbertos.add(mes)
+  avisar(r?.aviso || 'Nota lançada.', r?.aviso ? 'warning' : 'success')
   COLS.forEach((c) => {
     const el = document.getElementById('f-' + c.k)
     if (el) el.value = ''
   })
+  document.getElementById('f-cliente_id').value = ''
   await carregarAnos()
   carregarDados()
 }
@@ -696,6 +742,8 @@ function montarInterface() {
         </div>
       </div>
       <div class="barra-dir">
+        <input id="busca-nota" class="form-control form-control-sm" style="width:220px" placeholder="Buscar fatura, NF, cliente…">
+        <button id="btn-sem-cliente" class="fin-chip">Sem cliente</button>
         <button class="btn btn-sm btn-outline-secondary" onclick="expandirTodos()">Expandir todos</button>
         <button class="btn btn-sm btn-outline-secondary" onclick="recolherTodos()">Recolher todos</button>
         <button id="btn-excel" class="btn btn-sm btn-outline-success">Excel</button>
@@ -706,6 +754,11 @@ function montarInterface() {
     <div id="form-lancamento">
       <h5 class="secao-titulo-card mb-3">Lançar nota fiscal</h5>
       <div class="row g-2">
+        <div class="col-12 col-md-5"><label class="form-label small mb-0">Cliente</label>
+          <div class="d-flex gap-2"><select id="f-cliente_id" class="form-select form-select-sm"><option value="">Selecione o cliente…</option></select>
+          <a class="btn-icone" href="/HTML/financeiro/cadastros.html#clientes" title="Cadastrar cliente">+</a></div></div>
+        <div class="col-12 col-md-7 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" id="f-entra_fechamento" checked>
+          <label class="form-check-label small" for="f-entra_fechamento">Gerar o débito do cliente no Fechamento contábil (sem relançar)</label></div></div>
         <div class="col-6 col-md-2"><label class="form-label small mb-0">Data</label><input type="date" id="f-data" class="form-control form-control-sm"></div>
         <div class="col-6 col-md-2"><label class="form-label small mb-0">Mês (se sem data)</label><select id="f-mes" class="form-select form-select-sm"><option value="">—</option>${MESES.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('')}</select></div>
         <div class="col-6 col-md-2"><label class="form-label small mb-0">NF</label><input type="text" id="f-nf" class="form-control form-control-sm"></div>
@@ -761,20 +814,34 @@ function montarInterface() {
     carregarDados()
   })
   document.getElementById('btn-salvar-nota').addEventListener('click', salvarNota)
+  document.getElementById('busca-nota').addEventListener('input', (e) => {
+    busca = e.target.value
+    renderTabela()
+  })
+  document.getElementById('btn-sem-cliente').addEventListener('click', (e) => {
+    soSemCliente = !soSemCliente
+    e.target.classList.toggle('ativo', soSemCliente)
+    renderTabela()
+  })
+  document.getElementById('f-cliente_id').addEventListener('change', (e) => {
+    const pais = e.target.selectedOptions[0]?.dataset.pais
+    if (pais && !document.getElementById('f-pais').value) document.getElementById('f-pais').value = pais
+  })
   document.getElementById('btn-excel').addEventListener('click', exportarExcel)
   document.getElementById('btn-pdf').addEventListener('click', exportarPDF)
 }
 
+async function carregarClientes() {
+  const lista = await api.cadastros.clientes()
+  clientes = Array.isArray(lista) ? lista : []
+  const sel = document.getElementById('f-cliente_id')
+  if (sel) sel.innerHTML = '<option value="">Selecione o cliente…</option>' + opcoesClientes()
+}
+
 async function iniciar() {
-  const perfil = exigirPapel(['admin'])
-  if (!perfil) return
-  if (!EMAILS_FINANCEIRO.includes((perfil.email || '').toLowerCase())) {
-    window.location.href = '/HTML/producao/visao-geral.html'
-    return
-  }
-  montarCabecalho(perfil.papel)
+  if (!iniciarPagina()) return
   montarInterface()
-  await carregarAnos()
+  await Promise.all([carregarAnos(), carregarClientes()])
   carregarDados()
 }
 

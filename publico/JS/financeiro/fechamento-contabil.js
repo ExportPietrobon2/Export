@@ -1,9 +1,5 @@
 import { api } from '/JS/compartilhado/api.js'
-import { exigirPapel } from '/JS/compartilhado/sessao.js'
-import { montarCabecalho } from '/JS/compartilhado/cabecalho.js'
-import { filtroPaisAno, paisDe } from '/JS/compartilhado/filtro-pais-ano.js'
-
-const EMAILS_FINANCEIRO = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'joaoantonio@pietrobon.com.br']
+import { iniciarPagina, pill, avisar, hojeISO } from '/JS/financeiro/comum.js'
 const MESES = [
   '',
   'Janeiro',
@@ -30,7 +26,9 @@ const MODULOS = {
     tipoD: 'baixa',
     temFatura: true,
     colA: 'Débito do mês',
-    colD: 'Baixa do mês'
+    colD: 'Baixa do mês',
+    aviso:
+      'As notas lançadas em Faturamento (NF-e) com cliente geram o débito aqui sozinhas. Lance à mão só as baixas (recebimentos) e ajustes.'
   },
   adiant_clientes: {
     titulo: 'Adiantamentos de Clientes',
@@ -41,7 +39,8 @@ const MODULOS = {
     tipoD: 'debito',
     temFatura: false,
     colA: 'Crédito do mês',
-    colD: 'Débito do mês'
+    colD: 'Débito do mês',
+    aviso: 'Lance os adiantamentos recebidos de clientes e o uso deles nas faturas.'
   },
   adiant_fornecedores: {
     titulo: 'Adiantamentos a Fornecedores',
@@ -52,7 +51,9 @@ const MODULOS = {
     tipoD: 'pagamento',
     temFatura: false,
     colA: 'Débito do mês',
-    colD: 'Pagamento do mês'
+    colD: 'Baixa do mês',
+    aviso:
+      'Pagamentos de importação feitos antes da chegada da mercadoria entram aqui sozinhos como adiantamento. Quando a data de chegada é informada na importação, o adiantamento é baixado automaticamente.'
   }
 }
 
@@ -60,6 +61,7 @@ let meses = []
 let mesId = null
 let modulo = 'exterior'
 let saldoCache = null
+let mostrarZerados = false
 
 const $ = (id) => document.getElementById(id)
 function money(n) {
@@ -80,16 +82,12 @@ function esc(s) {
     .replace(/"/g, '&quot;')
 }
 
-async function carregarMeses(selecionar) {
+async function carregarMeses() {
   meses = await api.ec.meses()
   if (!Array.isArray(meses)) meses = []
-  if (selecionar) mesId = selecionar
   if (!mesId && meses.length) mesId = meses[0].id
   renderTopo()
   if (mesId) carregarSaldos()
-  else
-    $('area-saldos').innerHTML =
-      '<div class="card"><div class="card-body text-muted">Crie um período (mês) acima para começar.</div></div>'
 }
 
 function renderTopo() {
@@ -109,53 +107,65 @@ async function carregarSaldos() {
   }
   saldoCache = r
   const cfg = MODULOS[modulo]
-  const linhas = r.linhas
-  const t = linhas.reduce(
+  const linhas = r.linhas.filter(
+    (l) => mostrarZerados || Math.abs(l.anterior) > 0.009 || l.aumenta > 0.009 || l.diminui > 0.009
+  )
+  const t = r.linhas.reduce(
     (a, l) => ({ ant: a.ant + l.anterior, au: a.au + l.aumenta, di: a.di + l.diminui, at: a.at + l.atual }),
     { ant: 0, au: 0, di: 0, at: 0 }
   )
+  const ocultos = r.linhas.length - linhas.length
 
   area.innerHTML = `
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-      <h5 class="secao-titulo-card mb-0">${cfg.titulo}</h5>
-      <div class="d-flex gap-2 no-print">
-        <button class="btn btn-sm btn-outline-success" id="btn-ec-excel">Exportar Excel</button>
-        <button class="btn btn-sm btn-outline-danger" id="btn-ec-pdf">Exportar PDF</button>
-      </div>
+    <div class="fin-aviso no-print">${cfg.aviso}</div>
+    <div class="fin-kpis">
+      <div class="kpi kpi-cinza"><span class="kpi-rotulo">Saldo anterior</span><span class="kpi-valor">${money(t.ant)}</span></div>
+      <div class="kpi kpi-azul"><span class="kpi-rotulo">${cfg.colA}</span><span class="kpi-valor">${money(t.au)}</span></div>
+      <div class="kpi kpi-verde"><span class="kpi-rotulo">${cfg.colD}</span><span class="kpi-valor">${money(t.di)}</span></div>
+      <div class="kpi kpi-laranja"><span class="kpi-rotulo">Saldo atual</span><span class="kpi-valor">${money(t.at)}</span></div>
     </div>
-    <div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:.85rem">
+    <div class="fin-cartao">
+      <div class="fin-cartao-cab"><h2>${cfg.titulo} · ${esc(r.mes.nome)}</h2>
+        <div class="d-flex gap-2 no-print align-items-center">
+          ${ocultos || mostrarZerados ? `<button class="fin-chip ${mostrarZerados ? 'ativo' : ''}" id="btn-zerados">${mostrarZerados ? 'Ocultar zerados' : `Mostrar zerados (${ocultos})`}</button>` : ''}
+          <button class="btn-icone" id="btn-ec-excel">Excel</button>
+          <button class="btn-icone" id="btn-ec-pdf">PDF</button>
+        </div></div>
+      <div class="table-responsive"><table class="fin-tabela">
       <thead><tr>
-        <th>Entidade</th>
-        <th class="text-end">Saldo anterior</th>
-        <th class="text-end">${cfg.colA}</th>
-        <th class="text-end">${cfg.colD}</th>
-        <th class="text-end">Saldo atual</th>
-        <th class="no-print"></th>
+        <th>${cfg.tipoEnt === 'clientes' ? 'Cliente' : 'Fornecedor'}</th>
+        <th class="num">Saldo anterior</th>
+        <th class="num">${cfg.colA}</th>
+        <th class="num">${cfg.colD}</th>
+        <th class="num">Saldo atual</th>
       </tr></thead>
       <tbody>
-        ${linhas
-          .map(
-            (l) => `<tr>
-          <td>${esc(l.nome)}</td>
-          <td class="text-end">${money(l.anterior)}</td>
-          <td class="text-end">${money(l.aumenta)}</td>
-          <td class="text-end">${money(l.diminui)}</td>
-          <td class="text-end fw-semibold ${l.atual > 0 ? 'text-success' : 'text-muted'}">${money(l.atual)}</td>
-          <td class="no-print text-end"><button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="abrirLancamentos(${l.id}, '${esc(l.nome).replace(/'/g, "\\'")}')">Lançar</button></td>
+        ${
+          linhas.length
+            ? linhas
+                .map(
+                  (l) => `<tr class="clicavel" data-ent="${l.id}" data-nome="${esc(l.nome)}">
+          <td><div class="texto-forte">${esc(l.nome)}</div><div class="d-flex gap-1 flex-wrap">${l.pais ? `<span class="texto-sub">${esc(l.pais)}</span>` : ''}${l.automaticos ? pill(`${l.automaticos} automático${l.automaticos > 1 ? 's' : ''}`, 'auto') : ''}${l.ativo ? '' : pill('Inativo', 'neutro')}</div></td>
+          <td class="num">${money(l.anterior)}</td>
+          <td class="num">${money(l.aumenta)}</td>
+          <td class="num">${money(l.diminui)}</td>
+          <td class="num texto-forte ${l.atual > 0.009 ? 'valor-negativo' : l.atual < -0.009 ? 'valor-positivo' : ''}">${money(l.atual)}</td>
         </tr>`
-          )
-          .join('')}
-        <tr class="fw-bold" style="background:#f8fafc">
-          <td>TOTAL</td>
-          <td class="text-end">${money(t.ant)}</td>
-          <td class="text-end">${money(t.au)}</td>
-          <td class="text-end">${money(t.di)}</td>
-          <td class="text-end">${money(t.at)}</td>
-          <td class="no-print"></td>
-        </tr>
+                )
+                .join('')
+            : '<tr><td colspan="5"><div class="fin-vazio">Nenhum saldo neste período. Clique em "Mostrar zerados" para lançar para um cadastro sem movimento.</div></td></tr>'
+        }
       </tbody>
-    </table></div></div>
-    ${linhas.length ? '' : '<p class="text-muted fst-italic mt-2">Nenhum cliente/fornecedor ativo. Cadastre na aba "Cadastros".</p>'}`
+      <tfoot><tr><td>TOTAL</td><td class="num">${money(t.ant)}</td><td class="num">${money(t.au)}</td><td class="num">${money(t.di)}</td><td class="num">${money(t.at)}</td></tr></tfoot>
+    </table></div></div>`
+  if ($('btn-zerados'))
+    $('btn-zerados').addEventListener('click', () => {
+      mostrarZerados = !mostrarZerados
+      carregarSaldos()
+    })
+  area
+    .querySelectorAll('tr[data-ent]')
+    .forEach((tr) => tr.addEventListener('click', () => abrirLancamentos(Number(tr.dataset.ent), tr.dataset.nome)))
   $('btn-ec-excel').addEventListener('click', exportarExcel)
   $('btn-ec-pdf').addEventListener('click', exportarPDF)
 }
@@ -225,7 +235,17 @@ function exportarPDF() {
   window.print()
 }
 
-window.abrirLancamentos = async function (entidadeId, nome) {
+function dataPadraoDoMes() {
+  const m = meses.find((x) => x.id === mesId)
+  if (!m) return hojeISO()
+  const hoje = hojeISO()
+  const prefixo = `${m.ano}-${String(m.mes).padStart(2, '0')}`
+  if (hoje.startsWith(prefixo)) return hoje
+  const ultimo = new Date(m.ano, m.mes, 0).getDate()
+  return `${prefixo}-${String(ultimo).padStart(2, '0')}`
+}
+
+async function abrirLancamentos(entidadeId, nome) {
   window._ecEntidadeAtual = entidadeId
   const cfg = MODULOS[modulo]
   const r = await api.ec.lancamentos(modulo, mesId, entidadeId)
@@ -237,20 +257,21 @@ window.abrirLancamentos = async function (entidadeId, nome) {
     <div class="row g-2 align-items-end mb-3">
       <div class="col-6 col-md-3"><label class="form-label small mb-0">Tipo</label>
         <select id="l-tipo" class="form-select form-select-sm">
-          <option value="${cfg.tipoA}">${cfg.rotA}</option>
           <option value="${cfg.tipoD}">${cfg.rotD}</option>
+          <option value="${cfg.tipoA}">${cfg.rotA}</option>
         </select></div>
       <div class="col-6 col-md-2"><label class="form-label small mb-0">Data</label><input type="date" id="l-data" class="form-control form-control-sm"></div>
-      <div class="col-6 col-md-2"><label class="form-label small mb-0">Valor</label><input type="text" id="l-valor" class="form-control form-control-sm" placeholder="0,00"></div>
+      <div class="col-6 col-md-2"><label class="form-label small mb-0">Valor (R$)</label><input type="text" inputmode="decimal" id="l-valor" class="form-control form-control-sm" placeholder="0,00"></div>
       ${cfg.temFatura ? '<div class="col-6 col-md-2"><label class="form-label small mb-0">Nº Fatura</label><input type="text" id="l-fatura" class="form-control form-control-sm"></div>' : ''}
       <div class="col-12 col-md-${cfg.temFatura ? '3' : '5'}"><label class="form-label small mb-0">Observação</label><input type="text" id="l-obs" class="form-control form-control-sm"></div>
     </div>
     <button class="btn btn-ok-grande" id="l-salvar">Salvar lançamento</button>
+    <div class="texto-sub mt-2">O lançamento vai para o mês da data informada.</div>
     <hr>
     <div id="l-lista"></div>`
-  $('l-data').value = new Date().toISOString().slice(0, 10)
+  $('l-data').value = dataPadraoDoMes()
   renderListaLanc(lancs)
-  $('l-salvar').addEventListener('click', () => salvarLanc(entidadeId, nome))
+  $('l-salvar').addEventListener('click', () => salvarLanc(entidadeId))
   window._modalEc.show()
 }
 
@@ -262,27 +283,26 @@ function renderListaLanc(lancs) {
     return
   }
   const rot = { [cfg.tipoA]: cfg.rotA, [cfg.tipoD]: cfg.rotD }
-  el.innerHTML = `<table class="table table-sm mb-0" style="font-size:.85rem">
-    <thead><tr><th>Data</th><th>Tipo</th><th class="text-end">Valor</th>${cfg.temFatura ? '<th>Fatura</th>' : ''}<th>Obs.</th><th></th></tr></thead>
+  el.innerHTML = `<table class="fin-tabela">
+    <thead><tr><th>Data</th><th>Tipo</th><th class="num">Valor</th>${cfg.temFatura ? '<th>Fatura</th>' : ''}<th>Origem / obs.</th><th></th></tr></thead>
     <tbody>${lancs
       .map(
         (l) => `<tr>
       <td>${dBR(l.data_lanc)}</td>
       <td>${esc(rot[l.tipo] || l.tipo)}</td>
-      <td class="text-end">${money(l.valor)}</td>
+      <td class="num">${money(l.valor)}</td>
       ${cfg.temFatura ? `<td>${esc(l.fatura || '-')}</td>` : ''}
-      <td>${esc(l.observacao || '-')}</td>
-      <td class="text-end"><button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="excluirLanc(${l.id})">Excluir</button></td>
+      <td>${l.automatico ? pill('Automático', 'auto') + ' ' : ''}<span class="texto-sub">${esc(l.observacao || '')}</span></td>
+      <td class="acoes">${l.automatico ? '' : `<button class="btn-icone perigo" onclick="excluirLanc(${l.id})">Excluir</button>`}</td>
     </tr>`
       )
       .join('')}</tbody></table>`
 }
 
-async function salvarLanc(entidadeId, nome) {
+async function salvarLanc(entidadeId) {
   const cfg = MODULOS[modulo]
   const dados = {
     modulo,
-    mesId,
     entidadeId,
     tipo: $('l-tipo').value,
     data_lanc: $('l-data').value,
@@ -295,9 +315,10 @@ async function salvarLanc(entidadeId, nome) {
   const r = await api.ec.criarLancamento(dados)
   btn.disabled = false
   if (r?.erro) {
-    alert(r.erro || 'Erro ao salvar.')
+    avisar(r.erro || 'Erro ao salvar.', 'error')
     return
   }
+  avisar('Lançamento salvo.')
   const lr = await api.ec.lancamentos(modulo, mesId, entidadeId)
   renderListaLanc((lr && lr.lancamentos) || [])
   $('l-valor').value = ''
@@ -308,62 +329,14 @@ async function salvarLanc(entidadeId, nome) {
 
 window.excluirLanc = async function (id) {
   if (!confirm('Excluir este lançamento?')) return
-  await api.ec.excluirLancamento(modulo, id)
+  const r = await api.ec.excluirLancamento(modulo, id)
+  if (r?.erro) return avisar(r.erro, 'error')
   const entidadeId = window._ecEntidadeAtual
   if (entidadeId) {
     const lr = await api.ec.lancamentos(modulo, mesId, entidadeId)
     renderListaLanc((lr && lr.lancamentos) || [])
   }
   carregarSaldos()
-}
-
-async function abrirCadastros() {
-  const [clientes, fornecedores] = await Promise.all([api.ec.entidades('clientes'), api.ec.entidades('fornecedores')])
-  const linhaEnt = (e, tipo) => `<tr${tipo === 'clientes' ? ` data-pais="${esc(paisDe(e.pais))}"` : ''}>
-    <td>${esc(e.nome)}</td>${tipo === 'clientes' ? `<td>${esc(e.pais || '-')}</td>` : ''}
-    <td>${e.ativo ? '<span class="badge bg-success">Ativo</span>' : '<span class="badge bg-secondary">Inativo</span>'}</td>
-    <td class="text-end"><button class="btn btn-sm ${e.ativo ? 'btn-outline-danger' : 'btn-outline-secondary'} py-0 px-2" onclick="toggleEnt(${e.id}, '${tipo}')">${e.ativo ? 'Desativar' : 'Ativar'}</button></td>
-  </tr>`
-  $('modal-ec-body').innerHTML = `
-    <h5 class="mb-3">Cadastros</h5>
-    <div class="card mb-3"><div class="card-body">
-      <h6 class="fw-bold">Clientes (exterior)</h6>
-      <div class="row g-2 align-items-end mb-2">
-        <div class="col-6 col-md-5"><label class="form-label small mb-0">Nome</label><input type="text" id="c-nome" class="form-control form-control-sm"></div>
-        <div class="col-6 col-md-4"><label class="form-label small mb-0">País</label><input type="text" id="c-pais" class="form-control form-control-sm"></div>
-        <div class="col-12 col-md-3"><button class="btn btn-sm btn-pietrobon w-100" onclick="addEnt('clientes')">Adicionar</button></div>
-      </div>
-      <div class="table-responsive"><table class="table table-sm mb-0" style="font-size:.85rem"><thead><tr><th>Nome</th><th>País</th><th>Status</th><th></th></tr></thead><tbody>${clientes.map((c) => linhaEnt(c, 'clientes')).join('')}</tbody></table></div>
-    </div></div>
-    <div class="card"><div class="card-body">
-      <h6 class="fw-bold">Fornecedores (importação)</h6>
-      <div class="row g-2 align-items-end mb-2">
-        <div class="col-8 col-md-9"><label class="form-label small mb-0">Nome</label><input type="text" id="f-nome" class="form-control form-control-sm"></div>
-        <div class="col-4 col-md-3"><button class="btn btn-sm btn-pietrobon w-100" onclick="addEnt('fornecedores')">Adicionar</button></div>
-      </div>
-      <div class="table-responsive"><table class="table table-sm mb-0" style="font-size:.85rem"><thead><tr><th>Nome</th><th>Status</th><th></th></tr></thead><tbody>${fornecedores.map((f) => linhaEnt(f, 'fornecedores')).join('')}</tbody></table></div>
-    </div></div>`
-  const tabelaClientes = $('modal-ec-body').querySelector('tbody')
-  if (tabelaClientes)
-    filtroPaisAno(tabelaClientes, {
-      chave: 'ec-clientes',
-      antesDe: tabelaClientes.closest('.table-responsive'),
-      comAno: false
-    })
-  window._modalEc.show()
-}
-
-window.addEnt = async function (tipo) {
-  const nome = (tipo === 'clientes' ? $('c-nome') : $('f-nome')).value.trim()
-  if (!nome) return
-  const dados = { tipo, nome }
-  if (tipo === 'clientes') dados.pais = $('c-pais').value
-  await api.ec.criarEntidade(dados)
-  abrirCadastros()
-}
-window.toggleEnt = async function (id, tipo) {
-  await api.ec.toggleEntidade(id, tipo)
-  abrirCadastros()
 }
 
 async function exportarExcel() {
@@ -439,80 +412,47 @@ async function exportarExcel() {
 function montarInterface() {
   const cont = $('conteudo-ec')
   cont.innerHTML = `
-    <div class="card mb-3 no-print"><div class="card-body">
-      <div class="d-flex flex-wrap align-items-end gap-2">
-        <div><label class="form-label small mb-0 fw-semibold">Período</label><br>
-          <select id="sel-mes" class="form-select form-select-sm d-inline-block" style="width:150px;padding-right:30px"></select></div>
-        <button class="btn btn-sm btn-outline-secondary" id="btn-novo-mes">+ Novo mês</button>
-        <button class="btn btn-sm btn-outline-danger" id="btn-excluir-mes">Excluir mês</button>
-        <div class="ms-auto"><button class="btn btn-sm btn-pietrobon" id="btn-cadastros">Cadastros (clientes/fornecedores)</button></div>
-      </div>
-    </div></div>
+    <div class="fin-barra no-print">
+      <label class="small fw-semibold mb-0 text-muted">Período</label>
+      <select id="sel-mes" class="form-select form-select-sm" style="width:180px"></select>
+      <a class="btn-icone ms-auto" href="/HTML/financeiro/cadastros.html">Clientes e fornecedores</a>
+    </div>
 
-    <ul class="nav nav-tabs mb-3 no-print" id="tabs-ec">
-      <li class="nav-item"><a class="nav-link active" href="#" data-mod="exterior">Clientes Exterior</a></li>
-      <li class="nav-item"><a class="nav-link" href="#" data-mod="adiant_clientes">Adiant. de Clientes</a></li>
-      <li class="nav-item"><a class="nav-link" href="#" data-mod="adiant_fornecedores">Adiant. a Fornecedores</a></li>
-    </ul>
+    <div class="fin-abas no-print" id="tabs-ec">
+      <button class="ativo" data-mod="exterior">Clientes exterior</button>
+      <button data-mod="adiant_clientes">Adiantamentos de clientes</button>
+      <button data-mod="adiant_fornecedores">Adiantamentos a fornecedores</button>
+    </div>
 
     <div id="area-saldos"></div>
 
     <div class="modal fade" id="modal-ec" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-scrollable">
-      <div class="modal-content"><div class="modal-header"><h6 class="modal-title fw-bold">Contabilidade de Exportação</h6>
+      <div class="modal-content"><div class="modal-header"><h6 class="modal-title fw-bold">Lançamentos do mês</h6>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body" id="modal-ec-body"></div>
       </div></div></div>`
 
   window._modalEc = new bootstrap.Modal($('modal-ec'))
+  $('modal-ec').addEventListener('hidden.bs.modal', () => carregarSaldos())
 
   $('sel-mes').addEventListener('change', (e) => {
     mesId = parseInt(e.target.value)
     carregarSaldos()
   })
-  $('btn-novo-mes').addEventListener('click', async () => {
-    const ano = parseInt(prompt('Ano do período:', String(new Date().getFullYear())))
-    if (!ano) return
-    const mes = parseInt(prompt('Mês (1 a 12):', String(new Date().getMonth() + 1)))
-    if (!(mes >= 1 && mes <= 12)) {
-      alert('Mês inválido.')
-      return
-    }
-    const r = await api.ec.criarMes(ano, mes)
-    if (r?.erro) {
-      alert(r.erro)
-      return
-    }
-    carregarMeses(r.id)
-  })
-  $('btn-excluir-mes').addEventListener('click', async () => {
-    if (!mesId) return
-    const m = meses.find((x) => x.id === mesId)
-    if (!confirm(`Excluir o período ${m?.nome} e TODOS os lançamentos dele?`)) return
-    await api.ec.excluirMes(mesId)
-    mesId = null
-    carregarMeses()
-  })
-  $('btn-cadastros').addEventListener('click', abrirCadastros)
 
-  document.querySelectorAll('#tabs-ec .nav-link').forEach((a) => {
-    a.addEventListener('click', (e) => {
-      e.preventDefault()
-      document.querySelectorAll('#tabs-ec .nav-link').forEach((x) => x.classList.remove('active'))
-      a.classList.add('active')
-      modulo = a.dataset.mod
+  document.querySelectorAll('#tabs-ec button').forEach((b) => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#tabs-ec button').forEach((x) => x.classList.remove('ativo'))
+      b.classList.add('ativo')
+      modulo = b.dataset.mod
+      mostrarZerados = false
       if (mesId) carregarSaldos()
     })
   })
 }
 
 async function iniciar() {
-  const perfil = exigirPapel(['admin'])
-  if (!perfil) return
-  if (!EMAILS_FINANCEIRO.includes((perfil.email || '').toLowerCase())) {
-    window.location.href = '/HTML/producao/visao-geral.html'
-    return
-  }
-  montarCabecalho(perfil.papel)
+  if (!iniciarPagina()) return
   montarInterface()
   carregarMeses()
 }

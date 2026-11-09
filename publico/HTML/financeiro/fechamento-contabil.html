@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Fechamento Contabil · Hub de Exportações Pietrobon</title>
+  <title>Fechamento Contábil · Hub de Exportações Pietrobon</title>
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#ED3237">
   <meta name="mobile-web-app-capable" content="yes">
@@ -13,17 +13,18 @@
 </head>
 <body data-pagina="fechamento-contabil.html">
   <div id="cabecalho"></div>
-  <div class="container py-4">
+  <div class="container py-4 no-recolher">
     <div class="page-header">
       <div class="page-header-icon"></div>
       <div class="page-header-texto">
-        <h1 class="page-titulo">Contabilidade de Exportação</h1>
-        <p class="page-subtitulo">Saldos de clientes do exterior, fornecedores e adiantamentos</p>
+        <h1 class="page-titulo">Fechamento contábil</h1>
+        <p class="page-subtitulo">Saldos mensais de clientes do exterior e adiantamentos, com os lançamentos automáticos já incluídos</p>
       </div>
     </div>
     <div id="conteudo-ec"><p class="text-muted">Carregando...</p></div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script type="module" src="/JS/financeiro/fechamento-contabil.js"></script>
   <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js') }</script>
 </body>

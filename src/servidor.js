@@ -1,5 +1,6 @@
 const express = require('express')
 const path = require('path')
+const { prepararBanco } = require('./servicos/estrutura-banco')
 
 const app = express()
 app.use(express.json({ limit: '20mb' }))
@@ -7,8 +8,16 @@ app.use(express.urlencoded({ limit: '20mb', extended: true }))
 
 const PASTA_PUBLICA = path.join(__dirname, '..', 'publico')
 
+const PAGINA_INICIAL = '/HTML/financeiro/painel.html'
+
 const ENDERECOS_ANTIGOS = {
-  '/HTML/producao/admin.html': '/HTML/producao/visao-geral.html',
+  '/HTML/producao/admin.html': PAGINA_INICIAL,
+  '/HTML/producao/visao-geral.html': PAGINA_INICIAL,
+  '/HTML/producao/cadastro.html': PAGINA_INICIAL,
+  '/HTML/estoque/almoxarifado.html': PAGINA_INICIAL,
+  '/HTML/estoque/compras.html': PAGINA_INICIAL,
+  '/HTML/estoque/embarques.html': PAGINA_INICIAL,
+  '/HTML/estoque/recebimento.html': PAGINA_INICIAL,
   '/HTML/estoque/referencia.html': '/HTML/estoque/rendimentos.html',
   '/HTML/financeiro/contabil.html': '/HTML/financeiro/mensal-contabil.html',
   '/HTML/financeiro/exp-contabil.html': '/HTML/financeiro/fechamento-contabil.html',
@@ -23,23 +32,15 @@ app.use(express.static(PASTA_PUBLICA))
 
 app.use(require('./rotas/notificacoes'))
 app.use(require('./rotas/login'))
-app.use(require('./rotas/pedidos'))
-app.use(require('./rotas/produtos'))
-app.use(require('./rotas/recebimentos'))
 app.use(require('./rotas/usuarios'))
-app.use(require('./rotas/estoque'))
-app.use(require('./rotas/alertas'))
-app.use(require('./rotas/compras'))
-app.use(require('./rotas/pedidos-compra'))
+app.use(require('./rotas/painel'))
+app.use(require('./rotas/cadastros'))
 app.use(require('./rotas/mensal-contabil'))
 app.use(require('./rotas/fechamento-contabil'))
 app.use(require('./rotas/importacoes'))
 app.use(require('./rotas/custos-importacao'))
 app.use(require('./rotas/checklist'))
 app.use(require('./rotas/tarefas'))
-app.use(require('./rotas/catalogo-produtos'))
-
-require('./rotinas/alertas-diarios')
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(PASTA_PUBLICA, 'index.html'))
@@ -58,4 +59,6 @@ process.on('uncaughtException', (err) => {
 })
 
 const PORTA = process.env.PORT || 8080
-app.listen(PORTA, '0.0.0.0', () => console.log(`Servidor rodando na porta ${PORTA}`))
+prepararBanco().finally(() => {
+  app.listen(PORTA, '0.0.0.0', () => console.log(`Servidor rodando na porta ${PORTA}`))
+})

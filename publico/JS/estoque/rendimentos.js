@@ -394,7 +394,7 @@ export function iniciarReferencia(elementoContainer) {
 async function iniciar() {
   const perfil = exigirPapel('todos')
   if (!perfil) return
-  montarCabecalho(perfil.papel)
+  montarCabecalho()
   iniciarReferencia(null)
 }
 

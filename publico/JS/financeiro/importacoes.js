@@ -1,17 +1,32 @@
 import { api } from '/JS/compartilhado/api.js'
-import { exigirPapel } from '/JS/compartilhado/sessao.js'
-import { montarCabecalho } from '/JS/compartilhado/cabecalho.js'
-import { filtroPaisAno, paisDe, anoDe } from '/JS/compartilhado/filtro-pais-ano.js'
+import {
+  $,
+  iniciarPagina,
+  brl,
+  num,
+  valorMoeda,
+  dISO,
+  dBR,
+  hojeISO,
+  esc,
+  normalizar,
+  pill,
+  pillStatusImportacao,
+  pillPrazo,
+  barraProgresso,
+  numeroDoCampo,
+  avisar,
+  painelLateral,
+  buscarPtax
+} from '/JS/financeiro/comum.js'
 
-const EMAILS_FINANCEIRO = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'joaoantonio@pietrobon.com.br']
+const numf = num
 
-let resumo = null
+let resumo = { importacoes: [], contagem: {} }
 let fornecedores = []
-let aba = 'painel'
-let editImp = null
-let editForn = null
-let editCt = null
-let editPag = null
+let contratos = []
+let aba = 'importacoes'
+let filtro = { texto: '', situacao: 'abertas', fornecedor: '', ano: '' }
 let custoImpSel = ''
 let custoIdSel = null
 let custosDaImp = []
@@ -19,604 +34,521 @@ let custoCab = {}
 let custoDespesas = []
 let custoSt = []
 
-const $ = (id) => document.getElementById(id)
-const brl = (n) =>
-  'R$ ' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const numf = (n, d = 2) =>
-  (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d })
-const dISO = (v) => (v ? String(v).slice(0, 10) : '')
-const dBR = (v) => {
-  const s = dISO(v)
-  return s ? s.split('-').reverse().join('/') : '-'
-}
-const esc = (s) =>
-  String(s == null ? '' : s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-const STATUS_COR = { PAGO: 'bg-success', PARCIAL: 'bg-warning text-dark', DEVENDO: 'bg-danger' }
-
-async function autoPtax(dataId, taxaId, notaId) {
-  const data = $(dataId).value
-  const nota = $(notaId)
-  if (!data) {
-    if (nota) nota.textContent = ''
-    return
-  }
-  if (nota) {
-    nota.textContent = 'Buscando PTAX...'
-    nota.className = 'small text-muted mt-1'
-  }
-  const r = await api.fin.ptax(data)
-  if (r && !r.erro && r.taxa != null) {
-    $(taxaId).value = r.taxa
-    if (nota) {
-      nota.textContent = `PTAX ${numf(r.taxa, 4)} (${dBR(r.dataCotacao)})`
-      nota.className = 'small text-success mt-1'
-    }
-  } else if (nota) {
-    nota.textContent = 'PTAX indisponível — informe a taxa manualmente.'
-    nota.className = 'small text-danger mt-1'
-  }
-}
+const painel = () => painelLateral('painel-importacao', 'Importação')
 
 async function carregar() {
-  const r = await api.fin.resumo()
+  const [r, f, c] = await Promise.all([api.fin.resumo(), api.cadastros.fornecedores(), api.fin.contratos()])
   if (!r || r.erro) {
     $('area-fin').innerHTML = `<p class="text-danger">${esc(r?.erro || 'Erro ao carregar.')}</p>`
     return
   }
   resumo = r
-  fornecedores = await api.fin.fornecedores()
-  if (!Array.isArray(fornecedores)) fornecedores = []
+  fornecedores = Array.isArray(f) ? f : []
+  contratos = Array.isArray(c) ? c : []
   render()
 }
 
 function render() {
-  if (aba === 'painel') renderPainel()
-  else if (aba === 'importacoes') renderImportacoes()
-  else if (aba === 'fornecedores') renderFornecedores()
+  document.querySelectorAll('#abas-fin button').forEach((b) => b.classList.toggle('ativo', b.dataset.aba === aba))
+  if (aba === 'importacoes') renderImportacoes()
   else if (aba === 'contratos') renderContratos()
   else if (aba === 'custos') renderCustos()
 }
 
-function renderPainel() {
-  const c = resumo.contagem
-  $('area-fin').innerHTML = `
-    <div class="d-flex justify-content-end mb-2"><button class="btn btn-sm btn-outline-primary" id="btn-resumo-semanal">Enviar Resumo Semanal agora</button></div>
-    <div class="row g-3 mb-3">
-      <div class="col-6 col-md-3"><div class="card"><div class="card-body text-center py-3"><div class="small text-muted">Total Importado</div><div class="fw-bold fs-5">${brl(resumo.totalImportado)}</div></div></div></div>
-      <div class="col-6 col-md-3"><div class="card"><div class="card-body text-center py-3"><div class="small text-muted">Total Pago</div><div class="fw-bold fs-5 text-success">${brl(resumo.totalPago)}</div></div></div></div>
-      <div class="col-6 col-md-3"><div class="card"><div class="card-body text-center py-3"><div class="small text-muted">Saldo Devedor</div><div class="fw-bold fs-5 text-danger">${brl(resumo.saldoDevedor)}</div></div></div></div>
-      <div class="col-6 col-md-3"><div class="card"><div class="card-body text-center py-3"><div class="small text-muted">Importações</div><div class="fw-bold fs-5">${resumo.qtd}</div>
-        <div class="small text-muted">${c.DEVENDO} devendo · ${c.PARCIAL} parcial · ${c.PAGO} pago</div></div></div></div>
-    </div>
-    <div class="card"><div class="card-body">
-      <h5 class="secao-titulo-card mb-2">Resumo por fornecedor</h5>
-      <div class="table-responsive"><table class="table table-sm table-hover mb-0">
-        <thead><tr><th>Fornecedor</th><th class="text-end">Importado</th><th class="text-end">Pago</th><th class="text-end">Saldo devedor</th></tr></thead>
-        <tbody>${resumo.porFornecedor.map((p) => `<tr><td>${esc(p.fornecedor)}</td><td class="text-end">${brl(p.importado)}</td><td class="text-end">${brl(p.pago)}</td><td class="text-end fw-semibold ${p.saldo > 0.01 ? 'text-danger' : 'text-success'}">${brl(p.saldo)}</td></tr>`).join('')}
-          <tr class="fw-bold" style="background:#f8fafc"><td>TOTAL</td><td class="text-end">${brl(resumo.totalImportado)}</td><td class="text-end">${brl(resumo.totalPago)}</td><td class="text-end">${brl(resumo.saldoDevedor)}</td></tr>
-        </tbody></table></div>
-    </div></div>`
-  $('btn-resumo-semanal').addEventListener('click', async (e) => {
-    e.target.disabled = true
-    e.target.textContent = 'Enviando...'
-    const r = await api.fin.enviarResumoSemanal()
-    e.target.disabled = false
-    e.target.textContent = 'Enviar Resumo Semanal agora'
-    alert(r?.erro ? r.erro : 'Resumo enviado por e-mail.')
+const SITUACOES = [
+  ['abertas', 'A pagar', (i) => i.status === 'EM_ABERTO' || i.status === 'PARCIAL'],
+  ['vencidas', 'Vencidas', (i) => i.prazo === 'VENCIDA'],
+  ['breve', 'Vencem em 7 dias', (i) => i.prazo === 'VENCE_EM_BREVE'],
+  ['parciais', 'Pagas em parte', (i) => i.status === 'PARCIAL'],
+  ['quitadas', 'Quitadas', (i) => i.status === 'QUITADA' || i.status === 'PAGO_A_MAIOR'],
+  ['todas', 'Todas', () => true]
+]
+
+function importacoesFiltradas() {
+  const regra = (SITUACOES.find((s) => s[0] === filtro.situacao) || SITUACOES[0])[2]
+  const busca = normalizar(filtro.texto)
+  return resumo.importacoes.filter(
+    (i) =>
+      regra(i) &&
+      (!filtro.fornecedor || String(i.fornecedor_id) === filtro.fornecedor) &&
+      (!filtro.ano || String(i.data_invoice || '').startsWith(filtro.ano)) &&
+      (!busca || normalizar(`${i.invoice} ${i.fornecedor_nome} ${i.mercadoria} ${i.banco}`).includes(busca))
+  )
+}
+
+function totaisPorMoeda(lista, campo) {
+  const t = {}
+  lista.forEach((i) => {
+    const m = i.moeda || 'USD'
+    t[m] = (t[m] || 0) + (Number(i[campo]) || 0)
   })
+  return (
+    Object.entries(t)
+      .map(([m, v]) => valorMoeda(v, m))
+      .join(' · ') || '—'
+  )
 }
 
 function renderImportacoes() {
-  const imps = resumo.importacoes
-  const ed = editImp ? imps.find((x) => x.id === editImp) : null
-  const optForn = fornecedores.map((f) => `<option value="${f.id}">${esc(f.nome)}</option>`).join('')
-  $('area-fin').innerHTML = `
-    <div class="card mb-3 ${ed ? 'border-primary' : ''}"><div class="card-body">
-      <h5 class="secao-titulo-card mb-3">${ed ? 'Editar importação' : 'Nova importação'}</h5>
-      <div class="row g-2">
-        <div class="col-12 col-md-4"><label class="form-label small mb-0">Fornecedor</label><select id="i-fornecedor_id" class="form-select form-select-sm"><option value="">—</option>${optForn}</select></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">Nº Invoice</label><input id="i-invoice" class="form-control form-control-sm"></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">Data</label><input type="date" id="i-data_invoice" class="form-control form-control-sm"></div>
-        <div class="col-6 col-md-4"><label class="form-label small mb-0">Mercadoria</label><input id="i-mercadoria" class="form-control form-control-sm"></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">Moeda</label><input id="i-moeda" class="form-control form-control-sm" value="USD"></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">Valor (moeda)</label><input type="number" step="any" id="i-valor_moeda" class="form-control form-control-sm"></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">Taxa câmbio</label><input type="number" step="any" id="i-taxa_cambio" class="form-control form-control-sm"><div id="i-taxa-nota" class="small text-muted mt-1"></div></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">Banco</label><input id="i-banco" class="form-control form-control-sm" value="Santander"></div>
-      </div>
-      <button class="btn btn-ok-grande mt-3" id="btn-nova-imp">${ed ? 'Salvar alterações' : 'Lançar importação'}</button>
-      ${ed ? '<button class="btn btn-outline-secondary mt-3 ms-2" id="btn-cancel-imp">Cancelar</button>' : ''}
-    </div></div>
-    <div id="lista-importacoes">${imps
-      .map((i) => {
-        const pago = i.status === 'PAGO'
-        return `<div class="card mb-2 ${pago ? 'card-ok' : ''}" id="imp-card-${i.id}" data-pais="${esc(paisFornecedor(i.fornecedor_id))}" data-ano="${anoDe(i.data_invoice)}">
-        <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2 py-2">
-          <div class="d-flex align-items-center gap-2 flex-wrap">
-            <span class="fw-bold">${esc(i.invoice)}</span>
-            <span class="text-muted small">${esc(i.fornecedor_nome || '')}</span>
-            <span class="badge ${STATUS_COR[i.status]}">${i.status}</span>
-          </div>
-          <div class="d-flex gap-2 align-items-center flex-wrap">
-            <span class="small text-muted">${brl(i.valor_reais)}</span>
-            <span class="small fw-semibold ${i.saldo > 0.01 ? 'text-danger' : 'text-success'}">${brl(i.saldo)}</span>
-            <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="border-radius:8px"
-              data-ver-id="${i.id}" onclick="toggleImpDetalhe(${i.id})">Ver ▾</button>
-            <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="border-radius:8px"
-              onclick="editarImp(${i.id})" title="Editar">✏️</button>
-            <button class="btn btn-sm btn-outline-danger py-0 px-2" style="border-radius:8px"
-              onclick="excluirImp(${i.id})" title="Excluir">🗑</button>
-          </div>
-        </div>
-        <div id="imp-det-${i.id}" style="display:none" class="border-top px-3 pb-3 pt-2">
-          <div class="row g-2 mb-2 small">
-            <div class="col-6 col-md-3"><span class="text-muted">Mercadoria</span><br><strong>${esc(i.mercadoria || '-')}</strong></div>
-            <div class="col-6 col-md-2"><span class="text-muted">Moeda / Valor</span><br><strong>${i.moeda || ''} ${numf(i.valor_moeda)}</strong></div>
-            <div class="col-6 col-md-2"><span class="text-muted">Taxa câmbio</span><br><strong>${numf(i.taxa_cambio, 4)}</strong></div>
-            <div class="col-6 col-md-2"><span class="text-muted">Total pago</span><br><strong class="text-success">${brl(i.pago)}</strong></div>
-            <div class="col-6 col-md-3"><span class="text-muted">Saldo devedor</span><br><strong class="${i.saldo > 0.01 ? 'text-danger' : 'text-success'}">${brl(i.saldo)}</strong></div>
-            ${i.data_invoice ? `<div class="col-6 col-md-2"><span class="text-muted">Data invoice</span><br><strong>${dBR(i.data_invoice)}</strong></div>` : ''}
-            ${i.banco ? `<div class="col-6 col-md-2"><span class="text-muted">Banco</span><br><strong>${esc(i.banco)}</strong></div>` : ''}
-          </div>
-          <div class="d-flex gap-2 flex-wrap mt-2">
-            <button class="btn btn-sm btn-outline-primary" style="border-radius:8px" onclick="abrirPagamentos(${i.id})">💳 Pagamentos</button>
-          </div>
-        </div>
-      </div>`
-      })
-      .join('')}</div>`
-  if (ed) {
-    $('i-fornecedor_id').value = ed.fornecedor_id || ''
-    $('i-invoice').value = ed.invoice || ''
-    $('i-data_invoice').value = dISO(ed.data_invoice)
-    $('i-mercadoria').value = ed.mercadoria || ''
-    $('i-moeda').value = ed.moeda || ''
-    $('i-valor_moeda').value = ed.valor_moeda ?? ''
-    $('i-taxa_cambio').value = ed.taxa_cambio ?? ''
-    $('i-banco').value = ed.banco || ''
-    $('btn-cancel-imp').addEventListener('click', () => {
-      editImp = null
-      render()
-    })
-  }
-  $('i-data_invoice').addEventListener('change', () => autoPtax('i-data_invoice', 'i-taxa_cambio', 'i-taxa-nota'))
-  $('btn-nova-imp').addEventListener('click', ed ? salvarEdicaoImp : novaImportacao)
-  filtroPaisAno($('lista-importacoes'), { chave: 'importacoes' })
-}
-
-function paisFornecedor(id) {
-  const f = fornecedores.find((x) => String(x.id) === String(id))
-  return paisDe(f && f.pais)
-}
-
-function coletarImp() {
-  const dados = {}
-  ;['fornecedor_id', 'invoice', 'data_invoice', 'mercadoria', 'moeda', 'valor_moeda', 'taxa_cambio', 'banco'].forEach(
-    (k) => {
-      dados[k] = $('i-' + k).value
-    }
-  )
-  return dados
-}
-
-async function novaImportacao() {
-  const dados = coletarImp()
-  if (!dados.invoice) {
-    alert('Informe o Nº do invoice.')
-    return
-  }
-  const r = await api.fin.criarImportacao(dados)
-  if (r?.erro) {
-    alert(r.erro)
-    return
-  }
-  carregar()
-}
-
-async function salvarEdicaoImp() {
-  const dados = coletarImp()
-  if (!dados.invoice) {
-    alert('Informe o Nº do invoice.')
-    return
-  }
-  const r = await api.fin.editarImportacao(editImp, dados)
-  if (r?.erro) {
-    alert(r.erro)
-    return
-  }
-  editImp = null
-  carregar()
-}
-
-window.toggleImpDetalhe = function (id) {
-  const det = document.getElementById('imp-det-' + id)
-  if (!det) return
-  const aberto = det.style.display !== 'none'
-  det.style.display = aberto ? 'none' : 'block'
-  const btn = document.querySelector('[data-ver-id="' + id + '"]')
-  if (btn) btn.textContent = aberto ? 'Ver ▾' : 'Recolher ▴'
-}
-
-window.editarImp = function (id) {
-  editImp = id
-  aba = 'importacoes'
-  render()
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-window.excluirImp = async function (id) {
-  if (!confirm('Excluir esta importação e todos os pagamentos/contratos dela?')) return
-  await api.fin.excluirImportacao(id)
-  carregar()
-}
-
-window.abrirPagamentos = function (id) {
-  editPag = null
-  abrirPagamentosInner(id)
-}
-
-async function abrirPagamentosInner(id) {
-  const imp = resumo.importacoes.find((x) => x.id === id)
-  if (!imp) return
-  window._impAtual = id
-  const pags = await api.fin.pagamentos(id)
-  const lista = Array.isArray(pags) ? pags : []
-  const cts = await api.fin.contratos(id)
-  window._contratosImp = Array.isArray(cts) ? cts : []
-  const mapaCt = {}
-  window._contratosImp.forEach((c) => {
-    mapaCt[c.id] = c
-  })
-  const optCt = window._contratosImp
+  const anos = [...new Set(resumo.importacoes.map((i) => String(i.data_invoice || '').slice(0, 4)).filter(Boolean))]
+    .sort()
+    .reverse()
+  const usados = [...new Set(resumo.importacoes.map((i) => String(i.fornecedor_id)))]
+  const optForn = fornecedores
+    .filter((f) => usados.includes(String(f.id)))
     .map(
-      (c) =>
-        `<option value="${c.id}">Nº ${esc(c.num_contrato)} · ${brl(c.valor_reais)}${c.liquidado ? '' : ' (não liq.)'}</option>`
+      (f) => `<option value="${f.id}" ${String(f.id) === filtro.fornecedor ? 'selected' : ''}>${esc(f.nome)}</option>`
     )
     .join('')
-  const ep = editPag ? lista.find((p) => p.id === editPag) : null
-  $('modal-fin-body').innerHTML = `
-    <h5 class="mb-1">${esc(imp.invoice)} — ${esc(imp.fornecedor_nome || '')}</h5>
-    <div class="small text-muted mb-3">Valor: <strong>${brl(imp.valor_reais)}</strong> · Pago: <strong>${brl(imp.pago)}</strong> · Saldo: <strong class="${imp.saldo > 0.01 ? 'text-danger' : 'text-success'}">${brl(imp.saldo)}</strong></div>
-    <div class="row g-2 align-items-end mb-3 ${ep ? 'p-2 rounded border border-primary' : ''}">
-      ${ep ? '<div class="col-12"><span class="badge bg-primary">Editando pagamento</span></div>' : ''}
-      <div class="col-6 col-md-2"><label class="form-label small mb-0">Data</label><input type="date" id="p-data" class="form-control form-control-sm"></div>
-      <div class="col-6 col-md-2"><label class="form-label small mb-0">Valor pago (USD)</label><input type="number" step="any" id="p-valor-usd" class="form-control form-control-sm"></div>
-      <div class="col-6 col-md-2"><label class="form-label small mb-0">Valor pago (R$)</label><input type="number" step="any" id="p-valor" class="form-control form-control-sm"></div>
-      <div class="col-6 col-md-3"><label class="form-label small mb-0">Contrato de câmbio</label><select id="p-contrato_id" class="form-select form-select-sm"><option value="">— nenhum —</option>${optCt}</select><div id="p-ct-nota" class="small text-muted mt-1"></div></div>
-      <div class="col-6 col-md-3"><label class="form-label small mb-0">Forma</label><input id="p-forma" class="form-control form-control-sm" value="Câmbio Antecipado"></div>
-      <div class="col-12"><label class="form-label small mb-0">Observação</label><input id="p-obs" class="form-control form-control-sm"></div>
+  const lista = importacoesFiltradas()
+  const abertas = resumo.importacoes.filter((i) => i.status === 'EM_ABERTO' || i.status === 'PARCIAL')
+
+  $('area-fin').innerHTML = `
+    <div class="fin-kpis">
+      <div class="kpi kpi-azul"><span class="kpi-rotulo">Saldo a pagar</span><span class="kpi-valor">${totaisPorMoeda(abertas, 'saldo_moeda')}</span><span class="kpi-sub">${abertas.length} importação(ões) em aberto</span></div>
+      <div class="kpi kpi-vermelho"><span class="kpi-rotulo">Vencidas</span><span class="kpi-valor">${resumo.contagem.VENCIDA || 0}</span><span class="kpi-sub">${totaisPorMoeda(
+        abertas.filter((i) => i.prazo === 'VENCIDA'),
+        'saldo_moeda'
+      )}</span></div>
+      <div class="kpi kpi-laranja"><span class="kpi-rotulo">Vencem em 7 dias</span><span class="kpi-valor">${resumo.contagem.VENCE_EM_BREVE || 0}</span><span class="kpi-sub">${totaisPorMoeda(
+        abertas.filter((i) => i.prazo === 'VENCE_EM_BREVE'),
+        'saldo_moeda'
+      )}</span></div>
+      <div class="kpi kpi-verde"><span class="kpi-rotulo">Quitadas</span><span class="kpi-valor">${(resumo.contagem.QUITADA || 0) + (resumo.contagem.PAGO_A_MAIOR || 0)}</span><span class="kpi-sub">de ${resumo.importacoes.length} lançadas</span></div>
     </div>
-    <button class="btn btn-ok-grande" id="p-salvar">${ep ? 'Salvar alterações' : 'Registrar pagamento'}</button>
-    ${ep ? '<button class="btn btn-outline-secondary ms-2" id="p-cancel">Cancelar</button>' : ''}
-    <hr>
-    <div id="p-lista"></div>`
-  if (ep) {
-    $('p-data').value = dISO(ep.data_pgto)
-    $('p-valor').value = ep.valor_reais ?? ''
-    $('p-valor-usd').value = ep.valor_moeda ?? ''
-    $('p-forma').value = ep.forma || ''
-    $('p-obs').value = ep.obs || ''
-    $('p-contrato_id').value = ep.contrato_id || ''
-    $('p-cancel').addEventListener('click', () => {
-      editPag = null
-      abrirPagamentosInner(id)
-    })
-  } else {
-    $('p-data').value = new Date().toISOString().slice(0, 10)
-  }
 
-  const taxaPag = () => {
-    const cid = $('p-contrato_id').value
-    if (cid) {
-      const c = window._contratosImp.find((x) => String(x.id) === String(cid))
-      if (c && Number(c.taxa) > 0) return Number(c.taxa)
-    }
-    return Number(imp.taxa_cambio) || 0
-  }
+    <div class="fin-barra">
+      <input class="form-control form-control-sm busca" id="f-busca" placeholder="Buscar invoice, fornecedor ou mercadoria" value="${esc(filtro.texto)}">
+      <select class="form-select form-select-sm" id="f-fornecedor"><option value="">Todos os fornecedores</option>${optForn}</select>
+      <select class="form-select form-select-sm" id="f-ano"><option value="">Todos os anos</option>${anos.map((a) => `<option ${a === filtro.ano ? 'selected' : ''}>${a}</option>`).join('')}</select>
+      <button class="btn btn-pietrobon btn-sm ms-auto" id="btn-nova-imp">+ Nova importação</button>
+    </div>
+    <div class="fin-chips mb-3">${SITUACOES.map(
+      ([k, t, regra]) =>
+        `<button class="fin-chip ${filtro.situacao === k ? 'ativo' : ''}" data-situacao="${k}">${t}<span class="qtd">${resumo.importacoes.filter(regra).length}</span></button>`
+    ).join('')}</div>
 
-  $('p-valor-usd').addEventListener('input', () => {
-    const t = taxaPag()
-    const u = parseFloat($('p-valor-usd').value)
-    if (t > 0 && u >= 0) $('p-valor').value = (u * t).toFixed(2)
-  })
-
-  $('p-valor').addEventListener('input', () => {
-    const t = taxaPag()
-    const v = parseFloat($('p-valor').value)
-    if (t > 0 && v >= 0) $('p-valor-usd').value = (v / t).toFixed(2)
-    if (!$('p-contrato_id').value && v > 0) {
-      const match = window._contratosImp.find((c) => Math.abs((Number(c.valor_reais) || 0) - v) < 0.01)
-      if (match) {
-        $('p-contrato_id').value = match.id
-        $('p-ct-nota').textContent = `Vinculado ao contrato Nº ${match.num_contrato} (valor bate).`
-      }
-    }
-  })
-
-  $('p-contrato_id').addEventListener('change', () => {
-    const t = taxaPag()
-    const u = parseFloat($('p-valor-usd').value)
-    if (t > 0 && u >= 0) $('p-valor').value = (u * t).toFixed(2)
-  })
-  renderListaPag(lista, mapaCt)
-  $('p-salvar').addEventListener('click', salvarPagamento)
-  window._modalFin.show()
-}
-
-function renderListaPag(lista, mapaCt) {
-  const el = $('p-lista')
-  if (!lista.length) {
-    el.innerHTML = '<p class="text-muted fst-italic mb-0">Nenhum pagamento registrado.</p>'
-    return
-  }
-  const ct = mapaCt || {}
-  el.innerHTML = `<table class="table table-sm mb-0" style="font-size:.85rem"><thead><tr><th>Data</th><th class="text-end">Valor USD</th><th class="text-end">Valor R$</th><th>Contrato</th><th>Forma</th><th>Obs.</th><th></th></tr></thead>
-    <tbody>${lista
-      .map(
-        (
-          p
-        ) => `<tr class="${p.id === editPag ? 'table-primary' : ''}"><td>${dBR(p.data_pgto)}</td><td class="text-end">${numf(p.valor_moeda)}</td><td class="text-end">${brl(p.valor_reais)}</td><td>${p.contrato_id && ct[p.contrato_id] ? 'Nº ' + esc(ct[p.contrato_id].num_contrato) : '-'}</td><td>${esc(p.forma || '-')}</td><td>${esc(p.obs || '-')}</td>
-      <td class="text-end" style="white-space:nowrap"><button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="editarPag(${p.id})">Editar</button>
-        <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="excluirPag(${p.id})">Excluir</button></td></tr>`
-      )
-      .join('')}</tbody></table>`
-}
-
-window.editarPag = function (id) {
-  editPag = id
-  abrirPagamentosInner(window._impAtual)
-}
-
-async function salvarPagamento() {
-  const dados = {
-    importacao_id: window._impAtual,
-    data_pgto: $('p-data').value,
-    valor_reais: $('p-valor').value,
-    valor_moeda: $('p-valor-usd').value,
-    forma: $('p-forma').value,
-    obs: $('p-obs').value,
-    contrato_id: $('p-contrato_id').value || null
-  }
-  if (!(parseFloat(dados.valor_reais) >= 0)) {
-    alert('Informe o valor.')
-    return
-  }
-  const r = editPag ? await api.fin.editarPagamento(editPag, dados) : await api.fin.criarPagamento(dados)
-  if (r?.erro) {
-    alert(r.erro)
-    return
-  }
-  editPag = null
-  await carregar()
-  abrirPagamentosInner(window._impAtual)
-}
-
-window.excluirPag = async function (id) {
-  if (!confirm('Excluir este pagamento?')) return
-  await api.fin.excluirPagamento(id)
-  if (editPag === id) editPag = null
-  await carregar()
-  abrirPagamentosInner(window._impAtual)
-}
-
-function renderFornecedores() {
-  const ed = editForn ? fornecedores.find((x) => x.id === editForn) : null
-  $('area-fin').innerHTML = `
-    <div class="card mb-3 ${ed ? 'border-primary' : ''}"><div class="card-body">
-      <h5 class="secao-titulo-card mb-3">${ed ? 'Editar fornecedor' : 'Novo fornecedor'}</h5>
-      <div class="row g-2">
-        <div class="col-12 col-md-4"><label class="form-label small mb-0">Nome</label><input id="f-nome" class="form-control form-control-sm"></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">País</label><input id="f-pais" class="form-control form-control-sm"></div>
-        <div class="col-6 col-md-1"><label class="form-label small mb-0">Moeda</label><input id="f-moeda" class="form-control form-control-sm" value="USD"></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">Contato</label><input id="f-contato" class="form-control form-control-sm"></div>
-        <div class="col-6 col-md-3"><label class="form-label small mb-0">E-mail</label><input id="f-email" class="form-control form-control-sm"></div>
-        <div class="col-12"><label class="form-label small mb-0">Observações</label><input id="f-obs" class="form-control form-control-sm"></div>
+    <div class="fin-cartao">
+      <div class="table-responsive">
+        <table class="fin-tabela">
+          <thead><tr>
+            <th>Invoice</th><th class="oculta-celular">Data</th><th class="num">Valor</th><th>Pago</th><th class="num">Saldo</th><th>Situação</th><th></th>
+          </tr></thead>
+          <tbody>${
+            lista.length
+              ? lista
+                  .map(
+                    (i) => `<tr class="clicavel" data-imp="${i.id}">
+              <td><div class="texto-forte">${esc(i.invoice)}</div><div class="texto-sub">${esc(i.fornecedor_nome || 'Sem fornecedor')}${i.mercadoria ? ' · ' + esc(i.mercadoria) : ''}</div></td>
+              <td class="oculta-celular">${dBR(i.data_invoice)}</td>
+              <td class="num">${valorMoeda(i.valor_moeda, i.moeda)}<div class="texto-sub">${brl(i.valor_reais)}</div></td>
+              <td style="min-width:120px">${barraProgresso(i)}<div class="texto-sub mt-1">${valorMoeda(i.pago_moeda, i.moeda)} · ${num(i.percentual_pago, 0)}%</div></td>
+              <td class="num"><span class="texto-forte ${i.saldo_moeda > 0.01 ? 'valor-negativo' : ''}">${valorMoeda(Math.max(i.saldo_moeda, 0), i.moeda)}</span></td>
+              <td><div class="d-flex flex-column gap-1 align-items-start">${pillStatusImportacao(i)}${pillPrazo(i)}</div></td>
+              <td class="acoes">${i.status === 'EM_ABERTO' || i.status === 'PARCIAL' ? `<button class="btn-icone" data-pagar="${i.id}">Pagar</button>` : ''}</td>
+            </tr>`
+                  )
+                  .join('')
+              : `<tr><td colspan="7"><div class="fin-vazio">Nenhuma importação neste filtro.</div></td></tr>`
+          }</tbody>
+          ${
+            lista.length
+              ? `<tfoot><tr><td colspan="2">${lista.length} importação(ões)</td><td class="num">${totaisPorMoeda(lista, 'valor_moeda')}</td><td>${totaisPorMoeda(lista, 'pago_moeda')}</td><td class="num">${totaisPorMoeda(
+                  lista.map((i) => ({ ...i, saldo_moeda: Math.max(i.saldo_moeda, 0) })),
+                  'saldo_moeda'
+                )}</td><td colspan="2"></td></tr></tfoot>`
+              : ''
+          }
+        </table>
       </div>
-      <button class="btn btn-pietrobon btn-sm mt-3" id="btn-novo-forn">${ed ? 'Salvar alterações' : 'Adicionar fornecedor'}</button>
-      ${ed ? '<button class="btn btn-outline-secondary btn-sm mt-3 ms-2" id="btn-cancel-forn">Cancelar</button>' : ''}
-    </div></div>
-    <div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:.85rem">
-      <thead><tr><th>Fornecedor</th><th>País</th><th>Moeda</th><th>Contato</th><th>E-mail</th><th>Observações</th><th></th></tr></thead>
-      <tbody>${fornecedores
-        .map(
-          (
-            f
-          ) => `<tr class="${f.id === editForn ? 'table-primary' : ''}" data-pais="${esc(paisDe(f.pais))}"><td class="fw-semibold">${esc(f.nome)}</td><td>${esc(f.pais || '-')}</td><td>${esc(f.moeda || '-')}</td><td>${esc(f.contato || '-')}</td><td>${esc(f.email || '-')}</td><td>${esc(f.obs || '-')}</td>
-        <td class="text-end" style="white-space:nowrap"><button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="editarForn(${f.id})">Editar</button>
-          <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="excluirForn(${f.id})">🗑</button></td></tr>`
-        )
-        .join('')}</tbody>
-    </table></div></div>`
-  if (ed) {
-    ;['nome', 'pais', 'moeda', 'contato', 'email', 'obs'].forEach((k) => {
-      $('f-' + k).value = ed[k] || ''
-    })
-    $('btn-cancel-forn').addEventListener('click', () => {
-      editForn = null
-      render()
-    })
-  }
-  $('btn-novo-forn').addEventListener('click', ed ? salvarEdicaoForn : novoFornecedor)
-  const tabelaForn = $('area-fin').querySelector('tbody')
-  if (tabelaForn)
-    filtroPaisAno(tabelaForn, { chave: 'fornecedores', antesDe: tabelaForn.closest('.card'), comAno: false })
-}
+    </div>`
 
-function coletarForn() {
-  const dados = {}
-  ;['nome', 'pais', 'moeda', 'contato', 'email', 'obs'].forEach((k) => {
-    dados[k] = $('f-' + k).value
+  $('f-busca').addEventListener('input', (e) => {
+    filtro.texto = e.target.value
+    const pos = e.target.selectionStart
+    renderImportacoes()
+    $('f-busca').focus()
+    $('f-busca').setSelectionRange(pos, pos)
   })
-  return dados
+  $('f-fornecedor').addEventListener('change', (e) => {
+    filtro.fornecedor = e.target.value
+    renderImportacoes()
+  })
+  $('f-ano').addEventListener('change', (e) => {
+    filtro.ano = e.target.value
+    renderImportacoes()
+  })
+  document.querySelectorAll('[data-situacao]').forEach((b) =>
+    b.addEventListener('click', () => {
+      filtro.situacao = b.dataset.situacao
+      renderImportacoes()
+    })
+  )
+  $('btn-nova-imp').addEventListener('click', () => abrirFormImportacao(null))
+  document.querySelectorAll('tr[data-imp]').forEach((tr) =>
+    tr.addEventListener('click', (e) => {
+      const pagar = e.target.closest('[data-pagar]')
+      abrirDetalhe(Number(tr.dataset.imp), !!pagar)
+    })
+  )
 }
 
-async function novoFornecedor() {
-  const dados = coletarForn()
-  if (!dados.nome.trim()) {
-    alert('Informe o nome.')
-    return
-  }
-  const r = await api.fin.criarFornecedor(dados)
-  if (r?.erro) {
-    alert(r.erro)
-    return
-  }
-  carregar()
-}
-
-async function salvarEdicaoForn() {
-  const dados = coletarForn()
-  if (!dados.nome.trim()) {
-    alert('Informe o nome.')
-    return
-  }
-  const r = await api.fin.editarFornecedor(editForn, dados)
-  if (r?.erro) {
-    alert(r.erro)
-    return
-  }
-  editForn = null
-  carregar()
-}
-
-window.editarForn = function (id) {
-  editForn = id
-  aba = 'fornecedores'
-  render()
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-window.excluirForn = async function (id) {
-  if (!confirm('Excluir este fornecedor?')) return
-  const r = await api.fin.excluirFornecedor(id)
-  if (r?.erro) {
-    alert(r.erro)
-    return
-  }
-  carregar()
-}
-
-async function renderContratos() {
-  const contratos = await api.fin.contratos()
-  const lista = Array.isArray(contratos) ? contratos : []
-  const ed = editCt ? lista.find((x) => x.id === editCt) : null
-  const optImp = resumo.importacoes
-    .map((i) => `<option value="${i.id}">${esc(i.invoice)} — ${esc(i.fornecedor_nome || '')}</option>`)
+function opcoesFornecedores(selecionado) {
+  return fornecedores
+    .filter((f) => f.ativo || String(f.id) === String(selecionado))
+    .map(
+      (f) =>
+        `<option value="${f.id}" data-moeda="${esc(f.moeda || 'USD')}" ${String(f.id) === String(selecionado) ? 'selected' : ''}>${esc(f.nome)}</option>`
+    )
     .join('')
-  $('area-fin').innerHTML = `
-    <div class="card mb-3 ${ed ? 'border-primary' : ''}"><div class="card-body">
-      <h5 class="secao-titulo-card mb-3">${ed ? 'Editar contrato de câmbio' : 'Novo contrato de câmbio'}</h5>
-      <div class="row g-2">
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">Nº Contrato</label><input id="ct-num_contrato" class="form-control form-control-sm"></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">Banco</label><input id="ct-banco" class="form-control form-control-sm" value="Santander"></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">Data fechamento</label><input type="date" id="ct-data_fechamento" class="form-control form-control-sm"></div>
-        <div class="col-6 col-md-1"><label class="form-label small mb-0">Moeda</label><input id="ct-moeda" class="form-control form-control-sm" value="USD"></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">Valor (moeda)</label><input type="number" step="any" id="ct-valor_moeda" class="form-control form-control-sm"></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">Taxa</label><input type="number" step="any" id="ct-taxa" class="form-control form-control-sm"><div id="ct-taxa-nota" class="small text-muted mt-1"></div></div>
-        <div class="col-12 col-md-4"><label class="form-label small mb-0">Importação vinculada</label><select id="ct-importacao_id" class="form-select form-select-sm"><option value="">—</option>${optImp}</select></div>
-        <div class="col-6 col-md-2"><label class="form-label small mb-0">Data liquidação</label><input type="date" id="ct-data_liquidacao" class="form-control form-control-sm"></div>
-        <div class="col-6 col-md-2 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" id="ct-liquidado" checked><label class="form-check-label small" for="ct-liquidado">Liquidado</label></div></div>
-        <div class="col-12 col-md-4"><label class="form-label small mb-0">Observações</label><input id="ct-obs" class="form-control form-control-sm"></div>
-      </div>
-      <button class="btn btn-pietrobon btn-sm mt-3" id="btn-novo-ct">${ed ? 'Salvar alterações' : 'Adicionar contrato'}</button>
-      ${ed ? '<button class="btn btn-outline-secondary btn-sm mt-3 ms-2" id="btn-cancel-ct">Cancelar</button>' : ''}
-    </div></div>
-    <div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0" style="font-size:.82rem">
-      <thead><tr><th>Nº Contrato</th><th>Banco</th><th>Fechamento</th><th class="text-end">Valor (moeda)</th><th class="text-end">Taxa</th><th class="text-end">Valor R$</th><th>Invoice</th><th>Liquidado</th><th></th></tr></thead>
-      <tbody>${lista
-        .map(
-          (
-            c
-          ) => `<tr class="${c.id === editCt ? 'table-primary' : ''}"><td class="fw-semibold">${esc(c.num_contrato)}</td><td>${esc(c.banco || '-')}</td><td>${dBR(c.data_fechamento)}</td>
-        <td class="text-end">${c.moeda || ''} ${numf(c.valor_moeda)}</td><td class="text-end">${numf(c.taxa, 4)}</td><td class="text-end">${brl(c.valor_reais)}</td>
-        <td>${esc(c.invoice || '-')}</td><td>${c.liquidado ? '<span class="badge bg-success">Sim</span>' : '<span class="badge bg-secondary">Não</span>'}</td>
-        <td class="text-end" style="white-space:nowrap"><button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="editarCt(${c.id})">Editar</button>
-          <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="excluirCt(${c.id})">🗑</button></td></tr>`
-        )
-        .join('')}</tbody>
-    </table></div></div>`
-  if (ed) {
-    $('ct-num_contrato').value = ed.num_contrato || ''
-    $('ct-banco').value = ed.banco || ''
-    $('ct-data_fechamento').value = dISO(ed.data_fechamento)
-    $('ct-moeda').value = ed.moeda || ''
-    $('ct-valor_moeda').value = ed.valor_moeda ?? ''
-    $('ct-taxa').value = ed.taxa ?? ''
-    $('ct-importacao_id').value = ed.importacao_id || ''
-    $('ct-data_liquidacao').value = dISO(ed.data_liquidacao)
-    $('ct-liquidado').checked = !!ed.liquidado
-    $('ct-obs').value = ed.obs || ''
-    $('btn-cancel-ct').addEventListener('click', () => {
-      editCt = null
-      renderContratos()
-    })
-  }
-  $('ct-data_fechamento').addEventListener('change', () => autoPtax('ct-data_fechamento', 'ct-taxa', 'ct-taxa-nota'))
-  $('btn-novo-ct').addEventListener('click', ed ? salvarEdicaoCt : novoContrato)
 }
 
-function coletarCt() {
-  const dados = {}
-  ;[
-    'num_contrato',
-    'banco',
-    'data_fechamento',
-    'moeda',
-    'valor_moeda',
-    'taxa',
-    'importacao_id',
-    'data_liquidacao',
-    'obs'
-  ].forEach((k) => {
-    dados[k] = $('ct-' + k).value
+function abrirFormImportacao(id) {
+  const ed = id ? resumo.importacoes.find((x) => x.id === id) : null
+  const p = painel()
+  p.titulo(ed ? `Editar ${ed.invoice}` : 'Nova importação')
+  p.corpo.innerHTML = `
+    <div class="row g-2">
+      <div class="col-12"><label class="form-label">Fornecedor</label>
+        <div class="d-flex gap-2"><select id="i-fornecedor_id" class="form-select form-select-sm"><option value="">Selecione…</option>${opcoesFornecedores(ed?.fornecedor_id)}</select>
+        <a class="btn-icone" href="/HTML/financeiro/cadastros.html#fornecedores" title="Cadastrar fornecedor">+</a></div></div>
+      <div class="col-6"><label class="form-label">Nº da invoice</label><input id="i-invoice" class="form-control form-control-sm" value="${esc(ed?.invoice || '')}"></div>
+      <div class="col-6"><label class="form-label">Data da invoice</label><input type="date" id="i-data_invoice" class="form-control form-control-sm" value="${dISO(ed?.data_invoice)}"></div>
+      <div class="col-12"><label class="form-label">Mercadoria</label><input id="i-mercadoria" class="form-control form-control-sm" value="${esc(ed?.mercadoria || '')}"></div>
+      <div class="col-4"><label class="form-label">Moeda</label><select id="i-moeda" class="form-select form-select-sm">${['USD', 'EUR', 'CNY', 'BRL'].map((m) => `<option ${(ed?.moeda || 'USD') === m ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
+      <div class="col-8"><label class="form-label">Valor da invoice</label><input inputmode="decimal" id="i-valor_moeda" class="form-control form-control-sm" value="${ed ? ed.valor_moeda : ''}"></div>
+      <div class="col-6"><label class="form-label">Taxa de câmbio (PTAX)</label><input inputmode="decimal" id="i-taxa_cambio" class="form-control form-control-sm" value="${ed ? ed.taxa_cambio : ''}"><div id="i-taxa-nota" class="texto-sub mt-1"></div></div>
+      <div class="col-6"><label class="form-label">Valor em R$</label><div class="form-control form-control-sm bg-light fw-semibold" id="i-valor-reais">—</div></div>
+      <div class="col-6"><label class="form-label">Vencimento do pagamento</label><input type="date" id="i-data_vencimento" class="form-control form-control-sm" value="${dISO(ed?.data_vencimento)}">
+        <div class="d-flex gap-1 mt-1 flex-wrap">${[0, 30, 60, 90].map((d) => `<button type="button" class="fin-chip py-0" data-prazo="${d}">${d ? d + ' dias' : 'à vista'}</button>`).join('')}</div></div>
+      <div class="col-6"><label class="form-label">Chegada da mercadoria</label><input type="date" id="i-data_chegada" class="form-control form-control-sm" value="${dISO(ed?.data_chegada)}"><div class="texto-sub mt-1">Data da NF de entrada. Pagamentos antes dela são adiantamento.</div></div>
+      <div class="col-6"><label class="form-label">Banco</label><input id="i-banco" class="form-control form-control-sm" value="${esc(ed?.banco || '')}"></div>
+      <div class="col-12"><label class="form-label">Observações</label><input id="i-obs" class="form-control form-control-sm" value="${esc(ed?.obs || '')}"></div>
+    </div>
+    <div class="d-flex gap-2 mt-4">
+      <button class="btn btn-ok-grande" id="i-salvar">${ed ? 'Salvar alterações' : 'Lançar importação'}</button>
+      ${ed ? '<button class="btn btn-outline-danger ms-auto" id="i-excluir">Excluir</button>' : ''}
+    </div>`
+
+  const atualizarReais = () => {
+    const v = numeroDoCampo($('i-valor_moeda').value) * numeroDoCampo($('i-taxa_cambio').value)
+    $('i-valor-reais').textContent = v ? brl(v) : '—'
+  }
+  atualizarReais()
+  $('i-valor_moeda').addEventListener('input', atualizarReais)
+  $('i-taxa_cambio').addEventListener('input', atualizarReais)
+  $('i-fornecedor_id').addEventListener('change', (e) => {
+    const m = e.target.selectedOptions[0]?.dataset.moeda
+    if (m && !ed) $('i-moeda').value = m
   })
-  dados.liquidado = $('ct-liquidado').checked
-  return dados
+  $('i-data_invoice').addEventListener('change', async () => {
+    const data = $('i-data_invoice').value
+    if (!data || $('i-moeda').value !== 'USD') return
+    $('i-taxa-nota').textContent = 'Buscando PTAX…'
+    const r = await buscarPtax(data)
+    if (r) {
+      $('i-taxa_cambio').value = r.taxa
+      $('i-taxa-nota').textContent = `PTAX ${num(r.taxa, 4)} de ${dBR(r.dataCotacao)}`
+      atualizarReais()
+    } else $('i-taxa-nota').textContent = 'PTAX indisponível. Informe a taxa.'
+  })
+  p.corpo.querySelectorAll('[data-prazo]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const base = $('i-data_invoice').value || hojeISO()
+      const d = new Date(base + 'T00:00:00')
+      d.setDate(d.getDate() + Number(b.dataset.prazo))
+      $('i-data_vencimento').value = d.toISOString().slice(0, 10)
+    })
+  )
+  $('i-salvar').addEventListener('click', async () => {
+    const dados = {}
+    ;[
+      'fornecedor_id',
+      'invoice',
+      'data_invoice',
+      'data_vencimento',
+      'data_chegada',
+      'mercadoria',
+      'moeda',
+      'banco',
+      'obs'
+    ].forEach((k) => (dados[k] = $('i-' + k).value))
+    dados.valor_moeda = numeroDoCampo($('i-valor_moeda').value)
+    dados.taxa_cambio = numeroDoCampo($('i-taxa_cambio').value)
+    if (!dados.fornecedor_id) return avisar('Selecione o fornecedor.', 'warning')
+    const r = ed ? await api.fin.editarImportacao(ed.id, dados) : await api.fin.criarImportacao(dados)
+    if (r?.erro) return avisar(r.erro, 'error')
+    p.fechar()
+    avisar(ed ? 'Importação atualizada.' : 'Importação lançada.')
+    await carregar()
+  })
+  if (ed)
+    $('i-excluir').addEventListener('click', async () => {
+      if (!confirm(`Excluir a importação ${ed.invoice} com todos os pagamentos, contratos e custos dela?`)) return
+      const r = await api.fin.excluirImportacao(ed.id)
+      if (r?.erro) return avisar(r.erro, 'error')
+      p.fechar()
+      avisar('Importação excluída.')
+      carregar()
+    })
+  p.abrir()
 }
 
-async function novoContrato() {
-  const dados = coletarCt()
-  if (!dados.num_contrato) {
-    alert('Informe o Nº do contrato.')
-    return
+async function abrirDetalhe(id, focarPagamento) {
+  const i = resumo.importacoes.find((x) => x.id === id)
+  if (!i) return
+  const p = painel()
+  p.titulo(`Invoice ${i.invoice}`)
+  p.corpo.innerHTML = '<p class="text-muted">Carregando…</p>'
+  p.abrir()
+  const [pags, cts] = await Promise.all([api.fin.pagamentos(id), api.fin.contratos(id)])
+  const pagamentos = Array.isArray(pags) ? pags : []
+  const contratosImp = Array.isArray(cts) ? cts : []
+  const saldo = Math.max(i.saldo_moeda, 0)
+
+  p.corpo.innerHTML = `
+    <div class="d-flex flex-wrap gap-2 mb-2">${pillStatusImportacao(i)}${pillPrazo(i)}</div>
+    <div class="texto-sub mb-3">${esc(i.fornecedor_nome || 'Sem fornecedor')}${i.mercadoria ? ' · ' + esc(i.mercadoria) : ''} · invoice de ${dBR(i.data_invoice)}</div>
+    <div class="fin-cartao"><div class="fin-cartao-corpo">
+      <div class="fin-resumo-linha"><span>Valor da invoice</span><strong>${valorMoeda(i.valor_moeda, i.moeda)} · ${brl(i.valor_reais)}</strong></div>
+      <div class="fin-resumo-linha"><span>Taxa da invoice</span><strong>${num(i.taxa_cambio, 4)}</strong></div>
+      <div class="fin-resumo-linha"><span>Pago</span><strong>${valorMoeda(i.pago_moeda, i.moeda)} · ${brl(i.pago)}</strong></div>
+      <div class="fin-resumo-linha"><span>Saldo</span><strong class="${saldo > 0.01 ? 'valor-negativo' : 'valor-positivo'}">${valorMoeda(saldo, i.moeda)}${saldo > 0.01 ? ` · ≈ ${brl(i.saldo)}` : ''}</strong></div>
+      <div class="fin-resumo-linha"><span>Variação cambial</span><strong class="${i.variacao_cambial > 0 ? 'valor-negativo' : 'valor-positivo'}">${brl(i.variacao_cambial)}</strong></div>
+      <div class="fin-resumo-linha"><span>Vencimento</span><strong>${dBR(i.data_vencimento)}</strong></div>
+      <div class="fin-resumo-linha"><span>Chegada da mercadoria</span><strong>${dBR(i.data_chegada)}</strong></div>
+      <div class="mt-2">${barraProgresso(i)}</div>
+    </div></div>
+    <div class="d-flex gap-2 mb-3"><button class="btn-icone" id="d-editar">Editar importação</button><button class="btn-icone" id="d-custos">Custos de nacionalização</button></div>
+
+    <h6 class="fw-bold mb-2">Registrar pagamento</h6>
+    <div class="row g-2 mb-1" id="form-pag">
+      <div class="col-6"><label class="form-label">Data</label><input type="date" id="p-data" class="form-control form-control-sm" value="${hojeISO()}"></div>
+      <div class="col-6"><label class="form-label">Contrato de câmbio</label><select id="p-contrato" class="form-select form-select-sm"><option value="">Nenhum</option>${contratosImp
+        .filter((c) => !c.liquidado)
+        .map(
+          (c) => `<option value="${c.id}" data-taxa="${c.taxa}">Nº ${esc(c.num_contrato)} · ${num(c.taxa, 4)}</option>`
+        )
+        .join('')}</select></div>
+      <div class="col-6"><label class="form-label">Valor pago (${esc(i.moeda)})</label><input inputmode="decimal" id="p-moeda" class="form-control form-control-sm"></div>
+      <div class="col-6"><label class="form-label">Taxa</label><input inputmode="decimal" id="p-taxa" class="form-control form-control-sm" value="${i.taxa_cambio || ''}"><div class="texto-sub mt-1" id="p-taxa-nota"></div></div>
+      <div class="col-6"><label class="form-label">Valor em R$</label><input inputmode="decimal" id="p-reais" class="form-control form-control-sm"></div>
+      <div class="col-6"><label class="form-label">Forma</label><input id="p-forma" class="form-control form-control-sm" value="Câmbio"></div>
+      <div class="col-12"><label class="form-label">Observação</label><input id="p-obs" class="form-control form-control-sm"></div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-4">
+      <button class="btn btn-ok-grande btn-sm" id="p-salvar">Registrar pagamento</button>
+      ${saldo > 0.01 ? `<button class="btn-icone" id="p-quitar">Preencher saldo (${valorMoeda(saldo, i.moeda)})</button>` : ''}
+    </div>
+
+    <h6 class="fw-bold mb-2">Pagamentos (${pagamentos.length})</h6>
+    ${
+      pagamentos.length
+        ? `<table class="fin-tabela mb-3"><thead><tr><th>Data</th><th class="num">${esc(i.moeda)}</th><th class="num">R$</th><th></th></tr></thead><tbody>${pagamentos
+            .map((pg) => {
+              const auto = pg.origem === 'contrato'
+              const adiant = pg.entra_fechamento && (!i.data_chegada || dISO(pg.data_pgto) < i.data_chegada)
+              return `<tr>
+              <td>${dBR(pg.data_pgto)}<div class="texto-sub">${esc(pg.forma || '')}${pg.num_contrato ? ' · contrato ' + esc(pg.num_contrato) : ''}</div>
+                <div class="d-flex gap-1 mt-1 flex-wrap">${auto ? pill('Gerado pelo contrato', 'auto') : ''}${adiant ? pill('Adiantamento', 'neutro', 'Entra em Adiantamentos a Fornecedores no Fechamento') : ''}</div></td>
+              <td class="num">${num(pg.valor_moeda)}</td><td class="num">${brl(pg.valor_reais)}</td>
+              <td class="acoes">${auto ? '' : `<button class="btn-icone perigo" data-excluir-pag="${pg.id}">Excluir</button>`}</td></tr>`
+            })
+            .join('')}</tbody></table>`
+        : '<div class="fin-vazio">Nenhum pagamento registrado.</div>'
+    }
+    ${
+      contratosImp.length
+        ? `<h6 class="fw-bold mb-2">Contratos de câmbio</h6><ul class="fin-lista-alertas">${contratosImp
+            .map(
+              (
+                c
+              ) => `<li><div><div class="texto-forte">Nº ${esc(c.num_contrato)}</div><div class="texto-sub">${esc(c.banco || '')} · ${dBR(c.data_fechamento)} · taxa ${num(c.taxa, 4)}</div></div>
+              <div class="text-end">${valorMoeda(c.valor_moeda, c.moeda)}<div>${c.liquidado ? pill('Liquidado', 'quitada') : pill('A liquidar', 'alerta')}</div></div></li>`
+            )
+            .join('')}</ul>`
+        : ''
+    }`
+
+  const taxaAtual = () => numeroDoCampo($('p-taxa').value)
+  const recalcularReais = () => {
+    const v = numeroDoCampo($('p-moeda').value) * taxaAtual()
+    if (v) $('p-reais').value = v.toFixed(2)
   }
-  const r = await api.fin.criarContrato(dados)
-  if (r?.erro) {
-    alert(r.erro)
-    return
-  }
-  renderContratos()
+  $('p-moeda').addEventListener('input', recalcularReais)
+  $('p-taxa').addEventListener('input', recalcularReais)
+  $('p-contrato').addEventListener('change', (e) => {
+    const t = e.target.selectedOptions[0]?.dataset.taxa
+    if (t) {
+      $('p-taxa').value = t
+      $('p-taxa-nota').textContent = 'Taxa do contrato'
+      recalcularReais()
+    }
+  })
+  $('p-data').addEventListener('change', async () => {
+    if ($('p-contrato').value || i.moeda !== 'USD') return
+    $('p-taxa-nota').textContent = 'Buscando PTAX…'
+    const r = await buscarPtax($('p-data').value)
+    if (r) {
+      $('p-taxa').value = r.taxa
+      $('p-taxa-nota').textContent = `PTAX de ${dBR(r.dataCotacao)}`
+      recalcularReais()
+    } else $('p-taxa-nota').textContent = ''
+  })
+  if ($('p-quitar'))
+    $('p-quitar').addEventListener('click', () => {
+      $('p-moeda').value = saldo.toFixed(2)
+      recalcularReais()
+    })
+  $('p-salvar').addEventListener('click', async () => {
+    const dados = {
+      importacao_id: id,
+      data_pgto: $('p-data').value,
+      valor_moeda: numeroDoCampo($('p-moeda').value),
+      valor_reais: numeroDoCampo($('p-reais').value),
+      forma: $('p-forma').value,
+      obs: $('p-obs').value,
+      contrato_id: $('p-contrato').value || null
+    }
+    if (!(dados.valor_moeda > 0)) return avisar('Informe o valor pago.', 'warning')
+    const r = await api.fin.criarPagamento(dados)
+    if (r?.erro) return avisar(r.erro, 'error')
+    avisar('Pagamento registrado.')
+    await carregar()
+    abrirDetalhe(id)
+  })
+  p.corpo.querySelectorAll('[data-excluir-pag]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      if (!confirm('Excluir este pagamento?')) return
+      const r = await api.fin.excluirPagamento(b.dataset.excluirPag)
+      if (r?.erro) return avisar(r.erro, 'error')
+      await carregar()
+      abrirDetalhe(id)
+    })
+  )
+  $('d-editar').addEventListener('click', () => abrirFormImportacao(id))
+  $('d-custos').addEventListener('click', () => {
+    p.fechar()
+    aba = 'custos'
+    carregarCusto(String(id))
+    render()
+  })
+  if (focarPagamento) setTimeout(() => $('p-moeda').focus(), 300)
 }
 
-async function salvarEdicaoCt() {
-  const dados = coletarCt()
-  if (!dados.num_contrato) {
-    alert('Informe o Nº do contrato.')
-    return
-  }
-  const r = await api.fin.editarContrato(editCt, dados)
-  if (r?.erro) {
-    alert(r.erro)
-    return
-  }
-  editCt = null
-  renderContratos()
+function renderContratos() {
+  const abertos = contratos.filter((c) => !c.liquidado)
+  $('area-fin').innerHTML = `
+    <div class="fin-aviso">Ao marcar um contrato como <strong>liquidado</strong> e vinculá-lo a uma importação, o pagamento é lançado sozinho na importação (com a taxa e o valor do contrato). Desmarcar remove o pagamento.</div>
+    <div class="fin-barra">
+      <span class="texto-sub">${abertos.length} a liquidar · ${contratos.length - abertos.length} liquidado(s)</span>
+      <button class="btn btn-pietrobon btn-sm ms-auto" id="btn-novo-ct">+ Novo contrato</button>
+    </div>
+    <div class="fin-cartao"><div class="table-responsive"><table class="fin-tabela">
+      <thead><tr><th>Contrato</th><th class="oculta-celular">Fechamento</th><th class="num">Valor</th><th class="num">Taxa</th><th class="num">R$</th><th>Importação</th><th>Situação</th></tr></thead>
+      <tbody>${
+        contratos.length
+          ? contratos
+              .map(
+                (c) => `<tr class="clicavel" data-ct="${c.id}">
+          <td><div class="texto-forte">Nº ${esc(c.num_contrato)}</div><div class="texto-sub">${esc(c.banco || '')}</div></td>
+          <td class="oculta-celular">${dBR(c.data_fechamento)}</td>
+          <td class="num">${valorMoeda(c.valor_moeda, c.moeda)}</td><td class="num">${num(c.taxa, 4)}</td><td class="num">${brl(c.valor_reais)}</td>
+          <td>${c.invoice ? `<div>${esc(c.invoice)}</div><div class="texto-sub">${esc(c.fornecedor_nome || '')}</div>` : '<span class="texto-sub">Sem vínculo</span>'}</td>
+          <td>${c.liquidado ? pill(c.data_liquidacao ? `Liquidado ${dBR(c.data_liquidacao)}` : 'Liquidado', 'quitada') : pill('A liquidar', 'alerta')}${c.liquidado && c.importacao_id && !Number(c.qtd_pagamentos) ? '<div class="mt-1">' + pill('Sem pagamento vinculado', 'neutro', 'Nenhum pagamento da importação está ligado a este contrato') + '</div>' : ''}</td>
+        </tr>`
+              )
+              .join('')
+          : '<tr><td colspan="7"><div class="fin-vazio">Nenhum contrato cadastrado.</div></td></tr>'
+      }</tbody></table></div></div>`
+  $('btn-novo-ct').addEventListener('click', () => abrirFormContrato(null))
+  document
+    .querySelectorAll('tr[data-ct]')
+    .forEach((tr) => tr.addEventListener('click', () => abrirFormContrato(Number(tr.dataset.ct))))
 }
 
-window.editarCt = function (id) {
-  editCt = id
-  renderContratos()
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-window.excluirCt = async function (id) {
-  if (!confirm('Excluir este contrato?')) return
-  await api.fin.excluirContrato(id)
-  if (editCt === id) editCt = null
-  renderContratos()
+function abrirFormContrato(id) {
+  const ed = id ? contratos.find((c) => c.id === id) : null
+  const p = painelLateral('painel-contrato', ed ? `Contrato Nº ${ed.num_contrato}` : 'Novo contrato de câmbio')
+  const optImp = resumo.importacoes
+    .filter((i) => i.status === 'EM_ABERTO' || i.status === 'PARCIAL' || String(i.id) === String(ed?.importacao_id))
+    .map(
+      (i) =>
+        `<option value="${i.id}" data-saldo="${Math.max(i.saldo_moeda, 0)}" data-moeda="${esc(i.moeda)}" ${String(i.id) === String(ed?.importacao_id) ? 'selected' : ''}>${esc(i.invoice)} · ${esc(i.fornecedor_nome || '')} · saldo ${valorMoeda(Math.max(i.saldo_moeda, 0), i.moeda)}</option>`
+    )
+    .join('')
+  p.corpo.innerHTML = `
+    <div class="row g-2">
+      <div class="col-6"><label class="form-label">Nº do contrato</label><input id="ct-num_contrato" class="form-control form-control-sm" value="${esc(ed?.num_contrato || '')}"></div>
+      <div class="col-6"><label class="form-label">Banco</label><input id="ct-banco" class="form-control form-control-sm" value="${esc(ed?.banco || '')}"></div>
+      <div class="col-12"><label class="form-label">Importação</label><select id="ct-importacao_id" class="form-select form-select-sm"><option value="">Sem vínculo</option>${optImp}</select></div>
+      <div class="col-6"><label class="form-label">Data de fechamento</label><input type="date" id="ct-data_fechamento" class="form-control form-control-sm" value="${dISO(ed?.data_fechamento)}"></div>
+      <div class="col-6"><label class="form-label">Moeda</label><select id="ct-moeda" class="form-select form-select-sm">${['USD', 'EUR', 'CNY'].map((m) => `<option ${(ed?.moeda || 'USD') === m ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
+      <div class="col-6"><label class="form-label">Valor (moeda)</label><input inputmode="decimal" id="ct-valor_moeda" class="form-control form-control-sm" value="${ed ? ed.valor_moeda : ''}"></div>
+      <div class="col-6"><label class="form-label">Taxa</label><input inputmode="decimal" id="ct-taxa" class="form-control form-control-sm" value="${ed ? ed.taxa : ''}"><div class="texto-sub mt-1" id="ct-taxa-nota"></div></div>
+      <div class="col-12"><label class="form-label">Valor em R$</label><div class="form-control form-control-sm bg-light fw-semibold" id="ct-reais">—</div></div>
+      <div class="col-6 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" id="ct-liquidado" ${ed?.liquidado ? 'checked' : ''}><label class="form-check-label" for="ct-liquidado">Liquidado</label></div></div>
+      <div class="col-6"><label class="form-label">Data de liquidação</label><input type="date" id="ct-data_liquidacao" class="form-control form-control-sm" value="${dISO(ed?.data_liquidacao)}"></div>
+      <div class="col-12"><label class="form-label">Observações</label><input id="ct-obs" class="form-control form-control-sm" value="${esc(ed?.obs || '')}"></div>
+    </div>
+    <div class="d-flex gap-2 mt-4"><button class="btn btn-ok-grande" id="ct-salvar">${ed ? 'Salvar alterações' : 'Adicionar contrato'}</button>
+      ${ed ? '<button class="btn btn-outline-danger ms-auto" id="ct-excluir">Excluir</button>' : ''}</div>`
+  const atualizar = () => {
+    const v = numeroDoCampo($('ct-valor_moeda').value) * numeroDoCampo($('ct-taxa').value)
+    $('ct-reais').textContent = v ? brl(v) : '—'
+  }
+  atualizar()
+  $('ct-valor_moeda').addEventListener('input', atualizar)
+  $('ct-taxa').addEventListener('input', atualizar)
+  $('ct-importacao_id').addEventListener('change', (e) => {
+    const o = e.target.selectedOptions[0]
+    if (o && o.dataset.saldo && !$('ct-valor_moeda').value) {
+      $('ct-valor_moeda').value = Number(o.dataset.saldo).toFixed(2)
+      $('ct-moeda').value = o.dataset.moeda || 'USD'
+      atualizar()
+    }
+  })
+  $('ct-data_fechamento').addEventListener('change', async () => {
+    if ($('ct-taxa').value) return
+    const r = await buscarPtax($('ct-data_fechamento').value)
+    if (r) {
+      $('ct-taxa').value = r.taxa
+      $('ct-taxa-nota').textContent = `PTAX de ${dBR(r.dataCotacao)} (confira a taxa do banco)`
+      atualizar()
+    }
+  })
+  $('ct-liquidado').addEventListener('change', (e) => {
+    if (e.target.checked && !$('ct-data_liquidacao').value)
+      $('ct-data_liquidacao').value = $('ct-data_fechamento').value || hojeISO()
+  })
+  $('ct-salvar').addEventListener('click', async () => {
+    const dados = {}
+    ;['num_contrato', 'banco', 'importacao_id', 'data_fechamento', 'moeda', 'data_liquidacao', 'obs'].forEach(
+      (k) => (dados[k] = $('ct-' + k).value)
+    )
+    dados.valor_moeda = numeroDoCampo($('ct-valor_moeda').value)
+    dados.taxa = numeroDoCampo($('ct-taxa').value)
+    dados.liquidado = $('ct-liquidado').checked
+    const r = ed ? await api.fin.editarContrato(ed.id, dados) : await api.fin.criarContrato(dados)
+    if (r?.erro) return avisar(r.erro, 'error')
+    p.fechar()
+    avisar(
+      r.pagamento === 'automatico'
+        ? 'Contrato salvo e pagamento lançado na importação.'
+        : r.pagamento === 'manual'
+          ? 'Contrato salvo. A importação já tinha um pagamento ligado a este contrato.'
+          : 'Contrato salvo.'
+    )
+    await carregar()
+  })
+  if (ed)
+    $('ct-excluir').addEventListener('click', async () => {
+      if (!confirm('Excluir este contrato? O pagamento gerado por ele também será removido.')) return
+      await api.fin.excluirContrato(ed.id)
+      p.fechar()
+      carregar()
+    })
+  p.abrir()
 }
 
 function stRecolher(it) {
@@ -1114,41 +1046,26 @@ window.exportarCustoPDF = async () => {
 
 function montarInterface() {
   $('conteudo-fin').innerHTML = `
-    <ul class="nav nav-tabs mb-3" id="tabs-fin">
-      <li class="nav-item"><a class="nav-link active" href="#" data-aba="painel">Painel</a></li>
-      <li class="nav-item"><a class="nav-link" href="#" data-aba="importacoes">Importações</a></li>
-      <li class="nav-item"><a class="nav-link" href="#" data-aba="contratos">Contratos de Câmbio</a></li>
-      <li class="nav-item"><a class="nav-link" href="#" data-aba="custos">Custos de Importação</a></li>
-      <li class="nav-item"><a class="nav-link" href="#" data-aba="fornecedores">Fornecedores</a></li>
-    </ul>
-    <div id="area-fin"><p class="text-muted">Carregando...</p></div>
-    <div class="modal fade" id="modal-fin" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-scrollable">
-      <div class="modal-content"><div class="modal-header"><h6 class="modal-title fw-bold">Pagamentos da importação</h6>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body" id="modal-fin-body"></div></div></div></div>`
-  window._modalFin = new bootstrap.Modal($('modal-fin'))
-  document.querySelectorAll('#tabs-fin .nav-link').forEach((a) => {
-    a.addEventListener('click', (e) => {
-      e.preventDefault()
-      document.querySelectorAll('#tabs-fin .nav-link').forEach((x) => x.classList.remove('active'))
-      a.classList.add('active')
-      aba = a.dataset.aba
-      editImp = null
-      editForn = null
-      editCt = null
+    <div class="fin-abas" id="abas-fin">
+      <button data-aba="importacoes">Importações</button>
+      <button data-aba="contratos">Contratos de câmbio</button>
+      <button data-aba="custos">Custos de nacionalização</button>
+    </div>
+    <div id="area-fin"><p class="text-muted">Carregando...</p></div>`
+  document.querySelectorAll('#abas-fin button').forEach((b) =>
+    b.addEventListener('click', () => {
+      aba = b.dataset.aba
+      history.replaceState(null, '', aba === 'importacoes' ? location.pathname : '#' + aba)
       render()
     })
-  })
+  )
 }
 
 async function iniciar() {
-  const perfil = exigirPapel(['admin'])
-  if (!perfil) return
-  if (!EMAILS_FINANCEIRO.includes((perfil.email || '').toLowerCase())) {
-    window.location.href = '/HTML/producao/visao-geral.html'
-    return
-  }
-  montarCabecalho(perfil.papel)
+  if (!iniciarPagina()) return
+  const hash = location.hash.replace('#', '')
+  if (hash === 'contratos' || hash === 'custos') aba = hash
+  if (hash === 'vencidas') filtro.situacao = 'vencidas'
   montarInterface()
   carregar()
 }

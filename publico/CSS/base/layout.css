@@ -31,26 +31,14 @@
   box-shadow: 0 4px 12px rgba(232, 49, 58, 0.28);
 }
 
-body[data-pagina='visao-geral.html'] .page-header-icon::before {
-  content: '📊';
-}
-body[data-pagina='cadastro.html'] .page-header-icon::before {
-  content: '📋';
-}
-body[data-pagina='almoxarifado.html'] .page-header-icon::before {
-  content: '📦';
-}
-body[data-pagina='recebimento.html'] .page-header-icon::before {
-  content: '🚚';
-}
 body[data-pagina='rendimentos.html'] .page-header-icon::before {
   content: '📐';
 }
-body[data-pagina='embarques.html'] .page-header-icon::before {
-  content: '🚢';
+body[data-pagina='painel.html'] .page-header-icon::before {
+  content: '📊';
 }
-body[data-pagina='compras.html'] .page-header-icon::before {
-  content: '🛒';
+body[data-pagina='cadastros.html'] .page-header-icon::before {
+  content: '🗂️';
 }
 body[data-pagina='mensal-contabil.html'] .page-header-icon::before {
   content: '💰';

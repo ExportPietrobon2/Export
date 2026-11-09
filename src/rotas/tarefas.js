@@ -1,7 +1,6 @@
 const express = require('express')
-const bcrypt = require('bcryptjs')
 const { banco } = require('../config/banco')
-const { autenticarTarefas } = require('../middlewares/autenticacao')
+const { autenticar } = require('../middlewares/autenticacao')
 
 const rotas = express.Router()
 
@@ -20,13 +19,6 @@ async function inicializarTarefas() {
       criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`)
-    const hash = await bcrypt.hash('exp123', 10)
-    await banco.query('INSERT IGNORE INTO usuarios (email, senha, nome, papel) VALUES (?, ?, ?, ?)', [
-      'export3@pietrobon.com.br',
-      hash,
-      'Bernardo',
-      'auxiliar'
-    ])
   } catch (e) {
     console.error('Erro ao inicializar Tarefas:', e.message)
   }
@@ -34,7 +26,7 @@ async function inicializarTarefas() {
 
 setTimeout(inicializarTarefas, 3000)
 
-rotas.get('/api/tarefas', autenticarTarefas(), async (req, res) => {
+rotas.get('/api/tarefas', autenticar(), async (req, res) => {
   try {
     const [rows] = await banco.query('SELECT * FROM tarefas ORDER BY coluna, ordem, criado_em DESC')
     res.json(rows)
@@ -43,7 +35,7 @@ rotas.get('/api/tarefas', autenticarTarefas(), async (req, res) => {
   }
 })
 
-rotas.post('/api/tarefas', autenticarTarefas(), async (req, res) => {
+rotas.post('/api/tarefas', autenticar(), async (req, res) => {
   try {
     const { titulo, descricao, coluna, prioridade, responsavel, prazo } = req.body
     if (!titulo) return res.status(400).json({ erro: 'Título obrigatório.' })
@@ -66,7 +58,7 @@ rotas.post('/api/tarefas', autenticarTarefas(), async (req, res) => {
   }
 })
 
-rotas.patch('/api/tarefas/:id', autenticarTarefas(), async (req, res) => {
+rotas.patch('/api/tarefas/:id', autenticar(), async (req, res) => {
   try {
     const { titulo, descricao, coluna, prioridade, responsavel, prazo, ordem } = req.body
     const campos = []
@@ -109,7 +101,7 @@ rotas.patch('/api/tarefas/:id', autenticarTarefas(), async (req, res) => {
   }
 })
 
-rotas.delete('/api/tarefas/:id', autenticarTarefas(), async (req, res) => {
+rotas.delete('/api/tarefas/:id', autenticar(), async (req, res) => {
   try {
     await banco.query('DELETE FROM tarefas WHERE id = ?', [req.params.id])
     res.json({ ok: true })

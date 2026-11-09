@@ -1,16 +1,23 @@
+const USUARIOS_PERMITIDOS = [
+  'joaoantonio@pietrobon.com.br',
+  'export@pietrobon.com.br',
+  'export2@pietrobon.com.br',
+  'export3@pietrobon.com.br'
+]
+
+export const PAGINA_INICIAL = '/HTML/financeiro/painel.html'
+
 function obterToken() {
-  return sessionStorage.getItem('token') || localStorage.getItem('token_deposito')
+  return sessionStorage.getItem('token')
 }
 
 export function obterPerfil() {
   const token = obterToken()
   if (!token) return null
-
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    if (payload.exp * 1000 < Date.now()) {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    if (payload.exp * 1000 < Date.now() || !USUARIOS_PERMITIDOS.includes((payload.email || '').toLowerCase())) {
       sessionStorage.removeItem('token')
-      localStorage.removeItem('token_deposito')
       return null
     }
     return payload
@@ -19,28 +26,18 @@ export function obterPerfil() {
   }
 }
 
-export function exigirPapel(papeisPermitidos) {
+export function exigirPapel() {
   const perfil = obterPerfil()
-
   if (!perfil) {
     window.location.href = '/index.html'
     return null
   }
-
-  if (papeisPermitidos !== 'todos' && !papeisPermitidos.includes(perfil.papel)) {
-    window.location.href = '/index.html'
-    return null
-  }
-
   return perfil
 }
 
-export function salvarToken(token, papel) {
-  if (papel === 'deposito') {
-    localStorage.setItem('token_deposito', token)
-  } else {
-    sessionStorage.setItem('token', token)
-  }
+export function salvarToken(token) {
+  localStorage.removeItem('token_deposito')
+  sessionStorage.setItem('token', token)
 }
 
 export function sair() {

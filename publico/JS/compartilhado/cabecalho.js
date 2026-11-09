@@ -3,15 +3,6 @@ import { api } from '/JS/compartilhado/api.js'
 import { iniciarAvisos } from '/JS/compartilhado/avisos.js'
 import { iniciarRecolhiveis } from '/JS/compartilhado/secoes-recolhiveis.js'
 
-const EMAILS_TAREFAS = [
-  'export@pietrobon.com.br',
-  'export2@pietrobon.com.br',
-  'joaoantonio@pietrobon.com.br',
-  'export3@pietrobon.com.br'
-]
-
-const EMAILS_FINANCEIRO = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'joaoantonio@pietrobon.com.br']
-
 async function carregarBadgesPendencias() {
   try {
     const pendencias = await api.pendencias()
@@ -28,13 +19,7 @@ async function carregarBadgesPendencias() {
       link.appendChild(badge)
     }
 
-    adicionarBadge('/HTML/estoque/almoxarifado.html', pendencias.estoqueNaoDeclarado, 'bg-warning text-dark')
-    adicionarBadge('/HTML/estoque/embarques.html', pendencias.embarquesPendentes, 'bg-secondary')
-    adicionarBadge(
-      '/HTML/estoque/compras.html',
-      (pendencias.pedidosCompra || 0) + (pendencias.comprasAtrasadas || 0),
-      'bg-danger'
-    )
+    adicionarBadge('/HTML/financeiro/importacoes.html', pendencias.importacoesVencidas, 'bg-danger')
     adicionarBadge('/HTML/tarefas/tarefas.html', pendencias.tarefasPendentes, 'bg-primary')
   } catch (_) {}
 }
@@ -56,7 +41,7 @@ async function registrarNotificacaoPush() {
       applicationServerKey: chaveVapid
     })
 
-    const token = sessionStorage.getItem('token') || localStorage.getItem('token_deposito')
+    const token = sessionStorage.getItem('token')
     await fetch('/api/push/subscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -86,52 +71,30 @@ async function atualizarBotaoNotificacao(btn) {
   btn.style.opacity = '1'
 }
 
-export function montarCabecalho(papel) {
+export function montarCabecalho() {
   iniciarAvisos()
 
   const paginaAtual = document.body.dataset.pagina
-  const perfil = obterPerfil()
-  const emailAtual = perfil ? (perfil.email || '').toLowerCase() : ''
-  const temAcessoFinanceiro = EMAILS_FINANCEIRO.includes(emailAtual)
-  const temAcessoTarefas = EMAILS_TAREFAS.includes(emailAtual)
-  const temAcessoChecklist = [
-    'export2@pietrobon.com.br',
-    'export@pietrobon.com.br',
-    'export3@pietrobon.com.br'
-  ].includes(emailAtual)
+  obterPerfil()
 
   const secoes = [
     {
-      titulo: 'Produção',
-      itens: [
-        { href: '/HTML/producao/visao-geral.html', texto: 'Visão Geral das PIs' },
-        { href: '/HTML/producao/cadastro.html', texto: 'Cadastrar PI' },
-        { href: '/HTML/producao/checklist.html', texto: 'Check-list de Expedição', quando: temAcessoChecklist }
-      ]
-    },
-    {
-      titulo: 'Estoque e Compras',
-      itens: [
-        { href: '/HTML/estoque/almoxarifado.html', texto: 'Almoxarifado' },
-        { href: '/HTML/estoque/recebimento.html', texto: 'Recebimentos' },
-        { href: '/HTML/estoque/rendimentos.html', texto: 'Rendimentos' },
-        { href: '/HTML/estoque/embarques.html', texto: 'Embarques' },
-        { href: '/HTML/estoque/compras.html', texto: 'Compras' }
-      ]
-    },
-    {
       titulo: 'Financeiro',
-      quando: temAcessoFinanceiro,
       itens: [
-        { href: '/HTML/financeiro/mensal-contabil.html', texto: 'Mensal Contabil' },
-        { href: '/HTML/financeiro/fechamento-contabil.html', texto: 'Fechamento Contabil' },
-        { href: '/HTML/financeiro/importacoes.html', texto: 'Importações' }
+        { href: '/HTML/financeiro/painel.html', texto: 'Painel financeiro' },
+        { href: '/HTML/financeiro/importacoes.html', texto: 'Importações e câmbio' },
+        { href: '/HTML/financeiro/mensal-contabil.html', texto: 'Faturamento (NF-e)' },
+        { href: '/HTML/financeiro/fechamento-contabil.html', texto: 'Fechamento contábil' },
+        { href: '/HTML/financeiro/cadastros.html', texto: 'Clientes e fornecedores' }
       ]
     },
     {
-      titulo: 'Tarefas Exportação',
-      quando: temAcessoTarefas,
-      itens: [{ href: '/HTML/tarefas/tarefas.html', texto: 'Quadro de Tarefas' }]
+      titulo: 'Exportação',
+      itens: [
+        { href: '/HTML/producao/checklist.html', texto: 'Check-list de expedição' },
+        { href: '/HTML/tarefas/tarefas.html', texto: 'Quadro de tarefas' },
+        { href: '/HTML/estoque/rendimentos.html', texto: 'Rendimentos' }
+      ]
     }
   ]
 
@@ -163,7 +126,7 @@ export function montarCabecalho(papel) {
   nav.className = 'navbar navbar-pietrobon sticky-top'
   nav.innerHTML = `
     <div class="container-fluid px-3">
-      <a class="navbar-brand d-flex align-items-center gap-2" href="/HTML/producao/visao-geral.html">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="/HTML/financeiro/painel.html">
         <img src="/logo.png" alt="Hub de Exportações Pietrobon" style="height:36px;object-fit:contain;">
       </a>
       <div class="d-flex align-items-center gap-2 ms-auto">

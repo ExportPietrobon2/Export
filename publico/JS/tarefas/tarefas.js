@@ -31,7 +31,7 @@ let modalBS = null
 let emailAtual = ''
 
 async function requisitar(metodo, rota, corpo) {
-  const token = sessionStorage.getItem('token') || localStorage.getItem('token_deposito')
+  const token = sessionStorage.getItem('token')
   const opts = { method: metodo, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } }
   if (corpo) opts.body = JSON.stringify(corpo)
   try {
@@ -291,13 +291,8 @@ window.excluirTarefa = async function (id) {
 async function iniciar() {
   const perfil = exigirPapel('todos')
   if (!perfil) return
-  if (!EMAILS_TAREFAS.includes((perfil.email || '').toLowerCase())) {
-    document.body.innerHTML =
-      '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:Inter,sans-serif;color:#64748b;">Acesso restrito.</div>'
-    return
-  }
   emailAtual = (perfil.email || '').toLowerCase()
-  montarCabecalho(perfil.papel)
+  montarCabecalho()
   document.getElementById('modal-tarefa').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') salvarTarefa()
   })

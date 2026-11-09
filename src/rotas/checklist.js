@@ -1,6 +1,6 @@
 const express = require('express')
 const { banco, emTransacao } = require('../config/banco')
-const { autenticarChecklist } = require('../middlewares/autenticacao')
+const { autenticar } = require('../middlewares/autenticacao')
 
 const rotas = express.Router()
 
@@ -61,14 +61,14 @@ async function salvarItens(conexao, checklistId, itens) {
   }
 }
 
-rotas.get('/api/checklist', autenticarChecklist(), async (req, res) => {
+rotas.get('/api/checklist', autenticar(), async (req, res) => {
   const [rows] = await banco.query(
     'SELECT id, fatura, pedido, cliente_nome, data_emb, destino, criado_em FROM checklist_exp ORDER BY id DESC LIMIT 300'
   )
   res.json(rows)
 })
 
-rotas.get('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
+rotas.get('/api/checklist/:id', autenticar(), async (req, res) => {
   const [[cab]] = await banco.query('SELECT * FROM checklist_exp WHERE id = ?', [req.params.id])
   if (!cab) return res.status(404).json({ erro: 'Não encontrado.' })
   const [itens] = await banco.query('SELECT * FROM checklist_exp_itens WHERE checklist_id = ? ORDER BY ordem, id', [
@@ -77,7 +77,7 @@ rotas.get('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
   res.json({ ...cab, itens })
 })
 
-rotas.post('/api/checklist', autenticarChecklist(), async (req, res) => {
+rotas.post('/api/checklist', autenticar(), async (req, res) => {
   const b = req.body
   const vals = CAMPOS_CHECKLIST.map((c) => (b[c] === '' || b[c] === undefined ? null : b[c]))
   vals.push(req.usuario.nome || null)
@@ -92,7 +92,7 @@ rotas.post('/api/checklist', autenticarChecklist(), async (req, res) => {
   res.json({ id })
 })
 
-rotas.put('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
+rotas.put('/api/checklist/:id', autenticar(), async (req, res) => {
   const b = req.body
   const sets = CAMPOS_CHECKLIST.map((c) => `${c} = ?`)
   const vals = CAMPOS_CHECKLIST.map((c) => (b[c] === '' || b[c] === undefined ? null : b[c]))
@@ -104,7 +104,7 @@ rotas.put('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
   res.json({ ok: true })
 })
 
-rotas.delete('/api/checklist/:id', autenticarChecklist(), async (req, res) => {
+rotas.delete('/api/checklist/:id', autenticar(), async (req, res) => {
   await emTransacao(async (conexao) => {
     await conexao.query('DELETE FROM checklist_exp_itens WHERE checklist_id = ?', [req.params.id])
     await conexao.query('DELETE FROM checklist_exp WHERE id = ?', [req.params.id])

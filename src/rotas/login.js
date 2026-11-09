@@ -2,24 +2,25 @@ const express = require('express')
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const { banco } = require('../config/banco')
-const { CHAVE_JWT } = require('../middlewares/autenticacao')
+const { CHAVE_JWT, emailPermitido } = require('../middlewares/autenticacao')
 
 const rotas = express.Router()
 
 rotas.post('/api/login', async (req, res) => {
-  const { email, senha } = req.body
-  const [rows] = await banco.query('SELECT * FROM usuarios WHERE email = ?', [email])
-  if (rows.length === 0) return res.status(401).json({ erro: 'E-mail ou senha incorretos.' })
+  const email = String((req.body && req.body.email) || '')
+    .trim()
+    .toLowerCase()
+  const senha = String((req.body && req.body.senha) || '')
+  const negado = () => res.status(401).json({ erro: 'E-mail ou senha incorretos.' })
+  if (!emailPermitido(email)) return negado()
+  const [rows] = await banco.query('SELECT * FROM usuarios WHERE LOWER(email) = ?', [email])
+  if (!rows.length) return negado()
   const usuario = rows[0]
-  const senhaCorreta = await bcrypt.compare(senha, usuario.senha)
-  if (!senhaCorreta) return res.status(401).json({ erro: 'E-mail ou senha incorretos.' })
-  const expiracao = '30d'
-  const token = jwt.sign(
-    { id: usuario.id, nome: usuario.nome, papel: usuario.papel, email: usuario.email },
-    CHAVE_JWT,
-    { expiresIn: expiracao }
-  )
-  res.json({ token, papel: usuario.papel, nome: usuario.nome })
+  if (!(await bcrypt.compare(senha, usuario.senha))) return negado()
+  const token = jwt.sign({ id: usuario.id, nome: usuario.nome, papel: 'admin', email }, CHAVE_JWT, {
+    expiresIn: '30d'
+  })
+  res.json({ token, papel: 'admin', nome: usuario.nome })
 })
 
 module.exports = rotas

@@ -1,70 +1,28 @@
 const express = require('express')
 const { banco, emTransacao } = require('../config/banco')
-const { autenticarContabil } = require('../middlewares/autenticacao')
-const { enviarResumoSemanalImportacao, importacoesComputadas } = require('../servicos/resumo-importacoes')
+const { autenticar } = require('../middlewares/autenticacao')
+const { enviarResumoSemanalImportacao } = require('../servicos/resumo-importacoes')
+const { importacoesComputadas } = require('../servicos/financeiro')
 
 const rotas = express.Router()
 
-async function migrarFinanceiro() {
-  try {
-    const [cols] = await banco.query("SHOW COLUMNS FROM fin_pagamentos LIKE 'contrato_id'")
-    if (!cols.length) {
-      await banco.query('ALTER TABLE fin_pagamentos ADD COLUMN contrato_id INT NULL')
-      console.log('fin_pagamentos.contrato_id adicionado.')
-    }
-    const [[flag]] = await banco.query("SELECT chave FROM notif_log WHERE chave = 'backfill_pag_usd'")
-    if (!flag) {
-      await banco.query('CREATE TABLE IF NOT EXISTS notif_log (chave VARCHAR(60) PRIMARY KEY, ultima_data DATE)')
-      const [r] = await banco.query(`
-        UPDATE fin_pagamentos p JOIN fin_importacoes i ON i.id = p.importacao_id
-        SET p.valor_moeda = ROUND(p.valor_reais / i.taxa_cambio, 2)
-        WHERE (p.valor_moeda IS NULL OR p.valor_moeda = 0) AND i.taxa_cambio > 0 AND p.valor_reais > 0`)
-      await banco.query(
-        "INSERT INTO notif_log (chave, ultima_data) VALUES ('backfill_pag_usd', CURDATE()) ON DUPLICATE KEY UPDATE ultima_data = CURDATE()"
-      )
-      console.log('Backfill USD dos pagamentos:', r.affectedRows, 'linhas.')
-    }
-    try {
-      const [uc] = await banco.query("SHOW COLUMNS FROM fin_custos LIKE 'unidade'")
-      if (!uc.length) await banco.query("ALTER TABLE fin_custos ADD COLUMN unidade VARCHAR(4) DEFAULT 'KG'")
-      const [pc] = await banco.query("SHOW COLUMNS FROM fin_custos LIKE 'produto'")
-      if (!pc.length) await banco.query('ALTER TABLE fin_custos ADD COLUMN produto VARCHAR(200)')
-    } catch (e) {}
-  } catch (e) {
-    console.error('Erro migração financeiro:', e.message)
-  }
-}
+const vazioParaNulo = (v) => (v === '' || v === undefined ? null : v)
+const numero = (v) => parseFloat(String(v ?? '').replace(',', '.')) || 0
 
-setTimeout(migrarFinanceiro, 7000)
-
-rotas.post('/api/fin/resumo-semanal/enviar', autenticarContabil(), async (req, res) => {
+rotas.post('/api/fin/resumo-semanal/enviar', autenticar(), async (req, res) => {
   await enviarResumoSemanalImportacao(true)
   res.json({ ok: true })
 })
 
-rotas.get('/api/fin/resumo', autenticarContabil(), async (req, res) => {
+rotas.get('/api/fin/resumo', autenticar(), async (req, res) => {
   const imps = await importacoesComputadas()
-  const totalImportado = imps.reduce((s, i) => s + (Number(i.valor_reais) || 0), 0)
-  const totalPago = imps.reduce((s, i) => s + i.pago, 0)
-  const cont = { PAGO: 0, PARCIAL: 0, DEVENDO: 0 }
-  const porForn = {}
+  const contagem = { EM_ABERTO: 0, PARCIAL: 0, QUITADA: 0, PAGO_A_MAIOR: 0, VENCIDA: 0, VENCE_EM_BREVE: 0 }
   imps.forEach((i) => {
-    cont[i.status]++
-    const k = i.fornecedor_nome || '—'
-    if (!porForn[k]) porForn[k] = { fornecedor: k, importado: 0, pago: 0, saldo: 0 }
-    porForn[k].importado += Number(i.valor_reais) || 0
-    porForn[k].pago += i.pago
-    porForn[k].saldo += i.saldo
+    contagem[i.status]++
+    if (i.prazo === 'VENCIDA') contagem.VENCIDA++
+    if (i.prazo === 'VENCE_EM_BREVE') contagem.VENCE_EM_BREVE++
   })
-  res.json({
-    totalImportado,
-    totalPago,
-    saldoDevedor: totalImportado - totalPago,
-    qtd: imps.length,
-    contagem: cont,
-    porFornecedor: Object.values(porForn).sort((a, b) => b.saldo - a.saldo),
-    importacoes: imps
-  })
+  res.json({ contagem, importacoes: imps })
 })
 
 const cachePtax = {}
@@ -74,7 +32,7 @@ function formatarDataBcb(d) {
   return `${m}-${dd}-${y}`
 }
 
-rotas.get('/api/fin/ptax', autenticarContabil(), async (req, res) => {
+rotas.get('/api/fin/ptax', autenticar(), async (req, res) => {
   const data = String(req.query.data || '').slice(0, 10)
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return res.status(400).json({ erro: 'Data inválida.' })
   if (cachePtax[data]) return res.json(cachePtax[data])
@@ -98,50 +56,12 @@ rotas.get('/api/fin/ptax', autenticarContabil(), async (req, res) => {
   }
 })
 
-rotas.get('/api/fin/fornecedores', autenticarContabil(), async (req, res) => {
-  const [rows] = await banco.query('SELECT * FROM fin_fornecedores ORDER BY nome')
-  res.json(rows)
-})
-
-rotas.post('/api/fin/fornecedores', autenticarContabil(), async (req, res) => {
-  const b = req.body
-  if (!(b.nome || '').trim()) return res.status(400).json({ erro: 'Informe o nome.' })
-  await banco.query('INSERT INTO fin_fornecedores (nome, pais, moeda, contato, email, obs) VALUES (?,?,?,?,?,?)', [
-    b.nome.trim(),
-    b.pais || null,
-    b.moeda || 'USD',
-    b.contato || null,
-    b.email || null,
-    b.obs || null
-  ])
-  res.json({ ok: true })
-})
-
-rotas.patch('/api/fin/fornecedores/:id', autenticarContabil(), async (req, res) => {
-  const campos = ['nome', 'pais', 'moeda', 'contato', 'email', 'obs', 'ativo']
-  const sets = [],
-    vals = []
-  for (const c of campos) {
-    if (c in req.body) {
-      sets.push(`${c} = ?`)
-      vals.push(req.body[c] === '' ? null : req.body[c])
-    }
-  }
-  if (!sets.length) return res.json({ ok: true })
-  vals.push(req.params.id)
-  await banco.query(`UPDATE fin_fornecedores SET ${sets.join(', ')} WHERE id = ?`, vals)
-  res.json({ ok: true })
-})
-
-rotas.delete('/api/fin/fornecedores/:id', autenticarContabil(), async (req, res) => {
-  await banco.query('DELETE FROM fin_fornecedores WHERE id = ?', [req.params.id])
-  res.json({ ok: true })
-})
-
 const CAMPOS_IMPORTACAO = [
   'fornecedor_id',
   'invoice',
   'data_invoice',
+  'data_vencimento',
+  'data_chegada',
   'mercadoria',
   'moeda',
   'valor_moeda',
@@ -150,57 +70,66 @@ const CAMPOS_IMPORTACAO = [
   'obs'
 ]
 
-function calcularValorReais(b) {
-  return (parseFloat(b.valor_moeda) || 0) * (parseFloat(b.taxa_cambio) || 0)
+function valoresImportacao(b) {
+  const valorMoeda = numero(b.valor_moeda)
+  const taxa = numero(b.taxa_cambio)
+  return {
+    fornecedor_id: vazioParaNulo(b.fornecedor_id),
+    invoice: String(b.invoice || '').trim(),
+    data_invoice: vazioParaNulo(b.data_invoice),
+    data_vencimento: vazioParaNulo(b.data_vencimento),
+    data_chegada: vazioParaNulo(b.data_chegada),
+    mercadoria: vazioParaNulo(b.mercadoria),
+    moeda: b.moeda || 'USD',
+    valor_moeda: valorMoeda,
+    taxa_cambio: taxa,
+    valor_reais: Math.round(valorMoeda * taxa * 100) / 100,
+    banco: vazioParaNulo(b.banco),
+    obs: vazioParaNulo(b.obs)
+  }
 }
 
-rotas.post('/api/fin/importacoes', autenticarContabil(), async (req, res) => {
-  const b = req.body
-  if (!b.invoice) return res.status(400).json({ erro: 'Informe o Nº do invoice.' })
-  const valorReais = calcularValorReais(b)
+rotas.post('/api/fin/importacoes', autenticar(), async (req, res) => {
+  const v = valoresImportacao(req.body || {})
+  if (!v.invoice) return res.status(400).json({ erro: 'Informe o Nº da invoice.' })
+  if (!(v.valor_moeda > 0)) return res.status(400).json({ erro: 'Informe o valor da invoice.' })
+  const [[dup]] = await banco.query('SELECT id FROM fin_importacoes WHERE invoice = ? AND fornecedor_id <=> ?', [
+    v.invoice,
+    v.fornecedor_id
+  ])
+  if (dup) return res.status(400).json({ erro: 'Já existe uma importação com esta invoice para este fornecedor.' })
+  const colunas = Object.keys(v)
+  const [r] = await banco.query(
+    `INSERT INTO fin_importacoes (${colunas.join(', ')}) VALUES (${colunas.map(() => '?').join(', ')})`,
+    Object.values(v)
+  )
+  res.json({ ok: true, id: r.insertId })
+})
+
+rotas.patch('/api/fin/importacoes/:id', autenticar(), async (req, res) => {
+  const [[atual]] = await banco.query('SELECT * FROM fin_importacoes WHERE id = ?', [req.params.id])
+  if (!atual) return res.status(404).json({ erro: 'Importação não encontrada.' })
+  const mesclado = { ...atual }
+  for (const c of CAMPOS_IMPORTACAO) if (c in req.body) mesclado[c] = req.body[c]
+  const v = valoresImportacao(mesclado)
+  if (!v.invoice) return res.status(400).json({ erro: 'Informe o Nº da invoice.' })
   await banco.query(
-    `INSERT INTO fin_importacoes (fornecedor_id, invoice, data_invoice, mercadoria, moeda, valor_moeda, taxa_cambio, valor_reais, banco, obs)
-     VALUES (?,?,?,?,?,?,?,?,?,?)`,
-    [
-      b.fornecedor_id || null,
-      b.invoice,
-      b.data_invoice || null,
-      b.mercadoria || null,
-      b.moeda || 'USD',
-      parseFloat(b.valor_moeda) || 0,
-      parseFloat(b.taxa_cambio) || 0,
-      valorReais,
-      b.banco || null,
-      b.obs || null
-    ]
+    `UPDATE fin_importacoes SET ${Object.keys(v)
+      .map((c) => `${c} = ?`)
+      .join(', ')} WHERE id = ?`,
+    [...Object.values(v), req.params.id]
   )
   res.json({ ok: true })
 })
 
-rotas.patch('/api/fin/importacoes/:id', autenticarContabil(), async (req, res) => {
-  const sets = [],
-    vals = []
-  for (const c of CAMPOS_IMPORTACAO) {
-    if (c in req.body) {
-      let v = req.body[c]
-      if (v === '') v = null
-      if (c === 'valor_moeda' || c === 'taxa_cambio') v = parseFloat(v) || 0
-      sets.push(`${c} = ?`)
-      vals.push(v)
-    }
-  }
-  if ('valor_moeda' in req.body || 'taxa_cambio' in req.body) {
-    sets.push('valor_reais = ?')
-    vals.push(calcularValorReais(req.body))
-  }
-  if (!sets.length) return res.json({ ok: true })
-  vals.push(req.params.id)
-  await banco.query(`UPDATE fin_importacoes SET ${sets.join(', ')} WHERE id = ?`, vals)
-  res.json({ ok: true })
-})
-
-rotas.delete('/api/fin/importacoes/:id', autenticarContabil(), async (req, res) => {
+rotas.delete('/api/fin/importacoes/:id', autenticar(), async (req, res) => {
   await emTransacao(async (conexao) => {
+    const [custos] = await conexao.query('SELECT id FROM fin_custos WHERE importacao_id = ?', [req.params.id])
+    for (const c of custos) {
+      await conexao.query('DELETE FROM fin_custo_despesas WHERE custo_id = ?', [c.id])
+      await conexao.query('DELETE FROM fin_custo_st WHERE custo_id = ?', [c.id])
+    }
+    await conexao.query('DELETE FROM fin_custos WHERE importacao_id = ?', [req.params.id])
     await conexao.query('DELETE FROM fin_pagamentos WHERE importacao_id = ?', [req.params.id])
     await conexao.query('DELETE FROM fin_contratos WHERE importacao_id = ?', [req.params.id])
     await conexao.query('DELETE FROM fin_importacoes WHERE id = ?', [req.params.id])
@@ -208,42 +137,63 @@ rotas.delete('/api/fin/importacoes/:id', autenticarContabil(), async (req, res) 
   res.json({ ok: true })
 })
 
-rotas.get('/api/fin/pagamentos', autenticarContabil(), async (req, res) => {
-  const [rows] = await banco.query('SELECT * FROM fin_pagamentos WHERE importacao_id = ? ORDER BY data_pgto, id', [
-    parseInt(req.query.importacaoId) || 0
-  ])
+rotas.get('/api/fin/pagamentos', autenticar(), async (req, res) => {
+  const [rows] = await banco.query(
+    `SELECT p.*, c.num_contrato FROM fin_pagamentos p LEFT JOIN fin_contratos c ON c.id = p.contrato_id
+     WHERE p.importacao_id = ? ORDER BY p.data_pgto, p.id`,
+    [parseInt(req.query.importacaoId) || 0]
+  )
   res.json(rows)
 })
 
-rotas.post('/api/fin/pagamentos', autenticarContabil(), async (req, res) => {
-  const b = req.body
-  if (!b.importacao_id || !(parseFloat(b.valor_reais) >= 0)) return res.status(400).json({ erro: 'Dados inválidos.' })
+function valoresPagamento(b) {
+  return {
+    data_pgto: vazioParaNulo(b.data_pgto),
+    valor_reais: numero(b.valor_reais),
+    valor_moeda: numero(b.valor_moeda),
+    forma: vazioParaNulo(b.forma),
+    obs: vazioParaNulo(b.obs),
+    contrato_id: vazioParaNulo(b.contrato_id),
+    entra_fechamento: b.entra_fechamento === undefined ? 1 : b.entra_fechamento ? 1 : 0
+  }
+}
+
+rotas.post('/api/fin/pagamentos', autenticar(), async (req, res) => {
+  const b = req.body || {}
+  const v = valoresPagamento(b)
+  if (!b.importacao_id) return res.status(400).json({ erro: 'Importação não informada.' })
+  if (!v.data_pgto) return res.status(400).json({ erro: 'Informe a data do pagamento.' })
+  if (!(v.valor_moeda > 0) && !(v.valor_reais > 0)) return res.status(400).json({ erro: 'Informe o valor pago.' })
   await banco.query(
-    'INSERT INTO fin_pagamentos (importacao_id, data_pgto, valor_reais, valor_moeda, forma, obs, contrato_id) VALUES (?,?,?,?,?,?,?)',
-    [
-      b.importacao_id,
-      b.data_pgto || null,
-      parseFloat(b.valor_reais) || 0,
-      parseFloat(b.valor_moeda) || 0,
-      b.forma || null,
-      b.obs || null,
-      b.contrato_id || null
-    ]
+    'INSERT INTO fin_pagamentos (importacao_id, data_pgto, valor_reais, valor_moeda, forma, obs, contrato_id, entra_fechamento) VALUES (?,?,?,?,?,?,?,?)',
+    [b.importacao_id, v.data_pgto, v.valor_reais, v.valor_moeda, v.forma, v.obs, v.contrato_id, v.entra_fechamento]
   )
   res.json({ ok: true })
 })
 
-rotas.patch('/api/fin/pagamentos/:id', autenticarContabil(), async (req, res) => {
-  const campos = ['data_pgto', 'valor_reais', 'valor_moeda', 'forma', 'obs', 'contrato_id']
-  const sets = [],
-    vals = []
-  for (const c of campos) {
+async function pagamentoDoContrato(id) {
+  const [[p]] = await banco.query('SELECT origem FROM fin_pagamentos WHERE id = ?', [id])
+  return p && p.origem === 'contrato'
+}
+
+rotas.patch('/api/fin/pagamentos/:id', autenticar(), async (req, res) => {
+  if (await pagamentoDoContrato(req.params.id)) {
+    if (Object.keys(req.body || {}).length === 1 && 'entra_fechamento' in req.body) {
+      await banco.query('UPDATE fin_pagamentos SET entra_fechamento = ? WHERE id = ?', [
+        req.body.entra_fechamento ? 1 : 0,
+        req.params.id
+      ])
+      return res.json({ ok: true })
+    }
+    return res.status(400).json({ erro: 'Este pagamento foi gerado pelo contrato de câmbio. Altere o contrato.' })
+  }
+  const sets = []
+  const vals = []
+  const v = valoresPagamento({ ...req.body, entra_fechamento: req.body.entra_fechamento ?? 1 })
+  for (const c of Object.keys(v)) {
     if (c in req.body) {
-      let v = req.body[c]
-      if (v === '') v = null
-      if (c === 'valor_reais' || c === 'valor_moeda') v = parseFloat(v) || 0
       sets.push(`${c} = ?`)
-      vals.push(v)
+      vals.push(v[c])
     }
   }
   if (!sets.length) return res.json({ ok: true })
@@ -252,84 +202,129 @@ rotas.patch('/api/fin/pagamentos/:id', autenticarContabil(), async (req, res) =>
   res.json({ ok: true })
 })
 
-rotas.delete('/api/fin/pagamentos/:id', autenticarContabil(), async (req, res) => {
+rotas.delete('/api/fin/pagamentos/:id', autenticar(), async (req, res) => {
+  if (await pagamentoDoContrato(req.params.id)) {
+    return res
+      .status(400)
+      .json({ erro: 'Este pagamento foi gerado pelo contrato de câmbio. Desmarque "liquidado" no contrato.' })
+  }
   await banco.query('DELETE FROM fin_pagamentos WHERE id = ?', [req.params.id])
   res.json({ ok: true })
 })
 
-rotas.get('/api/fin/contratos', autenticarContabil(), async (req, res) => {
+async function sincronizarPagamentoDoContrato(conexao, contratoId, podeCriar) {
+  const [[c]] = await conexao.query('SELECT * FROM fin_contratos WHERE id = ?', [contratoId])
+  const [[auto]] = await conexao.query("SELECT id FROM fin_pagamentos WHERE contrato_id = ? AND origem = 'contrato'", [
+    contratoId
+  ])
+  const deveExistir = c && c.liquidado && c.importacao_id
+  if (!deveExistir) {
+    if (auto) await conexao.query('DELETE FROM fin_pagamentos WHERE id = ?', [auto.id])
+    return null
+  }
+  const [[manual]] = await conexao.query(
+    "SELECT id FROM fin_pagamentos WHERE contrato_id = ? AND (origem IS NULL OR origem <> 'contrato')",
+    [contratoId]
+  )
+  if (manual) {
+    if (auto) await conexao.query('DELETE FROM fin_pagamentos WHERE id = ?', [auto.id])
+    return 'manual'
+  }
+  const valores = [
+    c.importacao_id,
+    c.data_liquidacao || c.data_fechamento || new Date(),
+    Number(c.valor_reais) || 0,
+    Number(c.valor_moeda) || 0,
+    'Contrato de câmbio',
+    `Contrato Nº ${c.num_contrato}`
+  ]
+  if (!auto && !podeCriar) return null
+  if (auto) {
+    await conexao.query(
+      'UPDATE fin_pagamentos SET importacao_id = ?, data_pgto = ?, valor_reais = ?, valor_moeda = ?, forma = ?, obs = ? WHERE id = ?',
+      [...valores, auto.id]
+    )
+  } else {
+    await conexao.query(
+      "INSERT INTO fin_pagamentos (importacao_id, data_pgto, valor_reais, valor_moeda, forma, obs, contrato_id, origem, entra_fechamento) VALUES (?,?,?,?,?,?,?,'contrato',1)",
+      [...valores, contratoId]
+    )
+  }
+  return 'automatico'
+}
+
+rotas.get('/api/fin/contratos', autenticar(), async (req, res) => {
   const cond = req.query.importacaoId ? 'WHERE c.importacao_id = ?' : ''
   const args = req.query.importacaoId ? [parseInt(req.query.importacaoId)] : []
   const [rows] = await banco.query(
-    `
-    SELECT c.*, i.invoice FROM fin_contratos c LEFT JOIN fin_importacoes i ON i.id = c.importacao_id
-    ${cond} ORDER BY c.data_fechamento DESC, c.id DESC`,
+    `SELECT c.*, i.invoice, f.nome AS fornecedor_nome,
+       (SELECT COUNT(*) FROM fin_pagamentos p WHERE p.contrato_id = c.id) AS qtd_pagamentos
+     FROM fin_contratos c
+     LEFT JOIN fin_importacoes i ON i.id = c.importacao_id
+     LEFT JOIN fin_fornecedores f ON f.id = i.fornecedor_id
+     ${cond} ORDER BY c.liquidado ASC, c.data_fechamento DESC, c.id DESC`,
     args
   )
   res.json(rows)
 })
 
-rotas.post('/api/fin/contratos', autenticarContabil(), async (req, res) => {
-  const b = req.body
-  if (!b.num_contrato) return res.status(400).json({ erro: 'Informe o Nº do contrato.' })
-  await banco.query(
-    `INSERT INTO fin_contratos (num_contrato, banco, data_fechamento, moeda, valor_moeda, taxa, valor_reais, importacao_id, liquidado, data_liquidacao, obs)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-    [
-      b.num_contrato,
-      b.banco || null,
-      b.data_fechamento || null,
-      b.moeda || 'USD',
-      parseFloat(b.valor_moeda) || 0,
-      parseFloat(b.taxa) || 0,
-      (parseFloat(b.valor_moeda) || 0) * (parseFloat(b.taxa) || 0),
-      b.importacao_id || null,
-      b.liquidado ? 1 : 0,
-      b.data_liquidacao || null,
-      b.obs || null
-    ]
-  )
-  res.json({ ok: true })
+function valoresContrato(b) {
+  const valorMoeda = numero(b.valor_moeda)
+  const taxa = numero(b.taxa)
+  return {
+    num_contrato: String(b.num_contrato || '').trim(),
+    banco: vazioParaNulo(b.banco),
+    data_fechamento: vazioParaNulo(b.data_fechamento),
+    moeda: b.moeda || 'USD',
+    valor_moeda: valorMoeda,
+    taxa,
+    valor_reais: Math.round(valorMoeda * taxa * 100) / 100,
+    importacao_id: vazioParaNulo(b.importacao_id),
+    liquidado: b.liquidado ? 1 : 0,
+    data_liquidacao: vazioParaNulo(b.data_liquidacao),
+    obs: vazioParaNulo(b.obs)
+  }
+}
+
+rotas.post('/api/fin/contratos', autenticar(), async (req, res) => {
+  const v = valoresContrato(req.body || {})
+  if (!v.num_contrato) return res.status(400).json({ erro: 'Informe o Nº do contrato.' })
+  if (v.liquidado && !v.data_liquidacao) v.data_liquidacao = v.data_fechamento
+  const resultado = await emTransacao(async (conexao) => {
+    const colunas = Object.keys(v)
+    const [r] = await conexao.query(
+      `INSERT INTO fin_contratos (${colunas.join(', ')}) VALUES (${colunas.map(() => '?').join(', ')})`,
+      Object.values(v)
+    )
+    return sincronizarPagamentoDoContrato(conexao, r.insertId, true)
+  })
+  res.json({ ok: true, pagamento: resultado })
 })
 
-rotas.patch('/api/fin/contratos/:id', autenticarContabil(), async (req, res) => {
-  const b = req.body
-  const campos = [
-    'num_contrato',
-    'banco',
-    'data_fechamento',
-    'moeda',
-    'valor_moeda',
-    'taxa',
-    'importacao_id',
-    'liquidado',
-    'data_liquidacao',
-    'obs'
-  ]
-  const sets = [],
-    vals = []
-  for (const c of campos) {
-    if (c in b) {
-      let v = b[c]
-      if (v === '') v = null
-      if (c === 'valor_moeda' || c === 'taxa') v = parseFloat(v) || 0
-      if (c === 'liquidado') v = b[c] ? 1 : 0
-      sets.push(`${c} = ?`)
-      vals.push(v)
-    }
-  }
-  if ('valor_moeda' in b || 'taxa' in b) {
-    sets.push('valor_reais = ?')
-    vals.push((parseFloat(b.valor_moeda) || 0) * (parseFloat(b.taxa) || 0))
-  }
-  if (!sets.length) return res.json({ ok: true })
-  vals.push(req.params.id)
-  await banco.query(`UPDATE fin_contratos SET ${sets.join(', ')} WHERE id = ?`, vals)
-  res.json({ ok: true })
+rotas.patch('/api/fin/contratos/:id', autenticar(), async (req, res) => {
+  const [[atual]] = await banco.query('SELECT * FROM fin_contratos WHERE id = ?', [req.params.id])
+  if (!atual) return res.status(404).json({ erro: 'Contrato não encontrado.' })
+  const v = valoresContrato({ ...atual, ...req.body })
+  if (!v.num_contrato) return res.status(400).json({ erro: 'Informe o Nº do contrato.' })
+  if (v.liquidado && !v.data_liquidacao) v.data_liquidacao = v.data_fechamento
+  const resultado = await emTransacao(async (conexao) => {
+    await conexao.query(
+      `UPDATE fin_contratos SET ${Object.keys(v)
+        .map((c) => `${c} = ?`)
+        .join(', ')} WHERE id = ?`,
+      [...Object.values(v), req.params.id]
+    )
+    return sincronizarPagamentoDoContrato(conexao, req.params.id, !atual.liquidado)
+  })
+  res.json({ ok: true, pagamento: resultado })
 })
 
-rotas.delete('/api/fin/contratos/:id', autenticarContabil(), async (req, res) => {
-  await banco.query('DELETE FROM fin_contratos WHERE id = ?', [req.params.id])
+rotas.delete('/api/fin/contratos/:id', autenticar(), async (req, res) => {
+  await emTransacao(async (conexao) => {
+    await conexao.query("DELETE FROM fin_pagamentos WHERE contrato_id = ? AND origem = 'contrato'", [req.params.id])
+    await conexao.query('UPDATE fin_pagamentos SET contrato_id = NULL WHERE contrato_id = ?', [req.params.id])
+    await conexao.query('DELETE FROM fin_contratos WHERE id = ?', [req.params.id])
+  })
   res.json({ ok: true })
 })
 

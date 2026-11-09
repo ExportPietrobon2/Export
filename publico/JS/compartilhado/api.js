@@ -1,7 +1,7 @@
 const URL_BASE = ''
 
 function obterToken() {
-  return sessionStorage.getItem('token') || localStorage.getItem('token_deposito')
+  return sessionStorage.getItem('token')
 }
 
 async function requisitar(metodo, rota, corpo, formData) {
@@ -55,87 +55,20 @@ export const api = {
 
   pendencias: () => requisitar('GET', '/api/pendencias'),
 
-  pedidos: {
-    listar: (incluirConcluidas = false) => requisitar('GET', `/api/pedidos?incluirConcluidas=${incluirConcluidas}`),
-    completo: (incluirConcluidas = false) =>
-      requisitar('GET', `/api/pedidos/completo?incluirConcluidas=${incluirConcluidas}`),
-    criar: (dados) => requisitar('POST', '/api/pedidos', dados),
-    concluir: (id, concluida) => requisitar('PATCH', `/api/pedidos/${id}/concluir`, { concluida }),
-    editarEmbarque: (id, dataEmbarque) =>
-      requisitar('PATCH', `/api/pedidos/${id}/embarque`, { data_embarque: dataEmbarque }),
-    comentarioEmbarque: (id, comentario) =>
-      requisitar('PATCH', `/api/pedidos/${id}/comentario-embarque`, { comentario }),
-    excluir: (id) => requisitar('DELETE', `/api/pedidos/${id}`)
-  },
-
-  produtos: {
-    listar: (piId) => requisitar('GET', `/api/pedidos/${piId}/produtos`),
-    criar: (dados) => requisitar('POST', '/api/produtos', dados),
-    editarQuantidade: (id, quantidade) => requisitar('PATCH', `/api/produtos/${id}/quantidade`, { quantidade }),
-    insumos: (produtoId) => requisitar('GET', `/api/produtos/${produtoId}/insumos`),
-    salvarInsumos: (produtoId, dados) => requisitar('PATCH', `/api/produtos/${produtoId}/insumos`, dados)
-  },
-
-  recebimentos: {
-    pendentes: () => requisitar('GET', '/api/recebimentos/pendentes'),
-    registrar: (id, quantidadeRecebida, fotoProduto, fotoNota) => {
-      const formData = new FormData()
-      formData.append('quantidade_recebida', quantidadeRecebida)
-      if (fotoProduto) formData.append('foto_produto', fotoProduto)
-      if (fotoNota) formData.append('foto_nota', fotoNota)
-      return requisitar('PATCH', `/api/recebimentos/${id}`, null, formData)
-    }
-  },
-
   usuarios: {
     listar: () => requisitar('GET', '/api/usuarios'),
     criar: (dados) => requisitar('POST', '/api/usuarios', dados),
     excluir: (id) => requisitar('DELETE', `/api/usuarios/${id}`)
   },
 
-  alertas: {
-    declaracaoPendente: () => requisitar('GET', '/api/alertas/declaracao')
-  },
-
-  estoque: {
-    saldo: () => requisitar('GET', '/api/estoque/saldo'),
-    historico: () => requisitar('GET', '/api/estoque/historico'),
-    vinculos: () => requisitar('GET', '/api/estoque/vinculos'),
-    vincular: (dados) => requisitar('POST', '/api/estoque/vincular', dados),
-    editarVinculo: (id, dados) => requisitar('PATCH', `/api/estoque/vinculos/${id}`, dados),
-    excluirVinculo: (id) => requisitar('DELETE', `/api/estoque/vinculos/${id}`),
-    excluirEntrada: (id) => requisitar('DELETE', `/api/estoque/entradas/${id}`),
-    editarProdutoEntrada: (id, produto) => requisitar('PATCH', `/api/estoque/entradas/${id}/produto`, { produto }),
-    editarLocalizacaoEntrada: (id, localizacao) =>
-      requisitar('PATCH', `/api/estoque/entradas/${id}/localizacao`, { localizacao }),
-    registrarEntrada: (produto, embalagemKg, rotuloKg, palletCaixas, fotoProduto, fotoNota, localizacao) => {
-      const formData = new FormData()
-      formData.append('produto', produto)
-      formData.append('localizacao', localizacao || '')
-      formData.append('embalagem_kg', embalagemKg)
-      formData.append('rotulo_kg', rotuloKg)
-      formData.append('pallet_caixas', palletCaixas)
-      if (fotoProduto) formData.append('foto_produto', fotoProduto)
-      if (fotoNota) formData.append('foto_nota', fotoNota)
-      return requisitar('POST', '/api/estoque/entrada', null, formData)
-    }
-  },
-
-  compras: {
-    listar: () => requisitar('GET', '/api/compras'),
-    sugestoes: () => requisitar('GET', '/api/compras/sugestoes'),
-    criar: (dados) => requisitar('POST', '/api/compras', dados),
-    editar: (id, dados) => requisitar('PATCH', `/api/compras/${id}`, dados),
-    receber: (id) => requisitar('PATCH', `/api/compras/${id}/receber`),
-    observacao: (id, observacoes) => requisitar('PATCH', `/api/compras/${id}/observacao`, { observacoes }),
-    excluir: (id) => requisitar('DELETE', `/api/compras/${id}`)
-  },
-
-  demandas: {
-    listar: () => requisitar('GET', '/api/demandas'),
-    criar: (dados) => requisitar('POST', '/api/demandas', dados),
-    responder: (id, status) => requisitar('PATCH', `/api/demandas/${id}/status`, { status }),
-    excluir: (id) => requisitar('DELETE', `/api/demandas/${id}`)
+  cadastros: {
+    clientes: () => requisitar('GET', '/api/cadastros/clientes'),
+    criarCliente: (dados) => requisitar('POST', '/api/cadastros/clientes', dados),
+    editarCliente: (id, dados) => requisitar('PATCH', `/api/cadastros/clientes/${id}`, dados),
+    fornecedores: () => requisitar('GET', '/api/cadastros/fornecedores'),
+    criarFornecedor: (dados) => requisitar('POST', '/api/cadastros/fornecedores', dados),
+    editarFornecedor: (id, dados) => requisitar('PATCH', `/api/cadastros/fornecedores/${id}`, dados),
+    excluirFornecedor: (id) => requisitar('DELETE', `/api/cadastros/fornecedores/${id}`)
   },
 
   contabil: {
@@ -148,11 +81,6 @@ export const api = {
 
   ec: {
     meses: () => requisitar('GET', '/api/ec/meses'),
-    criarMes: (ano, mes) => requisitar('POST', '/api/ec/meses', { ano, mes }),
-    excluirMes: (id) => requisitar('DELETE', `/api/ec/meses/${id}`),
-    entidades: (tipo) => requisitar('GET', `/api/ec/entidades?tipo=${tipo}`),
-    criarEntidade: (dados) => requisitar('POST', '/api/ec/entidades', dados),
-    toggleEntidade: (id, tipo) => requisitar('PATCH', `/api/ec/entidades/${id}`, { tipo }),
     saldos: (modulo, mesId) => requisitar('GET', `/api/ec/saldos?modulo=${modulo}&mesId=${mesId}`),
     lancamentos: (modulo, mesId, entidadeId) =>
       requisitar('GET', `/api/ec/lancamentos?modulo=${modulo}&mesId=${mesId}&entidadeId=${entidadeId}`),
@@ -161,13 +89,10 @@ export const api = {
   },
 
   fin: {
+    painel: () => requisitar('GET', '/api/fin/painel'),
     resumo: () => requisitar('GET', '/api/fin/resumo'),
     ptax: (data) => requisitar('GET', `/api/fin/ptax?data=${data}`),
     enviarResumoSemanal: () => requisitar('POST', '/api/fin/resumo-semanal/enviar'),
-    fornecedores: () => requisitar('GET', '/api/fin/fornecedores'),
-    criarFornecedor: (dados) => requisitar('POST', '/api/fin/fornecedores', dados),
-    editarFornecedor: (id, dados) => requisitar('PATCH', `/api/fin/fornecedores/${id}`, dados),
-    excluirFornecedor: (id) => requisitar('DELETE', `/api/fin/fornecedores/${id}`),
     criarImportacao: (dados) => requisitar('POST', '/api/fin/importacoes', dados),
     editarImportacao: (id, dados) => requisitar('PATCH', `/api/fin/importacoes/${id}`, dados),
     excluirImportacao: (id) => requisitar('DELETE', `/api/fin/importacoes/${id}`),
@@ -185,12 +110,6 @@ export const api = {
     criarCusto: (impId, dados) => requisitar('POST', `/api/fin/custos/${impId}`, dados),
     salvarCusto: (impId, custoId, dados) => requisitar('PUT', `/api/fin/custos/${impId}/${custoId}`, dados),
     excluirCusto: (impId, custoId) => requisitar('DELETE', `/api/fin/custos/${impId}/${custoId}`)
-  },
-
-  catalogoProdutos: {
-    listar: () => requisitar('GET', '/api/catalogo-produtos'),
-    adicionar: (nome) => requisitar('POST', '/api/catalogo-produtos', { nome }),
-    excluir: (id) => requisitar('DELETE', `/api/catalogo-produtos/${id}`)
   },
 
   checklist: {

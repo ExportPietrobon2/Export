@@ -3,7 +3,6 @@ import { exigirPapel } from '/JS/compartilhado/sessao.js'
 import { montarCabecalho } from '/JS/compartilhado/cabecalho.js'
 import { filtroPaisAno, paisDe, anoDe } from '/JS/compartilhado/filtro-pais-ano.js'
 
-const EMAILS_CHECKLIST = ['export2@pietrobon.com.br', 'export@pietrobon.com.br', 'export3@pietrobon.com.br']
 const EXPORTADOR = [
   'PIETROBON & CIA. LTDA.',
   'Rua Osvaldo Cruz, 126',
@@ -301,11 +300,7 @@ function exportarPDF(d) {
 async function iniciar() {
   const perfil = exigirPapel('todos')
   if (!perfil) return
-  if (!EMAILS_CHECKLIST.includes((perfil.email || '').toLowerCase())) {
-    window.location.href = '/HTML/producao/visao-geral.html'
-    return
-  }
-  montarCabecalho(perfil.papel)
+  montarCabecalho()
   verLista()
 }
 
