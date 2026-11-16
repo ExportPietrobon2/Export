@@ -52,6 +52,9 @@ body[data-pagina='importacoes.html'] .page-header-icon::before {
 body[data-pagina='checklist.html'] .page-header-icon::before {
   content: '✅';
 }
+body[data-pagina='lot-code-list.html'] .page-header-icon::before {
+  content: '📦';
+}
 body[data-pagina='ordem-producao.html'] .page-header-icon::before {
   content: '🏭';
 }

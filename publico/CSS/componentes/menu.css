@@ -109,6 +109,9 @@
 #menu-principal a[href$='checklist.html']::before {
   content: '✅';
 }
+#menu-principal a[href$='lot-code-list.html']::before {
+  content: '📦';
+}
 #menu-principal a[href$='ordem-producao.html']::before {
   content: '🏭';
 }
