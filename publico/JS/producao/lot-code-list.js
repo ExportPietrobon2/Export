@@ -16,8 +16,56 @@ const MESES_EN = [
   'NOVEMBER',
   'DECEMBER'
 ]
+const MESES_ES = [
+  'ENERO',
+  'FEBRERO',
+  'MARZO',
+  'ABRIL',
+  'MAYO',
+  'JUNIO',
+  'JULIO',
+  'AGOSTO',
+  'SEPTIEMBRE',
+  'OCTUBRE',
+  'NOVIEMBRE',
+  'DICIEMBRE'
+]
 const UNIDADES = ['CARTONS', 'CANS', 'PACKS']
-const CARGO_ASSINATURA = 'Food Engineer'
+const LINHAS_EM_BRANCO = 4
+const TEXTOS = {
+  EN: {
+    titulo: 'LOT CODE LIST',
+    importador: 'IMPORTER:',
+    invoice: 'INVOICE',
+    descricao: 'DESCRIPTION',
+    lote: 'LOT NUMBER',
+    caixas: 'NUMBER OF BOXES PER BATCH',
+    fabricacao: 'MANUFACTURING DATE',
+    validade: 'BEST BEFORE DATE',
+    total: 'PACKS/CANS',
+    assinado: 'Signed',
+    cargoRotulo: 'Position',
+    data: 'Date',
+    cargo: 'Food Engineer',
+    unidades: { CARTONS: 'CARTONS', CANS: 'CANS', PACKS: 'PACKS' }
+  },
+  ES: {
+    titulo: 'LISTA DE CÓDIGOS DE LOTE',
+    importador: 'IMPORTADOR:',
+    invoice: 'FACTURA',
+    descricao: 'DESCRIPCIÓN',
+    lote: 'NÚMERO DE LOTE',
+    caixas: 'NÚMERO DE CAJAS POR LOTE',
+    fabricacao: 'FECHA DE FABRICACIÓN',
+    validade: 'FECHA DE VENCIMIENTO',
+    total: 'PAQUETES/LATAS',
+    assinado: 'Firmado',
+    cargoRotulo: 'Cargo',
+    data: 'Fecha',
+    cargo: 'Ingeniera de Alimentos',
+    unidades: { CARTONS: 'CAJAS', CANS: 'LATAS', PACKS: 'PAQUETES' }
+  }
+}
 
 let editId = null
 
@@ -52,10 +100,38 @@ function sufixoOrdinal(dia) {
   return 'th'
 }
 
-function dataPorExtenso(iso) {
+function dataPorExtenso(iso, idioma) {
   const [ano, mes, dia] = dISO(iso).split('-').map(Number)
   if (!ano || !mes || !dia) return ''
+  if (idioma === 'ES') return `${dia} DE ${MESES_ES[mes - 1]} DE ${ano}.`
   return `${MESES_EN[mes - 1]}, ${dia}${sufixoOrdinal(dia)}, ${ano}.`
+}
+
+async function baixarWord(id) {
+  let resposta
+  try {
+    resposta = await fetch(`/api/lot-code-list/${id}/word`, {
+      headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` }
+    })
+  } catch (_) {
+    avisar('Erro de conexão ao gerar o Word.')
+    return
+  }
+  if (!resposta.ok) {
+    avisar('Erro ao gerar o Word. Tente novamente.')
+    return
+  }
+  const conteudo = await resposta.blob()
+  const disposicao = resposta.headers.get('Content-Disposition') || ''
+  const encontrado = /filename="([^"]+)"/.exec(disposicao)
+  const endereco = URL.createObjectURL(conteudo)
+  const ancora = document.createElement('a')
+  ancora.href = endereco
+  ancora.download = encontrado ? encontrado[1] : 'Lot_Code_List.docx'
+  document.body.appendChild(ancora)
+  ancora.click()
+  ancora.remove()
+  setTimeout(() => URL.revokeObjectURL(endereco), 10000)
 }
 
 async function verLista() {
@@ -87,6 +163,7 @@ async function verLista() {
         <td style="white-space:nowrap" class="text-end">
           <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="editarLcl(${l.id})">Abrir</button>
           <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="pdfLcl(${l.id})">PDF</button>
+          <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="wordLcl(${l.id})">Word</button>
           <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="excluirLcl(${l.id})">🗑</button>
         </td></tr>`
         )
@@ -112,6 +189,7 @@ window.excluirLcl = async function (id) {
   if (r?.erro) avisar(r.erro)
   verLista()
 }
+window.wordLcl = (id) => baixarWord(id)
 window.pdfLcl = async function (id) {
   const d = await api.lotCode.obter(id)
   if (!d || d.erro) {
@@ -126,7 +204,8 @@ function linhaLoteHtml(l) {
   return `<tr class="lcl-lote">
     <td><input class="form-control form-control-sm lt-lote" maxlength="80" value="${esc(l.lote || '')}" style="min-width:90px"></td>
     <td><input class="form-control form-control-sm lt-caixas" inputmode="numeric" maxlength="9" value="${l.caixas ? esc(l.caixas) : ''}" style="min-width:90px"></td>
-    <td><input type="date" min="2000-01-01" max="2100-12-31" class="form-control form-control-sm lt-validade" value="${esc(dISO(l.validade))}" style="min-width:140px"></td>
+    <td class="col-fab"><input type="date" min="2000-01-01" max="2100-12-31" class="form-control form-control-sm lt-fabricacao" value="${esc(dISO(l.fabricacao))}" style="min-width:140px"></td>
+    <td class="col-val"><input type="date" min="2000-01-01" max="2100-12-31" class="form-control form-control-sm lt-validade" value="${esc(dISO(l.validade))}" style="min-width:140px"></td>
     <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 btn-rem-lote">✕</button></td>
   </tr>`
 }
@@ -145,7 +224,7 @@ function blocoItemHtml(item) {
       <div class="col-6 col-md-2 text-end"><button type="button" class="btn btn-sm btn-outline-danger btn-rem-produto">Remover produto</button></div>
     </div>
     <div class="table-responsive"><table class="table table-sm mb-1" style="font-size:.85rem">
-      <thead><tr><th>Lote</th><th>Caixas por lote</th><th>Validade</th><th></th></tr></thead>
+      <thead><tr><th>Lote</th><th>Caixas por lote</th><th class="col-fab">Fabricação</th><th class="col-val">Validade</th><th></th></tr></thead>
       <tbody class="lcl-lotes">${lotes.map(linhaLoteHtml).join('')}</tbody>
     </table></div>
     <div class="d-flex justify-content-between align-items-center">
@@ -153,6 +232,16 @@ function blocoItemHtml(item) {
       <span class="small fw-semibold it-total"></span>
     </div>
   </div>`
+}
+
+function aplicarTipoData() {
+  const tipo = $('l-tipo-data').value
+  document.querySelectorAll('#lcl-itens .col-fab').forEach((el) => {
+    el.style.display = tipo === 'VALIDADE' ? 'none' : ''
+  })
+  document.querySelectorAll('#lcl-itens .col-val').forEach((el) => {
+    el.style.display = tipo === 'FABRICACAO' ? 'none' : ''
+  })
 }
 
 function atualizarTotais() {
@@ -178,6 +267,8 @@ async function editar(id) {
     importador_endereco: '',
     importador_att: '',
     data_documento: hojeISO(),
+    idioma: 'EN',
+    tipo_data: 'VALIDADE',
     itens: [{ descricao: '', unidade: 'CARTONS', lotes: [{}] }]
   }
   const itens = d.itens && d.itens.length ? d.itens : [{ descricao: '', unidade: 'CARTONS', lotes: [{}] }]
@@ -191,6 +282,17 @@ async function editar(id) {
       <div class="row g-2 mb-2">
         <div class="col-12 col-md-4"><label class="form-label small mb-0">Invoice Nº</label><input id="l-fatura" maxlength="60" class="form-control form-control-sm" value="${esc(d.fatura)}" placeholder="Ex.: 125/2026"></div>
         <div class="col-6 col-md-4"><label class="form-label small mb-0">Data do documento</label><input type="date" min="2000-01-01" max="2100-12-31" id="l-data" class="form-control form-control-sm" value="${esc(dISO(d.data_documento))}"></div>
+        <div class="col-6 col-md-2"><label class="form-label small mb-0">Idioma do documento</label>
+          <select id="l-idioma" class="form-select form-select-sm">
+            <option value="EN"${d.idioma === 'ES' ? '' : ' selected'}>English</option>
+            <option value="ES"${d.idioma === 'ES' ? ' selected' : ''}>Español</option>
+          </select></div>
+        <div class="col-6 col-md-2"><label class="form-label small mb-0">Datas do lote</label>
+          <select id="l-tipo-data" class="form-select form-select-sm">
+            <option value="VALIDADE"${!d.tipo_data || d.tipo_data === 'VALIDADE' ? ' selected' : ''}>Validade</option>
+            <option value="FABRICACAO"${d.tipo_data === 'FABRICACAO' ? ' selected' : ''}>Fabricação</option>
+            <option value="AMBAS"${d.tipo_data === 'AMBAS' ? ' selected' : ''}>Fabricação e validade</option>
+          </select></div>
       </div>
       <hr>
       <h6 class="fw-bold small text-uppercase text-muted">Importador</h6>
@@ -212,13 +314,17 @@ async function editar(id) {
     <div class="d-flex gap-2 flex-wrap">
       <button class="btn btn-ok-grande" id="btn-salvar-lcl">Salvar</button>
       <button class="btn btn-outline-danger" id="btn-pdf-lcl">Salvar e exportar PDF</button>
+      <button class="btn btn-outline-secondary" id="btn-word-lcl">Salvar e gerar Word em branco</button>
     </div>`
 
   atualizarTotais()
+  aplicarTipoData()
+  $('l-tipo-data').addEventListener('change', aplicarTipoData)
   $('btn-voltar').addEventListener('click', verLista)
   $('btn-add-produto').addEventListener('click', () => {
     $('lcl-itens').insertAdjacentHTML('beforeend', blocoItemHtml({ descricao: '', unidade: 'CARTONS', lotes: [{}] }))
     atualizarTotais()
+    aplicarTipoData()
   })
   const area = $('lcl-itens')
   area.addEventListener('click', (e) => {
@@ -226,6 +332,7 @@ async function editar(id) {
     if (!bloco) return
     if (e.target.closest('.btn-add-lote')) {
       bloco.querySelector('.lcl-lotes').insertAdjacentHTML('beforeend', linhaLoteHtml({}))
+      aplicarTipoData()
     } else if (e.target.closest('.btn-rem-lote')) {
       e.target.closest('tr').remove()
     } else if (e.target.closest('.btn-rem-produto')) {
@@ -260,12 +367,19 @@ async function editar(id) {
     }
     exportarPDF(completo)
   })
+  $('btn-word-lcl').addEventListener('click', async () => {
+    const salvo = await salvar()
+    if (!salvo) return
+    await baixarWord(salvo)
+  })
 }
 
 function coletar() {
   const dados = {
     fatura: $('l-fatura').value,
     data_documento: $('l-data').value,
+    idioma: $('l-idioma').value,
+    tipo_data: $('l-tipo-data').value,
     importador_nome: $('l-imp-nome').value,
     importador_endereco: $('l-imp-endereco').value,
     importador_att: $('l-imp-att').value
@@ -276,6 +390,7 @@ function coletar() {
     lotes: [...bloco.querySelectorAll('.lcl-lote')].map((linha) => ({
       lote: linha.querySelector('.lt-lote').value,
       caixas: linha.querySelector('.lt-caixas').value,
+      fabricacao: linha.querySelector('.lt-fabricacao').value,
       validade: linha.querySelector('.lt-validade').value
     }))
   }))
@@ -307,26 +422,36 @@ function aguardarImagens(area) {
 }
 
 async function exportarPDF(d) {
+  const idioma = d.idioma === 'ES' ? 'ES' : 'EN'
+  const T = TEXTOS[idioma]
+  const temFabricacao = d.tipo_data === 'FABRICACAO' || d.tipo_data === 'AMBAS'
+  const temValidade = d.tipo_data !== 'FABRICACAO'
   const itens = d.itens || []
   const enderecos = String(d.importador_endereco || '')
     .split(/\r?\n/)
     .map((linha) => linha.trim())
     .filter(Boolean)
   const borda = 'border:1px solid #000'
-  const cabecalhoCelula = `${borda};padding:8px 6px;font-size:15px;font-weight:bold;text-align:center;vertical-align:bottom`
+  const tamanhoTitulo = idioma === 'ES' || temFabricacao ? 12 : 15
+  const cabecalhoCelula = `${borda};padding:8px 6px;font-size:${tamanhoTitulo}px;font-weight:bold;text-align:center;vertical-align:bottom`
   const celula = `${borda};padding:6px 8px;font-size:11.5px;vertical-align:top`
-  const pilha = (lotes, formatar) => lotes.map((l) => `<div style="line-height:2">${formatar(l)}</div>`).join('')
+  const pilha = (lotes, formatar) => {
+    if (!lotes.length) return Array.from({ length: LINHAS_EM_BRANCO }, () => '<div style="line-height:2">&nbsp;</div>').join('')
+    return lotes.map((l) => `<div style="line-height:2">${formatar(l) || '&nbsp;'}</div>`).join('')
+  }
 
   const linhasTabela = itens
     .map((item) => {
       const lotes = item.lotes || []
       const total = lotes.reduce((soma, l) => soma + (Number(l.caixas) || 0), 0)
+      const unidade = T.unidades[item.unidade] || item.unidade
       return `<tr>
-        <td style="${celula};width:36%">${esc(item.descricao)}</td>
+        <td style="${celula};width:30%">${esc(item.descricao)}</td>
         <td style="${celula};text-align:center">${pilha(lotes, (l) => esc(l.lote))}</td>
-        <td style="${celula};text-align:center">${pilha(lotes, (l) => fmtInt(l.caixas))}</td>
-        <td style="${celula};text-align:center">${pilha(lotes, (l) => dBR(l.validade))}</td>
-        <td style="${celula};text-align:center">${total} ${esc(item.unidade)}</td>
+        <td style="${celula};text-align:center">${pilha(lotes, (l) => (l.caixas ? fmtInt(l.caixas) : ''))}</td>
+        ${temFabricacao ? `<td style="${celula};text-align:center">${pilha(lotes, (l) => dBR(l.fabricacao))}</td>` : ''}
+        ${temValidade ? `<td style="${celula};text-align:center">${pilha(lotes, (l) => dBR(l.validade))}</td>` : ''}
+        <td style="${celula};text-align:center">${lotes.length ? `${total} ${esc(unidade)}` : `______ ${esc(unidade)}`}</td>
       </tr>`
     })
     .join('')
@@ -338,30 +463,31 @@ async function exportarPDF(d) {
       <img src="/imagens/lot-code-cabecalho.jpg" alt="" style="display:block;width:100%">
       <img src="/imagens/lot-code-marca.png" alt="" style="position:absolute;left:22mm;top:105mm;width:166mm;z-index:0;opacity:.12">
       <div style="position:relative;z-index:1;padding:9mm 13mm 0 13mm">
-        <div style="text-align:center;font-weight:bold;font-size:19px;text-decoration:underline;margin-bottom:9mm">LOT CODE LIST</div>
-        <div style="font-weight:bold;font-size:12.5px;text-decoration:underline;margin-bottom:3mm">IMPORTER:</div>
+        <div style="text-align:center;font-weight:bold;font-size:19px;text-decoration:underline;margin-bottom:9mm">${T.titulo}</div>
+        <div style="font-weight:bold;font-size:12.5px;text-decoration:underline;margin-bottom:3mm">${T.importador}</div>
         <div style="margin-left:4mm;font-size:12.5px;line-height:2">
           <div style="font-weight:bold">${esc(d.importador_nome)}</div>
           ${enderecos.map((linha) => `<div>${esc(linha)}</div>`).join('')}
           ${d.importador_att ? `<div>ATT: ${esc(d.importador_att)}</div>` : ''}
         </div>
         <div style="border-bottom:1px solid #000;width:108mm;margin:7mm 0 7mm"></div>
-        <div style="margin-left:13mm;font-weight:bold;font-size:12.5px;line-height:2">INVOICE: ${esc(d.fatura)}</div>
+        <div style="margin-left:13mm;font-weight:bold;font-size:12.5px;line-height:2">${T.invoice}: ${esc(d.fatura)}</div>
         <table style="width:100%;border-collapse:collapse;margin-top:7mm">
           <thead><tr>
-            <th style="${cabecalhoCelula};text-align:left">DESCRIPTION</th>
-            <th style="${cabecalhoCelula}">LOT NUMBER</th>
-            <th style="${cabecalhoCelula}">NUMBER OF BOXES PER BATCH</th>
-            <th style="${cabecalhoCelula}">BEST BEFORE DATE</th>
-            <th style="${cabecalhoCelula}">PACKS/CANS</th>
+            <th style="${cabecalhoCelula};text-align:left">${T.descricao}</th>
+            <th style="${cabecalhoCelula}">${T.lote}</th>
+            <th style="${cabecalhoCelula}">${T.caixas}</th>
+            ${temFabricacao ? `<th style="${cabecalhoCelula}">${T.fabricacao}</th>` : ''}
+            ${temValidade ? `<th style="${cabecalhoCelula}">${T.validade}</th>` : ''}
+            <th style="${cabecalhoCelula}">${T.total}</th>
           </tr></thead>
           <tbody>${linhasTabela}</tbody>
         </table>
         <div style="text-align:center;margin-top:15mm;font-size:12.5px;font-weight:bold;line-height:2;page-break-inside:avoid">
           ${assinatura}
-          <div>Signed: ______________</div>
-          <div>Position: ${CARGO_ASSINATURA}</div>
-          <div>Date: ${esc(dataPorExtenso(d.data_documento))}</div>
+          <div>${T.assinado}: ______________</div>
+          <div>${T.cargoRotulo}: ${T.cargo}</div>
+          <div>${T.data}: ${esc(dataPorExtenso(d.data_documento, idioma))}</div>
         </div>
       </div>
       <img src="/imagens/lot-code-rodape.jpg" alt="" style="position:absolute;left:0;bottom:0;width:100%">

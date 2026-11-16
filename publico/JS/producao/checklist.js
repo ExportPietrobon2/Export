@@ -125,6 +125,10 @@ async function importarLotCodeList() {
   definir('c-cliente_contato', lista.importador_att)
   const linhas = []
   lista.itens.forEach((item) => {
+    if (!item.lotes.length) {
+      linhas.push({ produto: item.descricao, gramatura: '', qtd_cx: '', lote: '', validade: '' })
+      return
+    }
     item.lotes.forEach((lote) => {
       linhas.push({
         produto: item.descricao,
