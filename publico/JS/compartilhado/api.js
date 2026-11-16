@@ -125,11 +125,6 @@ export const api = {
     obter: (id) => requisitar('GET', `/api/lot-code-list/${id}`),
     criar: (dados) => requisitar('POST', '/api/lot-code-list', dados),
     editar: (id, dados) => requisitar('PUT', `/api/lot-code-list/${id}`, dados),
-    excluir: (id) => requisitar('DELETE', `/api/lot-code-list/${id}`),
-    responsaveis: () => requisitar('GET', '/api/lot-code-responsaveis'),
-    obterResponsavel: (id) => requisitar('GET', `/api/lot-code-responsaveis/${id}`),
-    criarResponsavel: (dados) => requisitar('POST', '/api/lot-code-responsaveis', dados),
-    editarResponsavel: (id, dados) => requisitar('PUT', `/api/lot-code-responsaveis/${id}`, dados),
-    excluirResponsavel: (id) => requisitar('DELETE', `/api/lot-code-responsaveis/${id}`)
+    excluir: (id) => requisitar('DELETE', `/api/lot-code-list/${id}`)
   }
 }

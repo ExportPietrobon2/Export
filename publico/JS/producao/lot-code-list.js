@@ -17,14 +17,9 @@ const MESES_EN = [
   'DECEMBER'
 ]
 const UNIDADES = ['CARTONS', 'CANS', 'PACKS']
-const CARGO_PADRAO = 'Food Engineer'
-const LARGURA_MAXIMA_ASSINATURA = 700
-const LIMITE_ASSINATURA = 1800000
-const CHAVE_RESPONSAVEL = 'lcl_ultimo_responsavel'
+const CARGO_ASSINATURA = 'Food Engineer'
 
 let editId = null
-let editRespId = null
-let assinaturaAtual
 
 const $ = (id) => document.getElementById(id)
 const esc = (s) =>
@@ -63,27 +58,6 @@ function dataPorExtenso(iso) {
   return `${MESES_EN[mes - 1]}, ${dia}${sufixoOrdinal(dia)}, ${ano}.`
 }
 
-function lerResponsavelSalvo() {
-  try {
-    return localStorage.getItem(CHAVE_RESPONSAVEL)
-  } catch (_) {
-    return null
-  }
-}
-
-function gravarResponsavelSalvo(id) {
-  try {
-    if (id) localStorage.setItem(CHAVE_RESPONSAVEL, String(id))
-  } catch (_) {}
-}
-
-function responsavelInicial(responsaveis) {
-  const salvo = lerResponsavelSalvo()
-  if (salvo && responsaveis.some((r) => String(r.id) === salvo)) return Number(salvo)
-  if (responsaveis.length === 1) return responsaveis[0].id
-  return null
-}
-
 async function verLista() {
   editId = null
   const cont = $('conteudo-lcl')
@@ -97,7 +71,6 @@ async function verLista() {
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
       <h5 class="secao-titulo-card mb-0">Lot Code Lists cadastradas</h5>
       <div class="d-flex gap-2 flex-wrap">
-        <button class="btn btn-outline-secondary" id="btn-responsaveis">Responsáveis</button>
         <button class="btn btn-ok-grande" id="btn-novo-lcl">+ Nova Lot Code List</button>
       </div>
     </div>
@@ -121,7 +94,6 @@ async function verLista() {
         : '<p class="text-muted fst-italic">Nenhuma Lot Code List cadastrada. Clique em "Nova Lot Code List".</p>'
     }`
   $('btn-novo-lcl').addEventListener('click', () => editar(null))
-  $('btn-responsaveis').addEventListener('click', verResponsaveis)
   const busca = $('busca-lcl')
   if (busca) {
     busca.addEventListener('input', () => {
@@ -194,9 +166,9 @@ async function editar(id) {
   editId = id
   const cont = $('conteudo-lcl')
   cont.innerHTML = '<p class="text-muted">Carregando...</p>'
-  const [responsaveis, registro] = await Promise.all([api.lotCode.responsaveis(), id ? api.lotCode.obter(id) : null])
-  if (!Array.isArray(responsaveis) || (id && (!registro || registro.erro))) {
-    avisar((registro && registro.erro) || (responsaveis && responsaveis.erro) || 'Erro ao carregar.')
+  const registro = id ? await api.lotCode.obter(id) : null
+  if (id && (!registro || registro.erro)) {
+    avisar((registro && registro.erro) || 'Erro ao carregar.')
     verLista()
     return
   }
@@ -206,7 +178,6 @@ async function editar(id) {
     importador_endereco: '',
     importador_att: '',
     data_documento: hojeISO(),
-    responsavel_id: responsavelInicial(responsaveis),
     itens: [{ descricao: '', unidade: 'CARTONS', lotes: [{}] }]
   }
   const itens = d.itens && d.itens.length ? d.itens : [{ descricao: '', unidade: 'CARTONS', lotes: [{}] }]
@@ -219,14 +190,7 @@ async function editar(id) {
     <div class="card mb-3"><div class="card-body">
       <div class="row g-2 mb-2">
         <div class="col-12 col-md-4"><label class="form-label small mb-0">Invoice Nº</label><input id="l-fatura" maxlength="60" class="form-control form-control-sm" value="${esc(d.fatura)}" placeholder="Ex.: 125/2026"></div>
-        <div class="col-6 col-md-3"><label class="form-label small mb-0">Data do documento</label><input type="date" min="2000-01-01" max="2100-12-31" id="l-data" class="form-control form-control-sm" value="${esc(dISO(d.data_documento))}"></div>
-        <div class="col-6 col-md-5"><label class="form-label small mb-0">Responsável (assinatura)</label>
-          <select id="l-responsavel" class="form-select form-select-sm"><option value="">Sem responsável</option>${responsaveis
-            .map(
-              (r) =>
-                `<option value="${r.id}"${String(r.id) === String(d.responsavel_id) ? ' selected' : ''}>${esc(r.nome)} — ${esc(r.cargo)}</option>`
-            )
-            .join('')}</select></div>
+        <div class="col-6 col-md-4"><label class="form-label small mb-0">Data do documento</label><input type="date" min="2000-01-01" max="2100-12-31" id="l-data" class="form-control form-control-sm" value="${esc(dISO(d.data_documento))}"></div>
       </div>
       <hr>
       <h6 class="fw-bold small text-uppercase text-muted">Importador</h6>
@@ -302,7 +266,6 @@ function coletar() {
   const dados = {
     fatura: $('l-fatura').value,
     data_documento: $('l-data').value,
-    responsavel_id: $('l-responsavel').value || null,
     importador_nome: $('l-imp-nome').value,
     importador_endereco: $('l-imp-endereco').value,
     importador_att: $('l-imp-att').value
@@ -327,165 +290,7 @@ async function salvar() {
     return null
   }
   if (!editId) editId = r.id
-  gravarResponsavelSalvo(dados.responsavel_id)
   return editId
-}
-
-async function verResponsaveis() {
-  editRespId = null
-  const cont = $('conteudo-lcl')
-  cont.innerHTML = '<p class="text-muted">Carregando...</p>'
-  const linhas = await api.lotCode.responsaveis()
-  if (!Array.isArray(linhas)) {
-    cont.innerHTML = '<p class="text-danger">Erro ao carregar.</p>'
-    return
-  }
-  cont.innerHTML = `
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-      <h5 class="secao-titulo-card mb-0">Responsáveis pela assinatura</h5>
-      <div class="d-flex gap-2 flex-wrap">
-        <button class="btn btn-sm btn-outline-secondary" id="btn-voltar">← Voltar</button>
-        <button class="btn btn-ok-grande" id="btn-novo-resp">+ Novo responsável</button>
-      </div>
-    </div>
-    ${
-      linhas.length
-        ? `<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0">
-      <thead><tr><th>Nome</th><th>Cargo</th><th>Assinatura</th><th></th></tr></thead>
-      <tbody>${linhas
-        .map(
-          (r) => `<tr><td class="fw-semibold">${esc(r.nome)}</td><td>${esc(r.cargo)}</td>
-        <td>${r.tem_assinatura ? 'Cadastrada' : '<span class="text-muted">Sem imagem</span>'}</td>
-        <td style="white-space:nowrap" class="text-end">
-          <button class="btn btn-sm btn-outline-primary py-0 px-2" onclick="editarResp(${r.id})">Abrir</button>
-          <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="excluirResp(${r.id})">🗑</button>
-        </td></tr>`
-        )
-        .join('')}</tbody></table></div></div>`
-        : '<p class="text-muted fst-italic">Nenhum responsável cadastrado. Clique em "Novo responsável".</p>'
-    }`
-  $('btn-voltar').addEventListener('click', verLista)
-  $('btn-novo-resp').addEventListener('click', () => editarResponsavel(null))
-}
-
-window.editarResp = (id) => editarResponsavel(id)
-window.excluirResp = async function (id) {
-  if (!confirm('Excluir este responsável?')) return
-  const r = await api.lotCode.excluirResponsavel(id)
-  if (r?.erro) avisar(r.erro)
-  verResponsaveis()
-}
-
-function lerImagem(arquivo) {
-  return new Promise((resolver, rejeitar) => {
-    if (!/^image\/(png|jpeg)$/.test(arquivo.type)) {
-      rejeitar(new Error('Use uma imagem PNG ou JPEG.'))
-      return
-    }
-    const leitor = new FileReader()
-    leitor.onerror = () => rejeitar(new Error('Não foi possível ler a imagem.'))
-    leitor.onload = () => {
-      const imagem = new Image()
-      imagem.onerror = () => rejeitar(new Error('Imagem inválida.'))
-      imagem.onload = () => {
-        const escala = Math.min(1, LARGURA_MAXIMA_ASSINATURA / imagem.naturalWidth)
-        const canvas = document.createElement('canvas')
-        canvas.width = Math.max(1, Math.round(imagem.naturalWidth * escala))
-        canvas.height = Math.max(1, Math.round(imagem.naturalHeight * escala))
-        const contexto = canvas.getContext('2d')
-        const ehPng = arquivo.type === 'image/png'
-        if (!ehPng) {
-          contexto.fillStyle = '#fff'
-          contexto.fillRect(0, 0, canvas.width, canvas.height)
-        }
-        contexto.drawImage(imagem, 0, 0, canvas.width, canvas.height)
-        const resultado = ehPng ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.9)
-        if (resultado.length > LIMITE_ASSINATURA) {
-          rejeitar(new Error('A imagem da assinatura é grande demais. Use uma imagem menor.'))
-          return
-        }
-        resolver(resultado)
-      }
-      imagem.src = leitor.result
-    }
-    leitor.readAsDataURL(arquivo)
-  })
-}
-
-function mostrarPreviaAssinatura(origem) {
-  const previa = $('r-previa')
-  const botao = $('btn-remover-assinatura')
-  if (origem) {
-    previa.src = origem
-    previa.style.display = 'block'
-    botao.style.display = 'inline-block'
-  } else {
-    previa.removeAttribute('src')
-    previa.style.display = 'none'
-    botao.style.display = 'none'
-  }
-}
-
-async function editarResponsavel(id) {
-  editRespId = id
-  assinaturaAtual = undefined
-  let d = { nome: '', cargo: CARGO_PADRAO, assinatura: null }
-  if (id) {
-    d = await api.lotCode.obterResponsavel(id)
-    if (!d || d.erro) {
-      avisar((d && d.erro) || 'Erro ao carregar.')
-      verResponsaveis()
-      return
-    }
-  }
-  const cont = $('conteudo-lcl')
-  cont.innerHTML = `
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-      <h5 class="secao-titulo-card mb-0">${id ? 'Editar responsável' : 'Novo responsável'}</h5>
-      <button class="btn btn-sm btn-outline-secondary" id="btn-voltar">← Voltar</button>
-    </div>
-    <div class="card mb-3"><div class="card-body">
-      <div class="row g-2">
-        <div class="col-12 col-md-6"><label class="form-label small mb-0">Nome</label><input id="r-nome" maxlength="160" class="form-control form-control-sm" value="${esc(d.nome)}"></div>
-        <div class="col-12 col-md-6"><label class="form-label small mb-0">Cargo (Position)</label><input id="r-cargo" maxlength="120" class="form-control form-control-sm" value="${esc(d.cargo)}"></div>
-        <div class="col-12">
-          <label class="form-label small mb-0">Imagem da assinatura (PNG ou JPEG)</label>
-          <input type="file" id="r-arquivo" accept="image/png,image/jpeg" class="form-control form-control-sm">
-          <img id="r-previa" alt="Assinatura" class="border rounded mt-2 bg-white" style="display:none;max-height:110px;max-width:100%">
-          <div><button type="button" id="btn-remover-assinatura" class="btn btn-sm btn-outline-danger mt-2" style="display:none">Remover assinatura</button></div>
-        </div>
-      </div>
-    </div></div>
-    <div class="d-flex gap-2 flex-wrap"><button class="btn btn-ok-grande" id="btn-salvar-resp">Salvar</button></div>`
-
-  mostrarPreviaAssinatura(d.assinatura)
-  $('btn-voltar').addEventListener('click', verResponsaveis)
-  $('r-arquivo').addEventListener('change', async (e) => {
-    const arquivo = e.target.files && e.target.files[0]
-    if (!arquivo) return
-    try {
-      assinaturaAtual = await lerImagem(arquivo)
-      mostrarPreviaAssinatura(assinaturaAtual)
-    } catch (erro) {
-      e.target.value = ''
-      avisar(erro.message)
-    }
-  })
-  $('btn-remover-assinatura').addEventListener('click', () => {
-    assinaturaAtual = null
-    $('r-arquivo').value = ''
-    mostrarPreviaAssinatura(null)
-  })
-  $('btn-salvar-resp').addEventListener('click', async () => {
-    const dados = { nome: $('r-nome').value, cargo: $('r-cargo').value }
-    if (assinaturaAtual !== undefined) dados.assinatura = assinaturaAtual
-    const r = editRespId ? await api.lotCode.editarResponsavel(editRespId, dados) : await api.lotCode.criarResponsavel(dados)
-    if (!r || r.erro) {
-      avisar((r && r.erro) || 'Erro ao salvar.')
-      return
-    }
-    verResponsaveis()
-  })
 }
 
 function aguardarImagens(area) {
@@ -507,7 +312,6 @@ async function exportarPDF(d) {
     .split(/\r?\n/)
     .map((linha) => linha.trim())
     .filter(Boolean)
-  const responsavel = d.responsavel || null
   const borda = 'border:1px solid #000'
   const cabecalhoCelula = `${borda};padding:8px 6px;font-size:15px;font-weight:bold;text-align:center;vertical-align:bottom`
   const celula = `${borda};padding:6px 8px;font-size:11.5px;vertical-align:top`
@@ -527,10 +331,7 @@ async function exportarPDF(d) {
     })
     .join('')
 
-  const assinatura =
-    responsavel && responsavel.assinatura
-      ? `<img src="${responsavel.assinatura}" alt="" style="display:block;width:40mm;margin:0 auto 2mm">`
-      : '<div style="height:22mm"></div>'
+  const assinatura = '<img src="/imagens/lot-code-assinatura.jpg" alt="" style="display:block;width:40mm;margin:0 auto 2mm">'
 
   const html = `
     <div style="position:relative;width:210mm;min-height:296mm;box-sizing:border-box;padding-bottom:36mm;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif">
@@ -559,7 +360,7 @@ async function exportarPDF(d) {
         <div style="text-align:center;margin-top:15mm;font-size:12.5px;font-weight:bold;line-height:2;page-break-inside:avoid">
           ${assinatura}
           <div>Signed: ______________</div>
-          <div>Position: ${esc(responsavel ? responsavel.cargo : '')}</div>
+          <div>Position: ${CARGO_ASSINATURA}</div>
           <div>Date: ${esc(dataPorExtenso(d.data_documento))}</div>
         </div>
       </div>
