@@ -91,6 +91,7 @@ export function montarCabecalho() {
     {
       titulo: 'Exportação',
       itens: [
+        { href: '/HTML/producao/lot-code-list.html', texto: 'Lot Code List' },
         { href: '/HTML/producao/checklist.html', texto: 'Check-list de expedição' },
         { href: '/HTML/tarefas/tarefas.html', texto: 'Quadro de tarefas' },
         { href: '/HTML/estoque/rendimentos.html', texto: 'Rendimentos' }

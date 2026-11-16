@@ -40,6 +40,7 @@ app.use(require('./rotas/fechamento-contabil'))
 app.use(require('./rotas/importacoes'))
 app.use(require('./rotas/custos-importacao'))
 app.use(require('./rotas/checklist'))
+app.use(require('./rotas/lot-code-list'))
 app.use(require('./rotas/tarefas'))
 
 app.get('*', (req, res) => {

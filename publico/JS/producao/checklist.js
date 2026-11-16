@@ -93,6 +93,51 @@ function linhaItemHtml(it) {
   </tr>`
 }
 
+async function importarLotCodeList() {
+  const idLista = $('cl-lcl-origem').value
+  if (!idLista) {
+    alert('Escolha uma Lot Code List.')
+    return
+  }
+  const preenchido = [...document.querySelectorAll('#cl-itens .cl-item')].some(
+    (tr) =>
+      tr.querySelector('.it-produto').value || tr.querySelector('.it-qtd_cx').value || tr.querySelector('.it-lote').value
+  )
+  if (preenchido && !confirm('Os itens atuais do check-list serão substituídos pelos da Lot Code List. Continuar?')) return
+  const lista = await api.lotCode.obter(idLista)
+  if (!lista || lista.erro) {
+    alert((lista && lista.erro) || 'Erro ao carregar a Lot Code List.')
+    return
+  }
+  const definir = (campo, valor) => {
+    if (valor) $(campo).value = valor
+  }
+  definir('c-fatura', lista.fatura)
+  definir('c-cliente_nome', lista.importador_nome)
+  definir(
+    'c-cliente_endereco',
+    String(lista.importador_endereco || '')
+      .split(/\r?\n/)
+      .map((linha) => linha.trim())
+      .filter(Boolean)
+      .join(', ')
+  )
+  definir('c-cliente_contato', lista.importador_att)
+  const linhas = []
+  lista.itens.forEach((item) => {
+    item.lotes.forEach((lote) => {
+      linhas.push({
+        produto: item.descricao,
+        gramatura: '',
+        qtd_cx: fmtInt(lote.caixas),
+        lote: lote.lote,
+        validade: dBR(lote.validade)
+      })
+    })
+  })
+  $('cl-itens').innerHTML = linhas.map(linhaItemHtml).join('')
+}
+
 async function editar(id) {
   editId = id
   let d = { itens: [{}, {}, {}] }
@@ -100,6 +145,8 @@ async function editar(id) {
     d = await api.checklist.obter(id)
     if (!d.itens || !d.itens.length) d.itens = [{}]
   }
+  const listasLotCode = await api.lotCode.listar()
+  const opcoesLotCode = Array.isArray(listasLotCode) ? listasLotCode : []
   const cont = $('conteudo-cl')
   cont.innerHTML = `
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
@@ -134,6 +181,17 @@ async function editar(id) {
         <h6 class="fw-bold mb-0">Produtos / Itens</h6>
         <button type="button" class="btn btn-sm btn-outline-danger" id="btn-add-item">+ Adicionar item</button>
       </div>
+      ${
+        opcoesLotCode.length
+          ? `<div class="row g-2 align-items-end mb-3">
+        <div class="col-12 col-md-8"><label class="form-label small mb-0">Preencher com uma Lot Code List</label>
+          <select id="cl-lcl-origem" class="form-select form-select-sm"><option value="">Escolha a invoice</option>${opcoesLotCode
+            .map((l) => `<option value="${l.id}">${esc(l.fatura)} — ${esc(l.importador_nome)}</option>`)
+            .join('')}</select></div>
+        <div class="col-12 col-md-4"><button type="button" class="btn btn-sm btn-outline-danger w-100" id="btn-importar-lcl">Preencher itens e lotes</button></div>
+      </div>`
+          : ''
+      }
       <div class="table-responsive"><table class="table table-sm mb-0" style="font-size:.85rem">
         <thead><tr><th>Produto</th><th>Gramatura</th><th>Qtd (cx)</th><th>Lote</th><th>Validade</th><th></th></tr></thead>
         <tbody id="cl-itens">${d.itens.map(linhaItemHtml).join('')}</tbody>
@@ -159,6 +217,8 @@ async function editar(id) {
   $('btn-add-item').addEventListener('click', () => {
     $('cl-itens').insertAdjacentHTML('beforeend', linhaItemHtml({}))
   })
+  const botaoImportar = $('btn-importar-lcl')
+  if (botaoImportar) botaoImportar.addEventListener('click', importarLotCodeList)
   $('cl-itens').addEventListener('click', (e) => {
     const b = e.target.closest('.btn-rem-item')
     if (b) b.closest('tr').remove()
